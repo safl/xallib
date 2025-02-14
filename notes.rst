@@ -1,0 +1,149 @@
+===========================================
+ Mapping-layer based on XFS on-disk format
+===========================================
+
+The goal is to build a data-access library capable of reading data from XFS file
+systems without requiring the file system to be mounted or the storage device to
+be managed by the operating system.
+
+This is necessary in scenarios such as:
+
+* The storage device driver is detached from the OS:
+
+  - Operating in user space (e.g., SPDK/NVMe).
+  - Operating on a peripheral device (e.g., BaM).
+
+The library's minimal requirements include:
+
+* Traversing the file system
+
+  - Reading directory contents.
+  - Accessing inode properties.
+  - Reading regular file contents.
+
+The focus is solely on an efficient data-access library, with no interest in
+forensics, recovery, or repair.
+
+Tooling
+=======
+
+To inspect and gain familarity with the on-disk format, then there are excellent
+tools to do so. These include ``xfs_db`` and ``xfs_metadump``, which understand
+the XFS on-disk format.
+
+In addition, ``dd``` for reading/write, along with ``hexdump`` / ``bless`` for
+inspecting the data, either by accesing a storage device directly, or dumping
+it first.
+
+Nomenclature
+============
+
+These come in handy when learning about the on-disk format. Note; meta-data
+is stored in big-endian format, thus on x86 systems these need conversion to
+little-endian when reading them
+
+Superblock (SB)
+  ...
+
+Sector
+  A unit which typically match the minimal I/O size; equivalent to an **lba** of
+  an NVMe device.
+
+Inode
+  ...
+
+Allocation Group (AG)
+  ...
+
+  Allocaton Group Free Block (AGF)
+
+    ...
+
+  Allocaton Group Inode (AGI)
+
+    ...
+
+  Allocaton Group Free List (AGFL)
+
+    ...
+
+Block
+
+  ...
+
+Data Structures
+===============
+
+* Superblock
+
+* AGI
+
+* Inode
+
+Visualized
+----------
+
+Here is a visualization of an Allocation Group, the headers including the
+Superblock followed by Allocation Group Headers.
+
++----+-----+-----+------+------------------------------------------+
+| sb | agf | agi | agfl |          ... blocks ...                  |
++----+-----+-----+------+------------------------------------------+
+| First Allocation Group (AG) starting with the primary Superblock |
++------------------------------------------------------------------+
+
++----+-----+-----+------+------------------------------------------+
+| sb | agf | agi | agfl |          ... blocks ...                  |
++----+-----+-----+------+------------------------------------------+
+| Second Allocation Group (AG) starting with a Superblock copy     |
++------------------------------------------------------------------+
+
+...
+
++----+-----+-----+------+------------------------------------------+
+| sb | agf | agi | agfl |          ... blocks ...                  |
++----+-----+-----+------+------------------------------------------+
+| Nth Allocation Group starting a Superblock copy                  |
++------------------------------------------------------------------+
+
+This ordering is why the Allocation Group is regarded as its own little
+file-system, because it is. Each allocation group manage a collection of blocks
+with all that entails.
+
+Traversing the file system
+==========================
+
+1) Retrieve the **primary** SB
+
+This is done to obtain basic addressing values and information such as
+sector-size, block-size and number of AGs. As you can see above then each AG has
+a superblock. These are all copies of the superblock from the first AG.
+
+Hence, the notion of the "primary" SB.
+
+2) Retrieve meta-data for all Allocation Groups
+
+Read all AG meta-data from disk, this is done ahead of time before doing any
+further processing.
+
+3) Traverse Inodes
+
+Inode numbers in XFS are not just consequitive integers, they are encoding in
+format describing their location relative. This encoding 
+
+Inodes are 64bit values with addressing
+
+The SB has the first
+
+Appendix
+========
+
+The implementation of the XFS Access Library (xal) is done by reading the
+material below, dumping meta-data and data from XFS formated disks for
+inspection (hexdump), and experimental data-access scripts implemented in
+Python. This approach was taken as I want the library to be BSD-3 and do not
+want to be GPL-v2 infected.
+
+* https://www.usenix.org/system/files/login/articles/140-hellwig.pdf
+
+* https://www.kernel.org/pub/linux/utils/fs/xfs/docs/xfs_filesystem_structure.pdf
