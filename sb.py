@@ -6,24 +6,6 @@ from pathlib import Path
 import ctypes
 
 
-def decode_inode_no(ino):
-    """
-    Inodes in XFS are 64bit values encoding:
-
-    * allocation group (AG)
-    * block within the AG
-    * and inode offset within the block
-
-    This function decodes the format and returns the individual parts
-    """
-
-    ag = (ino >> 32) & 0xFFFFFFFF  # Extract AG (bits 63-32)
-    block_number = (ino >> 9) & 0x7FFFFFFF  # Extract block number (bits 31-9)
-    inode_offset = ino & 0x1FF  # Extract inode offset (bits 8-0)
-
-    return ag, block_number, inode_offset
-
-
 def decode_uuid(uuid_field):
     """Convert a raw uuid field into a readable UUID string."""
 
@@ -109,19 +91,45 @@ class Superblock(ctypes.BigEndianStructure):
         sb_magicnum_text = magic_as_text(self.sb_magicnum)
 
         return (
-            f"XFS Superblock:\n"
-            f"  Magic Number: {hex(self.sb_magicnum)} '{sb_magicnum_text}'\n"
-            f"  Sector Size: {self.sb_sectsize}\n"
-            f"  AllocationGroupCount: {self.sb_agcount}\n"
-            f"  Block Size: {self.sb_blocksize}\n"
-            f"  Data Blocks: {self.sb_dblocks}\n"
-            f"  Root Inode: {self.sb_rootino} | {decode_inode_no(self.sb_rootino)}\n"
+            f"Superblock:\n"
+            f"  magicnum: {hex(self.sb_magicnum)} '{sb_magicnum_text}'\n"
+            f"  sectsize: {self.sb_sectsize}\n"
+            f"  inodesize: {self.sb_inodesize}\n"
+            f"  agcount: {self.sb_agcount}\n"
+            f"  agblocks: {self.sb_agblocks}\n"
+            f"  blocksize: {self.sb_blocksize}\n"
+            f"  dblocks: {self.sb_dblocks}\n"
+            f"  rootino: {self.sb_rootino} | {self.decode_inode_no(self.sb_rootino)}\n"
             f"  UUID: {decode_uuid(self.sb_uuid)}\n"
-            f"  File System Name: {self.sb_fname.decode('utf-8').rstrip()}\n"
-            f"  Free Data Blocks: {self.sb_fdblocks}\n"
-            f"  Free Inodes: {self.sb_ifree}\n"
+            f"  fname: {self.sb_fname.decode('utf-8').rstrip()}\n"
+            f"  fdblocks: {self.sb_fdblocks}\n"
+            f"  ifree: {self.sb_ifree}\n"
             f"  CRC: {hex(self.sb_crc)}\n"
         )
+
+    def decode_inode_no(self, ino):
+        """
+        Inodes in XFS are 64bit values encoding:
+
+        * allocation group (AG)
+        * block within the AG
+        * and inode offset within the block
+
+        in the following format:
+
+        * low inopblog bits - offset in block
+        * next agblklog bits - block number in ag
+        * next agno_log bits - ag number
+
+        Or, so is my assumption... this function makes use of the values from sb to do
+        the decode and returns the individual parts
+        """
+
+        ag = (ino >> 32) & 0xFFFFFFFF  # Extract AG (bits 63-32)
+        block_number = (ino >> 9) & 0x7FFFFFFF  # Extract block number (bits 31-9)
+        inode_offset = ino & 0x1FF  # Extract inode offset (bits 8-0)
+
+        return ag, block_number, inode_offset
 
 
 # Define constants for the size of arrays used in the structure
@@ -200,6 +208,7 @@ def retrieve_agi(dev, sb: Superblock, agno: int):
     """Return the Allocation Group Inode (AGI) for the given Allocation Group number"""
 
     sb_ofz_nbytes = agno * sb.sb_agblocks * sb.sb_blocksize
+    print("offset: ", sb_ofz_nbytes)
 
     # Seeking to the start of the Allocation Group and skipping past the superblock copy
     # and the AGF, since all we want is to index the file-system and read data out
@@ -210,7 +219,7 @@ def retrieve_agi(dev, sb: Superblock, agno: int):
 
 def main():
 
-    dev_path = Path("/dev/nvme1n1")
+    dev_path = Path("/dev/sda1")
 
     with dev_path.open("rb") as dev:
         # Retrieve the primary Superblock

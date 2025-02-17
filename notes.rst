@@ -126,14 +126,32 @@ Hence, the notion of the "primary" SB.
 Read all AG meta-data from disk, this is done ahead of time before doing any
 further processing.
 
+3) Read all inodes and associate them with Allocation Groups
+
+Inodes are stored in inode chunks, each containing 64 inodes within an
+allocation group. To reduce disk access when traversing the file system, we read
+all inodes into memory within the allocation group structure.
+Ideally, we store them in an contigous array, allowing lookup using the decoded
+inode_number.
+
+To achieve this, we need to walk the einode B+tree of pointed to by the
+Allocation Group Inode meta-header. So, we start here:
+
+* ``agi->agi_root``
+
+
 3) Traverse Inodes
 
 Inode numbers in XFS are not just consequitive integers, they are encoding in
-format describing their location relative. This encoding 
+format describing their location relative. 
 
-Inodes are 64bit values with addressing
+-- directories on "local" / short-form
 
-The SB has the first
+When i8count is set, then the first i8count number of inode numbers are 64bit.
+
+- Does this mean that they have the AG encoded?
+- When "normalizing" it, should it encode the AG then?
+
 
 Appendix
 ========
