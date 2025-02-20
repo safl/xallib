@@ -289,7 +289,8 @@ xal_dir_pp(struct xal_dir *dir)
 		wrtn += printf("xal_dir_entry:\n");
 		wrtn += printf("  namelen: %u\n", dir->entries[i].namelen);
 		wrtn += printf("  name: '%s'\n", dir->entries[i].name);
-		wrtn += printf("  ino: %zu\n", dir->entries[i].ino);
+		wrtn += printf("  ino: 0x%08X\n", dir->entries[i].ino);
+		wrtn += printf("  ftype: %d\n", dir->entries[i].ftype);
 	}
 }
 
