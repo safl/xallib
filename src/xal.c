@@ -319,7 +319,7 @@ xal_dir_from_shortform(struct xal *xal, void *buf, struct xal_dir **dir)
 		memcpy(entry->name, cursor, entry->namelen);
 		cursor += entry->namelen; ///< Advance past 'name'
 
-		entry->ftype = *((uint64_t *)(cursor));
+		entry->ftype = *((uint8_t *)(cursor));
 		cursor += 1; ///< Advance past file-type
 
 		///< This is determined by i8count...
