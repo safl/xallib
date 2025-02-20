@@ -38,6 +38,9 @@ struct xal_dir {
 	struct xal_dir_entry entries[];
 } __attribute__((packed));
 
+int
+xal_dir_pp(struct xal_dir *dir);
+
 /**
  * XAL Allocation Group
  *
