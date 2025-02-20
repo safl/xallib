@@ -322,8 +322,8 @@ xal_dir_from_shortform(struct xal *xal, void *buf, struct xal_dir **dir)
 		entry->ftype = *((uint8_t *)(cursor));
 		cursor += 1; ///< Advance past file-type
 
-		///< This is determined by i8count...
-		entry->ino = *(uint32_t *)cursor;
+		///< TODO: add support handling of i8count here
+		entry->ino = be32toh(*(uint32_t *)cursor);
 		cursor += 4; ///< Advance past inode number
 	}
 	xal_dir_pp(cand);
