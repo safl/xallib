@@ -301,9 +301,6 @@ xal_dir_from_shortform(struct xal *xal, void *buf, struct xal_dir **dir)
 	char *cursor = (void *)(((char *)buf) + 182);
 	struct xal_dir *cand;
 
-	printf("count; %u, i8count: %u\n", odf->count, odf->i8count);
-	dump_bytes(buf + 176, 30);
-
 	cand = calloc(1, odf->count * sizeof(*cand->entries) + sizeof(*cand));
 	if (!cand) {
 		return -errno;
@@ -326,7 +323,6 @@ xal_dir_from_shortform(struct xal *xal, void *buf, struct xal_dir **dir)
 		entry->ino = be32toh(*(uint32_t *)cursor);
 		cursor += 4; ///< Advance past inode number
 	}
-	xal_dir_pp(cand);
 
 	*dir = cand;
 
