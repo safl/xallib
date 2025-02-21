@@ -86,8 +86,9 @@ struct xal {
 };
 
 /**
- * Open the block device at 'path', a mountpoint from , you could think of this
- * as "mounting" it
+ * Open the block device at 'path'
+ *
+ * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
  */
 int
 xal_open(const char *path, struct xal **xal);
