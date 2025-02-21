@@ -120,7 +120,7 @@ xal_traverse(struct xal *xal, void *cb_func, void *cb_data);
  * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
  */
 int
-xal_dir_from_shortform(struct xal *xal, void *buf, struct xal_dir **dir);
+xal_dir_from_shortform(void *inode, struct xal_dir **dir);
 
 /**
  * Pretty-print the given 'struct xal_superblock'

@@ -48,7 +48,7 @@ main(int argc, char *argv[])
 
 		printf("ino_offset: %zu\n", ino_offset);
 
-		xal_dir_from_shortform(xal, buf, &dir);
+		xal_dir_from_shortform(buf, &dir);
 		xal_dir_pp(dir);
 	}
 

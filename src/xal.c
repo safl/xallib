@@ -297,7 +297,7 @@ xal_dir_pp(struct xal_dir *dir)
 }
 
 int
-xal_dir_from_shortform(struct xal *xal, void *buf, struct xal_dir **dir)
+xal_dir_from_shortform(void *inode, struct xal_dir **dir)
 {
 	struct xal_xfs_dir2_sf_hdr *odf = (void *)(((char *)inode) + sizeof(struct xal_dinode));
 	char *cursor = (void *)(((char *)inode) + sizeof(struct xal_dinode) +
