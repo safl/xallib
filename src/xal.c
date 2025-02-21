@@ -350,3 +350,56 @@ xal_dinode_pp(void *buf)
 
 	return wrtn;
 }
+
+/**
+ * Internal helper recursively traversing file-system
+ */
+int
+traverse(struct xal *xal, uint64_t ino, void *cb_func, void *cb_data)
+{
+	uint8_t buf[BUF_NBYTES] = {0};
+	struct xal_dinode *dinode;
+	struct xal_dir *dir;
+	ssize_t nbytes;
+
+	printf("\n## ino(0x%08" PRIX64 ")\n", ino);
+
+	///< Read the on-disk inode data
+	nbytes = pread(xal->handle.fd, buf, xal->sectsize, xal_get_inode_offset(xal, ino));
+	if (nbytes != xal->sectsize) {
+		return -EIO;
+	}
+
+	dinode = (void*)buf;
+	xal_dinode_pp(buf);
+
+	switch(dinode->di_format) {
+	case XAL_DINODE_FMT_DEV:
+		break;
+
+	case XAL_DINODE_FMT_BTREE:
+		break;
+
+	case XAL_DINODE_FMT_EXTENTS:
+		break;
+
+	case XAL_DINODE_FMT_LOCAL:
+		xal_dir_from_shortform(buf, &dir);
+		xal_dir_pp(dir);
+		for (uint8_t i = 0; i < dir->count; ++i) {
+			traverse(xal, dir->entries[i].ino, NULL, NULL);
+		}
+		break;
+
+	case XAL_DINODE_FMT_UUID:
+		break;
+	}
+
+	return 0;
+}
+
+int
+xal_traverse(struct xal *xal, void *cb_func, void *cb_data)
+{
+	return traverse(xal, xal->rootino, NULL, NULL);
+}

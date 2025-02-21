@@ -33,23 +33,10 @@ main(int argc, char *argv[])
 
 	xal_pp(xal);
 
-	{
-		uint64_t ino_offset = xal_get_inode_offset(xal, xal->rootino);
-		struct xal_dir *dir;
-		char buf[BUF_NBYTES] = {0};
-		ssize_t nbytes;
-
-		nbytes = pread(xal->handle.fd, buf, xal->sectsize, ino_offset);
-		if (nbytes != xal->sectsize) {
-			return EIO;
-		}
-
-		xal_dinode_pp(buf);
-
-		printf("ino_offset: %zu\n", ino_offset);
-
-		xal_dir_from_shortform(buf, &dir);
-		xal_dir_pp(dir);
+	err = xal_traverse(xal, NULL, NULL);
+	if (err) {
+		xal_close(xal);
+		return err;
 	}
 
 	return 0;
