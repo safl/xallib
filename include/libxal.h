@@ -113,9 +113,11 @@ int
 xal_traverse(struct xal *xal, void *cb_func, void *cb_data);
 
 /**
+ * Construct a directory index, with entries, from the XFS shortform pointed to by 'buf'
  *
- * The given buffer should be the entire inode, e.g. all of the 256, 512, or how many bytes an
- * inode is, as described by the given 'xal.inodesize'.
+ * @param inode Buffer pointing to inode in on-disk format
+ *
+ * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
  */
 int
 xal_dir_from_shortform(struct xal *xal, void *buf, struct xal_dir **dir);
