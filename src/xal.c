@@ -299,6 +299,7 @@ xal_dir_from_shortform(struct xal *xal, void *buf, struct xal_dir **dir)
 {
 	struct xal_xfs_dir2_sf_hdr *odf = (void *)(((char *)buf) + 176);
 	char *cursor = (void *)(((char *)buf) + 182);
+	uint8_t i8count = odf->i8count;
 	struct xal_dir *cand;
 
 	cand = calloc(1, odf->count * sizeof(*cand->entries) + sizeof(*cand));
@@ -319,9 +320,14 @@ xal_dir_from_shortform(struct xal *xal, void *buf, struct xal_dir **dir)
 		entry->ftype = *((uint8_t *)(cursor));
 		cursor += 1; ///< Advance past file-type
 
-		///< TODO: add support handling of i8count here
-		entry->ino = be32toh(*(uint32_t *)cursor);
-		cursor += 4; ///< Advance past inode number
+		if (i8count) {
+			i8count--;
+			entry->ino = be64toh(*(uint64_t *)cursor);
+			cursor += 8; ///< Advance past inode number
+		} else {
+			entry->ino = be32toh(*(uint32_t *)cursor);
+			cursor += 4; ///< Advance past inode number
+		}
 	}
 
 	*dir = cand;
