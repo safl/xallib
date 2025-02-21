@@ -292,6 +292,8 @@ xal_dir_pp(struct xal_dir *dir)
 		wrtn += printf("  ino: 0x%08" PRIX64 "\n", dir->entries[i].ino);
 		wrtn += printf("  ftype: %" PRIu8 "\n", dir->entries[i].ftype);
 	}
+
+	return wrtn;
 }
 
 int
