@@ -45,11 +45,11 @@ xal_ag_pp(struct xal_ag *ag)
 	}
 
 	wrtn += printf("xal_ag:\n");
-	wrtn += printf("  seqno: %u\n", ag->seqno);
-	wrtn += printf("  agf_length: %u\n", ag->agf_length);
-	wrtn += printf("  agi_count: %u\n", ag->agi_count);
-	wrtn += printf("  agi_root: %u\n", ag->agi_root);
-	wrtn += printf("  agi_level: %u\n", ag->agi_level);
+	wrtn += printf("  seqno: %" PRIu32 "\n", ag->seqno);
+	wrtn += printf("  agf_length: %" PRIu32 "\n", ag->agf_length);
+	wrtn += printf("  agi_count: %" PRIu32 "\n", ag->agi_count);
+	wrtn += printf("  agi_root: %" PRIu32 "\n", ag->agi_root);
+	wrtn += printf("  agi_level: %" PRIu32 "\n", ag->agi_level);
 
 	return wrtn;
 }
@@ -65,15 +65,15 @@ xal_pp(struct xal *xal)
 	}
 
 	wrtn += printf("xal:\n");
-	wrtn += printf("  blocksize: %u\n", xal->blocksize);
-	wrtn += printf("  sectsize: %u\n", xal->sectsize);
-	wrtn += printf("  inodesize: %u\n", xal->inodesize);
-	wrtn += printf("  inopblock: %u\n", xal->inopblock);
-	wrtn += printf("  inopblog: %u\n", xal->inopblog);
-	wrtn += printf("  rootino: %zu\n", xal->rootino);
-	wrtn += printf("  agblocks: %d\n", xal->agblocks);
-	wrtn += printf("  agblklog: %d\n", xal->agblklog);
-	wrtn += printf("  agcount: %d\n", xal->agcount);
+	wrtn += printf("  blocksize: %" PRIu32 "\n", xal->blocksize);
+	wrtn += printf("  sectsize: %" PRIu16 "\n", xal->sectsize);
+	wrtn += printf("  inodesize: %" PRIu16 "\n", xal->inodesize);
+	wrtn += printf("  inopblock: %" PRIu16 "\n", xal->inopblock);
+	wrtn += printf("  inopblog: %" PRIu8 "\n", xal->inopblog);
+	wrtn += printf("  rootino: %" PRIu64 "\n", xal->rootino);
+	wrtn += printf("  agblocks: %" PRIu32 "\n", xal->agblocks);
+	wrtn += printf("  agblklog: %" PRIu8 "\n", xal->agblklog);
+	wrtn += printf("  agcount: %" PRIu32 "\n", xal->agcount);
 
 	for (uint32_t i = 0; i < xal->agcount; ++i) {
 		wrtn += xal_ag_pp(&xal->ags[i]);
@@ -176,13 +176,13 @@ xal_sb_pp(void *buf)
 	int wrtn = 0;
 
 	wrtn += printf("xal_sb:\n");
-	wrtn += printf("  magicnum: 0x%x\n", be32toh(sb->magicnum));
-	wrtn += printf("  blocksize: 0x%x\n", be32toh(sb->blocksize));
-	wrtn += printf("  rootino: %zu\n", be64toh(sb->rootino));
-	wrtn += printf("  agblocks: %d\n", be32toh(sb->agblocks));
-	wrtn += printf("  agcount: %d\n", be32toh(sb->agcount));
-	wrtn += printf("  sectsize: %u\n", be16toh(sb->sectsize));
-	wrtn += printf("  inodesize: %u\n", be16toh(sb->inodesize));
+	wrtn += printf("  magicnum: 0x%" PRIx32 "\n", be32toh(sb->magicnum));
+	wrtn += printf("  blocksize: 0x%" PRIx32 "x\n", be32toh(sb->blocksize));
+	wrtn += printf("  rootino: %" PRIx64 "zu\n", be64toh(sb->rootino));
+	wrtn += printf("  agblocks: %" PRIx32 "d\n", be32toh(sb->agblocks));
+	wrtn += printf("  agcount: %" PRIx32 "d\n", be32toh(sb->agcount));
+	wrtn += printf("  sectsize: %" PRIx16 "u\n", be16toh(sb->sectsize));
+	wrtn += printf("  inodesize: %" PRIx16 "u\n", be16toh(sb->inodesize));
 	wrtn += printf("  fname: '%.*s'\n", XALLABEL_MAX, sb->sb_fname);
 
 	return wrtn;
@@ -287,10 +287,10 @@ xal_dir_pp(struct xal_dir *dir)
 
 	for (uint8_t i = 0; i < dir->count; ++i) {
 		wrtn += printf("xal_dir_entry:\n");
-		wrtn += printf("  namelen: %u\n", dir->entries[i].namelen);
+		wrtn += printf("  namelen: %" PRIu8 "\n", dir->entries[i].namelen);
 		wrtn += printf("  name: '%s'\n", dir->entries[i].name);
-		wrtn += printf("  ino: 0x%08X\n", dir->entries[i].ino);
-		wrtn += printf("  ftype: %d\n", dir->entries[i].ftype);
+		wrtn += printf("  ino: 0x%08" PRIX64 "\n", dir->entries[i].ino);
+		wrtn += printf("  ftype: %" PRIu8 "\n", dir->entries[i].ftype);
 	}
 }
 
