@@ -27,10 +27,11 @@
 #include <inttypes.h>
 
 struct xal_dir_entry {
-	uint8_t namelen; ///< Length of the name excluding nul-termination
-	char name[257];	 ///< Nul-terminated string
-	uint8_t ftype;
-	uint64_t ino; ///< Inode number ??? Should the AG be added here?
+	uint64_t ino;	 ///< Inode number of the directory entry; Should the AG be added here?
+	uint8_t ftype;	 ///< File-type
+	uint8_t namelen; ///< Length of the name; not counting nul-termination
+	char name[256];	 ///< Name; not including nul-termination
+	uint8_t pad[54];
 } __attribute__((packed));
 
 struct xal_dir {
