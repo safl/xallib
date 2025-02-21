@@ -248,16 +248,6 @@ xal_dinode_format_str(int val)
 	return "INODE_FORMAT_UNKNOWN";
 }
 
-struct xal_dir2_sf_hdr {
-	uint8_t count;	 ///< Number of inodes
-	uint8_t i8count; ///< ??
-	uint64_t parent; ///< Parent directory inode number
-} __attribute__((packed));
-
-struct xal_dir2_sf_entry {
-	uint8_t namelen;
-} __attribute__((packed));
-
 void
 dump_bytes(void *buf, int nbytes)
 {
@@ -299,19 +289,28 @@ xal_dir_pp(struct xal_dir *dir)
 int
 xal_dir_from_shortform(void *inode, struct xal_dir **dir)
 {
-	struct xal_xfs_dir2_sf_hdr *odf = (void *)(((char *)inode) + sizeof(struct xal_dinode));
-	char *cursor = (void *)(((char *)inode) + sizeof(struct xal_dinode) +
-				sizeof(struct xal_xfs_dir2_sf_hdr));
-	uint8_t i8count = odf->i8count;
+	uint8_t *cursor = inode;
+	uint8_t count, i8count;
 	struct xal_dir *cand;
 
-	cand = calloc(1, odf->count * sizeof(*cand->entries) + sizeof(*cand));
+	cursor += sizeof(struct xal_dinode); ///< Advance past inode data
+
+	count = *cursor;
+	cursor += 1; ///< Advance past count
+
+	i8count = *cursor;
+	cursor += 1; ///< Advance past i8count
+
+	cursor += i8count ? 8 : 4; ///< Advance past parent inode number
+
+	cand = calloc(1, count * sizeof(*cand->entries) + sizeof(*cand));
 	if (!cand) {
 		return -errno;
 	}
-	cand->count = odf->count;
+	cand->count = count;
 
-	for (int i = 0; i < odf->count; ++i) {
+	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
+	for (int i = 0; i < count; ++i) {
 		struct xal_dir_entry *entry = &cand->entries[i];
 
 		entry->namelen = *cursor;
@@ -320,16 +319,16 @@ xal_dir_from_shortform(void *inode, struct xal_dir **dir)
 		memcpy(entry->name, cursor, entry->namelen);
 		cursor += entry->namelen; ///< Advance past 'name'
 
-		entry->ftype = *((uint8_t *)(cursor));
-		cursor += 1; ///< Advance past file-type
+		entry->ftype = *cursor;
+		cursor += 1; ///< Advance past 'ftype'
 
 		if (i8count) {
 			i8count--;
 			entry->ino = be64toh(*(uint64_t *)cursor);
-			cursor += 8; ///< Advance past inode number
+			cursor += 8; ///< Advance past 64-bit inode number
 		} else {
 			entry->ino = be32toh(*(uint32_t *)cursor);
-			cursor += 4; ///< Advance past inode number
+			cursor += 4; ///< Advance past 32-bit inode number
 		}
 	}
 
