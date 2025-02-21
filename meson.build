@@ -10,6 +10,7 @@ public_headers = files(
 
 sources = files(
   'src/xal.c',
+  'src/pp.c',
   'src/utils.c'
 )
 

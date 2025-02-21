@@ -26,21 +26,48 @@
  */
 #include <inttypes.h>
 
-struct xal_dir_entry {
-	uint64_t ino;	 ///< Inode number of the directory entry; Should the AG be added here?
-	uint8_t ftype;	 ///< File-type
-	uint8_t namelen; ///< Length of the name; not counting nul-termination
-	char name[256];	 ///< Name; not including nul-termination
-	uint8_t pad[54];
-} __attribute__((packed));
-
-struct xal_dir {
-	uint8_t count;
-	struct xal_dir_entry entries[];
+struct xal_extent {
+	uint64_t start_offset;
+	uint64_t start_block;
+	uint64_t nblocks;
+	void *next;
 } __attribute__((packed));
 
 int
-xal_dir_pp(struct xal_dir *dir);
+xal_extent_pp(struct xal_extent *extent);
+
+struct xal_dir_entry {
+	uint64_t ino;	 ///< Inode number of the directory entry; Should the AG be added here?
+	uint8_t ftype;	 ///< File-type (directory, filename, symlink etc.)
+	uint8_t namelen; ///< Length of the name; not counting nul-termination
+	uint32_t count;	 ///< Number of extents
+	struct xal_extent head; ///< First extent
+	char name[256];		///< Name; not including nul-termination
+	uint8_t rsvd[18];
+} __attribute__((packed));
+
+struct xal_inode {
+	uint64_t ino;	 ///< Inode number of the directory entry; Should the AG be added here?
+	uint8_t ftype;	 ///< File-type (directory, filename, symlink etc.)
+	uint8_t namelen; ///< Length of the name; not counting nul-termination
+	uint32_t count;	 ///< Number of extents
+	struct xal_extent head; ///< First extent
+	char name[256];		///< Name; not including nul-termination
+	uint8_t rsvd[9];
+	uint8_t nchildren; ///< Number of children
+	void *children[];
+} __attribute__((packed));
+
+int
+xal_inode_pp(struct xal_inode *inode);
+
+/**
+ * An encapsulation of the device handle, this is done preparation for using xNVMe
+ */
+union xal_handle {
+	int fd;
+	void *ptr;
+};
 
 /**
  * XAL Allocation Group
@@ -58,21 +85,17 @@ struct xal_ag {
 	uint32_t agi_level;  ///< levels in inode btree
 };
 
-union xal_dev_handle {
-	int fd;
-	void *ptr;
-};
+int
+xal_ag_pp(struct xal_ag *ag);
 
 /**
  * XAL
  *
  * Contains a handle to the storage device along with meta-data describing the
  * data-layout.
- *
- * Byte-order: host-endianess
  */
 struct xal {
-	union xal_dev_handle handle;
+	union xal_handle handle;
 	uint32_t blocksize;  ///< Size of a block, in bytes
 	uint16_t sectsize;   ///< Size of a sector, in bytes
 	uint16_t inodesize;  ///< inode size, in bytes
@@ -88,6 +111,10 @@ struct xal {
 /**
  * Open the block device at 'path'
  *
+ * This will retrieve the Superblock (sb) and Allocation Group (AG) headers for all AGs. These are
+ * utilized to instantiate the 'struct xal' with a subset of the on-disk-format parsed to native
+ * format.
+ *
  * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
  */
 int
@@ -97,47 +124,29 @@ void
 xal_close(struct xal *xal);
 
 int
+xal_get_index(struct xal *xal, struct xal_inode **index);
+
+int
 xal_pp(struct xal *xal);
 
-uint64_t
-xal_get_inode_offset(struct xal *xal, uint64_t ino);
-
 /**
- * Traverse the given mountpoint; invokes 'cb_func(cb_data, inode)' for each
- * discovered inode
+ * Recursively walk the given directory
  *
- * Returns 0 on success. On error, negative errno is returned to indicate the
- * error.
+ * Invoking the given cb_func with cb_data for each directory-entry in the traversal. Do note that
+ * not all inode-types are supported, e.g. symlinks are not represented only the types:
+ *
+ *   * Directory
+ *   * Regular file
+ *
+ * Returns 0 on success. On error, negative errno is returned to indicate the error.
  */
 int
-xal_traverse(struct xal *xal, void *cb_func, void *cb_data);
+xal_dir_walk(struct xal_inode *dir, void *cb_func, void *cb_data);
 
 /**
- * Construct a directory index, with entries, from the XFS shortform pointed to by 'buf'
+ * Pretty-print the given directory
  *
- * @param inode Buffer pointing to inode in on-disk format
- *
- * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
+ * Returns 0 on success. On error, negative errno is returned to indicate the error.
  */
 int
-xal_dir_from_shortform(void *inode, struct xal_dir **dir);
-
-/**
- * Pretty-print the given 'struct xal_superblock'
- *
- * NOTE: Assumes that the given superblock has been converted to host endianess
- */
-int
-xal_sb_pp(void *buf);
-
-int
-xal_agf_pp(void *buf);
-
-int
-xal_agi_pp(void *buf);
-
-int
-xal_agfl_pp(void *buf);
-
-int
-xal_dinode_pp(void *buf);
+xal_dir_pp(struct xal_inode *dir);

@@ -11,8 +11,51 @@
 #include <string.h>
 #include <unistd.h>
 #include <xal.h>
+#include <xal_pp.h>
 
 #define BUF_NBYTES 4096
+
+/**
+struct pool {
+	size_t nentries;
+	size_t current;
+	struct xal_dir_entry entries[];
+};
+
+int
+pool_alloc(size_t count, struct pool **pool)
+{
+	struct pool *cand;
+
+	cand = calloc(count, sizeof(**pool));
+	if (!cand) {
+		return -errno;
+	}
+	cand->current = 0;
+	cand->nentries = count;
+
+	*pool = cand;
+
+	return 0;
+}
+
+int
+pool_pop(struct pool *pool, struct xal_dir_entry **entry)
+{
+	// TODO: do re-allocate here
+
+	*entry = &pool->entries[pool->current];
+	pool->current += 1;
+
+	return 0;
+}
+
+void
+pool_free(struct pool *pool)
+{
+	free(pool);
+}
+*/
 
 uint64_t
 xal_get_inode_offset(struct xal *xal, uint64_t ino)
@@ -32,54 +75,6 @@ xal_get_inode_offset(struct xal *xal, uint64_t ino)
 	offset = (agno * xal->agblocks + agbno) * xal->blocksize;
 
 	return offset + (agbino * xal->inodesize);
-}
-
-int
-xal_ag_pp(struct xal_ag *ag)
-{
-	int wrtn = 0;
-
-	if (!ag) {
-		wrtn += printf("xal_ag: ~\n");
-		return wrtn;
-	}
-
-	wrtn += printf("xal_ag:\n");
-	wrtn += printf("  seqno: %" PRIu32 "\n", ag->seqno);
-	wrtn += printf("  agf_length: %" PRIu32 "\n", ag->agf_length);
-	wrtn += printf("  agi_count: %" PRIu32 "\n", ag->agi_count);
-	wrtn += printf("  agi_root: %" PRIu32 "\n", ag->agi_root);
-	wrtn += printf("  agi_level: %" PRIu32 "\n", ag->agi_level);
-
-	return wrtn;
-}
-
-int
-xal_pp(struct xal *xal)
-{
-	int wrtn = 0;
-
-	if (!xal) {
-		wrtn += printf("xal: ~\n");
-		return wrtn;
-	}
-
-	wrtn += printf("xal:\n");
-	wrtn += printf("  blocksize: %" PRIu32 "\n", xal->blocksize);
-	wrtn += printf("  sectsize: %" PRIu16 "\n", xal->sectsize);
-	wrtn += printf("  inodesize: %" PRIu16 "\n", xal->inodesize);
-	wrtn += printf("  inopblock: %" PRIu16 "\n", xal->inopblock);
-	wrtn += printf("  inopblog: %" PRIu8 "\n", xal->inopblog);
-	wrtn += printf("  rootino: %" PRIu64 "\n", xal->rootino);
-	wrtn += printf("  agblocks: %" PRIu32 "\n", xal->agblocks);
-	wrtn += printf("  agblklog: %" PRIu8 "\n", xal->agblklog);
-	wrtn += printf("  agcount: %" PRIu32 "\n", xal->agcount);
-
-	for (uint32_t i = 0; i < xal->agcount; ++i) {
-		wrtn += xal_ag_pp(&xal->ags[i]);
-	}
-
-	return wrtn;
 }
 
 void
@@ -125,8 +120,6 @@ xal_open(const char *path, struct xal **xal)
 	base.agblklog = psb->sb_agblklog;
 	base.agcount = be32toh(psb->agcount);
 
-	// TODO: add verification that agcount has a reasonable size
-
 	cand = calloc(1, sizeof(*cand) + sizeof(*(cand->ags)) * base.agcount);
 	if (!cand) {
 		perror("Failed allocating Reading Primary Superblock failed.");
@@ -169,129 +162,14 @@ xal_open(const char *path, struct xal **xal)
 	return 0;
 }
 
-int
-xal_sb_pp(void *buf)
-{
-	struct xal_sb *sb = buf;
-	int wrtn = 0;
 
-	wrtn += printf("xal_sb:\n");
-	wrtn += printf("  magicnum: 0x%" PRIx32 "\n", be32toh(sb->magicnum));
-	wrtn += printf("  blocksize: 0x%" PRIx32 "x\n", be32toh(sb->blocksize));
-	wrtn += printf("  rootino: %" PRIx64 "zu\n", be64toh(sb->rootino));
-	wrtn += printf("  agblocks: %" PRIx32 "d\n", be32toh(sb->agblocks));
-	wrtn += printf("  agcount: %" PRIx32 "d\n", be32toh(sb->agcount));
-	wrtn += printf("  sectsize: %" PRIx16 "u\n", be16toh(sb->sectsize));
-	wrtn += printf("  inodesize: %" PRIx16 "u\n", be16toh(sb->inodesize));
-	wrtn += printf("  fname: '%.*s'\n", XALLABEL_MAX, sb->sb_fname);
-
-	return wrtn;
-}
 
 int
-xal_agf_pp(void *buf)
-{
-	struct xal_agf *agf = buf;
-	int wrtn = 0;
-
-	wrtn += printf("xal_agf:\n");
-	wrtn += printf("  magicnum: 0x%x\n", be32toh(agf->magicnum));
-	wrtn += printf("  seqno: 0x%x\n", be32toh(agf->seqno));
-	wrtn += printf("  length: 0x%x\n", be32toh(agf->length));
-
-	return wrtn;
-}
-
-int
-xal_agi_pp(void *buf)
-{
-	struct xal_agi *agi = buf;
-	int wrtn = 0;
-
-	wrtn += printf("xal_agi:\n");
-	wrtn += printf("  magicnum: 0x%x\n", be32toh(agi->magicnum));
-	wrtn += printf("  seqno: 0x%x\n", be32toh(agi->seqno));
-	wrtn += printf("  length: 0x%x\n", be32toh(agi->length));
-
-	return wrtn;
-}
-
-int
-xal_agfl_pp(void *buf)
-{
-	struct xal_agfl *agfl = buf;
-	int wrtn = 0;
-
-	wrtn += printf("xal_agfl:\n");
-	wrtn += printf("  magicnum: 0x%x\n", agfl->magicnum);
-	wrtn += printf("  seqno: 0x%x\n", agfl->seqno);
-
-	return wrtn;
-}
-
-const char *
-xal_dinode_format_str(int val)
-{
-	switch (val) {
-	case XAL_DINODE_FMT_BTREE:
-		return "btree";
-	case XAL_DINODE_FMT_DEV:
-		return "dev";
-	case XAL_DINODE_FMT_EXTENTS:
-		return "extents";
-	case XAL_DINODE_FMT_LOCAL:
-		return "local";
-	case XAL_DINODE_FMT_UUID:
-		return "uuid";
-	};
-
-	return "INODE_FORMAT_UNKNOWN";
-}
-
-void
-dump_bytes(void *buf, int nbytes)
-{
-	for (int i = 0; i < nbytes; ++i) {
-		uint8_t val = ((uint8_t *)buf)[i];
-
-		if ((val > 31) && (val < 127)) {
-			printf("%03d: '%c'\n", i, val);
-		} else {
-			printf("%03d: %u\n", i, val);
-		}
-	}
-}
-
-int
-xal_dir_pp(struct xal_dir *dir)
-{
-	int wrtn = 0;
-
-	if (!dir) {
-		wrtn += printf("xal_dir: ~\n");
-		return wrtn;
-	}
-
-	wrtn += printf("xal_dir:\n");
-	wrtn += printf("  count: %u\n", dir->count);
-
-	for (uint8_t i = 0; i < dir->count; ++i) {
-		wrtn += printf("xal_dir_entry:\n");
-		wrtn += printf("  namelen: %" PRIu8 "\n", dir->entries[i].namelen);
-		wrtn += printf("  name: '%s'\n", dir->entries[i].name);
-		wrtn += printf("  ino: 0x%08" PRIX64 "\n", dir->entries[i].ino);
-		wrtn += printf("  ftype: %" PRIu8 "\n", dir->entries[i].ftype);
-	}
-
-	return wrtn;
-}
-
-int
-xal_dir_from_shortform(void *inode, struct xal_dir **dir)
+xal_dir_from_shortform(void *inode, struct xal_inode **dir)
 {
 	uint8_t *cursor = inode;
 	uint8_t count, i8count;
-	struct xal_dir *cand;
+	struct xal_inode *cand;
 
 	cursor += sizeof(struct xal_dinode); ///< Advance past inode data
 
@@ -303,7 +181,7 @@ xal_dir_from_shortform(void *inode, struct xal_dir **dir)
 
 	cursor += i8count ? 8 : 4; ///< Advance past parent inode number
 
-	cand = calloc(1, count * sizeof(*cand->entries) + sizeof(*cand));
+	cand = calloc(1, count * sizeof(*cand->children) + sizeof(*cand));
 	if (!cand) {
 		return -errno;
 	}
@@ -311,7 +189,7 @@ xal_dir_from_shortform(void *inode, struct xal_dir **dir)
 
 	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
 	for (int i = 0; i < count; ++i) {
-		struct xal_dir_entry *entry = &cand->entries[i];
+		struct xal_inode *entry = cand->children[i];
 
 		entry->namelen = *cursor;
 		cursor += 1 + 2; ///< Advance past 'namelen' and 'offset[2]'
@@ -337,29 +215,63 @@ xal_dir_from_shortform(void *inode, struct xal_dir **dir)
 	return 0;
 }
 
+void
+decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
+{
+	// Extract start offset (bits 9-62)
+	extent->start_offset = (l0 >> 9) & 0xFFFFFFFFFFFFF;
+
+	// Extract start block (l0:0-8 and l1:21-63)
+	extent->start_block = ((l0 & 0x1FF) << 43) | (l1 >> 21);
+
+	// Extract block count (l1:0-20)
+	extent->nblocks = l1 & 0x1FFFFF;
+}
+
 int
-xal_dinode_pp(void *buf)
+xal_decode_extents(void *buf)
 {
 	struct xal_dinode *dinode = buf;
-	int wrtn = 0;
+	uint8_t *cursor = buf;
+	uint64_t nextents;
 
-	wrtn += printf("xal_dinode:\n");
-	wrtn += printf("  magic: 0x%x | 0x%x\n", dinode->di_magic, XAL_DINODE_MAGIC);
-	wrtn += printf("  format: 0x%x\n", dinode->di_format);
-	wrtn += printf("  format_str: '%s'\n", xal_dinode_format_str(dinode->di_format));
+	/**
+	 * For some reason then di_big_nextents is populated. As far as i understand that should
+	 * not happen for format=0x2 "extents" as this should have all extent-records inline in the
+	 * inode. Thus this abomination... just grabbing whatever has a value...
+	 */
+	nextents =
+	    (dinode->di_nextents) ? be32toh(dinode->di_nextents) : be64toh(dinode->di_big_nextents);
 
-	return wrtn;
+	printf("nextents: %" PRIu64 "\n", nextents);
+	printf("dinode->magic: 0x%04" PRIX32 "\n", dinode->di_magic);
+	printf("dinode->di_size: %" PRIu64 "\n", be64toh(dinode->di_size));
+
+	cursor += sizeof(struct xal_dinode); ///< Advance past inode data
+
+	for (uint64_t i = 0; i < nextents; ++i) {
+		uint64_t l0, l1;
+
+		l0 = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+
+		l1 = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+
+		decode_xfs_extent(l0, l1, NULL);
+	}
+
+	return 0;
 }
 
 /**
- * Internal helper recursively traversing file-system
+ * Internal helper recursively traversing the on-disk-format to build an index of the file-system
  */
 int
-traverse(struct xal *xal, uint64_t ino, void *cb_func, void *cb_data)
+process_inode(struct xal *xal, uint64_t ino, struct xal_inode *index)
 {
 	uint8_t buf[BUF_NBYTES] = {0};
 	struct xal_dinode *dinode;
-	struct xal_dir *dir;
 	ssize_t nbytes;
 
 	printf("\n## ino(0x%08" PRIX64 ")\n", ino);
@@ -370,26 +282,31 @@ traverse(struct xal *xal, uint64_t ino, void *cb_func, void *cb_data)
 		return -EIO;
 	}
 
-	dinode = (void*)buf;
+	dinode = (void *)buf;
 	xal_dinode_pp(buf);
 
-	switch(dinode->di_format) {
-	case XAL_DINODE_FMT_DEV:
+	switch (dinode->di_format) {
+	case XAL_DINODE_FMT_DEV: ///< What is this?
 		break;
 
-	case XAL_DINODE_FMT_BTREE:
+	case XAL_DINODE_FMT_BTREE: ///< Recursively walk the btree
 		break;
 
-	case XAL_DINODE_FMT_EXTENTS:
+	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
+		xal_decode_extents(buf);
 		break;
 
-	case XAL_DINODE_FMT_LOCAL:
+	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
+	{
+		struct xal_inode *dir;
+
 		xal_dir_from_shortform(buf, &dir);
-		xal_dir_pp(dir);
+		xal_inode_pp(dir);
 		for (uint8_t i = 0; i < dir->count; ++i) {
-			traverse(xal, dir->entries[i].ino, NULL, NULL);
+			struct xal_inode *child = dir->children[i];
+			process_inode(xal, child->ino, index);
 		}
-		break;
+	} break;
 
 	case XAL_DINODE_FMT_UUID:
 		break;
@@ -399,7 +316,18 @@ traverse(struct xal *xal, uint64_t ino, void *cb_func, void *cb_data)
 }
 
 int
-xal_traverse(struct xal *xal, void *cb_func, void *cb_data)
+xal_get_index(struct xal *xal, struct xal_inode **index)
 {
-	return traverse(xal, xal->rootino, NULL, NULL);
+	printf("xal_get_index(): not implemented. xal(%p), index(%p)\n", (void *)xal,
+	       (void *)index);
+	return 0;
+}
+
+int
+xal_dir_walk(struct xal_inode *dir, void *cb_func, void *cb_data)
+{
+	printf("xal_dir_walk(): not implemented; dir(%p), func(%p), data(%p)\n", (void *)dir,
+	       (void *)cb_func, (void *)cb_data);
+
+	return -ENOSYS;
 }

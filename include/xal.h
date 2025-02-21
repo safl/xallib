@@ -277,6 +277,9 @@ enum xal_dinode_fmt {
 	XAL_DINODE_FMT_UUID	/* added long ago, but never used */
 };
 
+#define XAL_DIFLAG2_NREXT64_BIT 4	/* large extent counters */
+#define XAL_DIFLAG2_NREXT64	(1 << XAL_DIFLAG2_NREXT64_BIT)
+
 struct xal_dinode {
 	__be16 di_magic;     /* inode magic # = XFS_DINODE_MAGIC */
 	__be16 di_mode;	     /* mode and type of file */

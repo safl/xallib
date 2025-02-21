@@ -18,6 +18,7 @@
 int
 main(int argc, char *argv[])
 {
+	struct xal_inode *index;
 	struct xal *xal;
 	int err;
 
@@ -30,14 +31,20 @@ main(int argc, char *argv[])
 	if (err < 0) {
 		return -err;
 	}
-
 	xal_pp(xal);
 
-	err = xal_traverse(xal, NULL, NULL);
+	err = xal_get_index(xal, &index);
 	if (err) {
-		xal_close(xal);
-		return err;
+		goto exit;
 	}
 
-	return 0;
+	err = xal_dir_walk(index, NULL, NULL);
+	if (err) {
+		goto exit;
+	}
+
+exit:
+	xal_close(xal);
+
+	return -err;
 }
