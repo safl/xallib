@@ -23,4 +23,4 @@ install:
 run:
 #	sudo chown safl:safl /dev/sda1
 #	sudo mount -o nodatacow /dev/sda1
-	./$(builddir)/xal /dev/sda1
+	valgrind ./$(builddir)/xal /dev/sda1

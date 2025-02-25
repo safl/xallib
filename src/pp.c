@@ -37,17 +37,17 @@ xal_pp(struct xal *xal)
 	}
 
 	wrtn += printf("xal:\n");
-	wrtn += printf("  blocksize: %" PRIu32 "\n", xal->blocksize);
-	wrtn += printf("  sectsize: %" PRIu16 "\n", xal->sectsize);
-	wrtn += printf("  inodesize: %" PRIu16 "\n", xal->inodesize);
-	wrtn += printf("  inopblock: %" PRIu16 "\n", xal->inopblock);
-	wrtn += printf("  inopblog: %" PRIu8 "\n", xal->inopblog);
-	wrtn += printf("  rootino: %" PRIu64 "\n", xal->rootino);
-	wrtn += printf("  agblocks: %" PRIu32 "\n", xal->agblocks);
-	wrtn += printf("  agblklog: %" PRIu8 "\n", xal->agblklog);
-	wrtn += printf("  agcount: %" PRIu32 "\n", xal->agcount);
+	wrtn += printf("  sb.blocksize: %" PRIu32 "\n", xal->sb.blocksize);
+	wrtn += printf("  sb.sectsize: %" PRIu16 "\n", xal->sb.sectsize);
+	wrtn += printf("  sb.inodesize: %" PRIu16 "\n", xal->sb.inodesize);
+	wrtn += printf("  sb.inopblock: %" PRIu16 "\n", xal->sb.inopblock);
+	wrtn += printf("  sb.inopblog: %" PRIu8 "\n", xal->sb.inopblog);
+	wrtn += printf("  sb.rootino: %" PRIu64 "\n", xal->sb.rootino);
+	wrtn += printf("  sb.agblocks: %" PRIu32 "\n", xal->sb.agblocks);
+	wrtn += printf("  sb.agblklog: %" PRIu8 "\n", xal->sb.agblklog);
+	wrtn += printf("  sb.agcount: %" PRIu32 "\n", xal->sb.agcount);
 
-	for (uint32_t i = 0; i < xal->agcount; ++i) {
+	for (uint32_t i = 0; i < xal->sb.agcount; ++i) {
 		wrtn += xal_ag_pp(&xal->ags[i]);
 	}
 
@@ -57,7 +57,7 @@ xal_pp(struct xal *xal)
 int
 xal_sb_pp(void *buf)
 {
-	struct xal_sb *sb = buf;
+	struct xal_odf_sb *sb = buf;
 	int wrtn = 0;
 
 	wrtn += printf("xal_sb:\n");
@@ -104,7 +104,7 @@ xal_agi_pp(void *buf)
 int
 xal_agfl_pp(void *buf)
 {
-	struct xal_agfl *agfl = buf;
+	struct xal_xfs_agfl *agfl = buf;
 	int wrtn = 0;
 
 	wrtn += printf("xal_agfl:\n");
@@ -151,7 +151,9 @@ xal_inode_pp(struct xal_inode *inode)
 	wrtn += printf("  nchildren: %u\n", inode->count);
 
 	for (uint8_t i = 0; i < inode->count; ++i) {
-		xal_inode_pp(inode->children[i]);
+		struct xal_inode *children = inode->children;
+
+		xal_inode_pp(&children[i]);
 	}
 
 	return wrtn;

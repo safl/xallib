@@ -58,10 +58,13 @@ typedef struct {
 #define XAL_AGI_MAGIC 0x58414749  /* 'XAGI' */
 #define XAL_AGFL_MAGIC 0x5841464c /* 'XAFL' */
 
+#define XAL_XFS_DIR3_FT_REG_FILE 1
+#define XAL_XFS_DIR3_FT_DIR 2
+
 /**
  * The XFS Superblock on-disk representation in v5 format
  */
-struct xal_sb {
+struct xal_odf_sb {
 	uint32_t magicnum;  /* magic number == XAL_SB_MAGIC */
 	uint32_t blocksize; /* logical block size, bytes */
 
@@ -251,7 +254,7 @@ struct xal_agi {
 	/* structure must be padded to 64 bit alignment */
 };
 
-struct xal_agfl {
+struct xal_xfs_agfl {
 	__be32 magicnum;
 	__be32 seqno;
 	uuid_t agfl_uuid;
@@ -277,8 +280,8 @@ enum xal_dinode_fmt {
 	XAL_DINODE_FMT_UUID	/* added long ago, but never used */
 };
 
-#define XAL_DIFLAG2_NREXT64_BIT 4	/* large extent counters */
-#define XAL_DIFLAG2_NREXT64	(1 << XAL_DIFLAG2_NREXT64_BIT)
+#define XAL_DIFLAG2_NREXT64_BIT 4 /* large extent counters */
+#define XAL_DIFLAG2_NREXT64 (1 << XAL_DIFLAG2_NREXT64_BIT)
 
 struct xal_dinode {
 	__be16 di_magic;     /* inode magic # = XFS_DINODE_MAGIC */

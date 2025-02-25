@@ -11,51 +11,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <xal.h>
+#include <xal_pool.h>
 #include <xal_pp.h>
 
 #define BUF_NBYTES 4096
-
-/**
-struct pool {
-	size_t nentries;
-	size_t current;
-	struct xal_dir_entry entries[];
-};
-
-int
-pool_alloc(size_t count, struct pool **pool)
-{
-	struct pool *cand;
-
-	cand = calloc(count, sizeof(**pool));
-	if (!cand) {
-		return -errno;
-	}
-	cand->current = 0;
-	cand->nentries = count;
-
-	*pool = cand;
-
-	return 0;
-}
-
-int
-pool_pop(struct pool *pool, struct xal_dir_entry **entry)
-{
-	// TODO: do re-allocate here
-
-	*entry = &pool->entries[pool->current];
-	pool->current += 1;
-
-	return 0;
-}
-
-void
-pool_free(struct pool *pool)
-{
-	free(pool);
-}
-*/
 
 uint64_t
 xal_get_inode_offset(struct xal *xal, uint64_t ino)
@@ -63,28 +22,30 @@ xal_get_inode_offset(struct xal *xal, uint64_t ino)
 	uint64_t agno, agbno, agbino, offset;
 
 	// Allocation Group Number
-	agno = ino >> xal->agblklog;
+	agno = ino >> xal->sb.agblklog;
 
 	// Block Number relative to Allocation Group
-	agbno = (ino & ((1ULL << xal->agblklog) - 1)) >> xal->inopblog;
+	agbno = (ino & ((1ULL << xal->sb.agblklog) - 1)) >> xal->sb.inopblog;
 
 	// Inode number relative to Block in Allocation Group
-	agbino = ino & ((1ULL << xal->inopblog) - 1);
+	agbino = ino & ((1ULL << xal->sb.inopblog) - 1);
 
 	// Absolute Inode offset in bytes
-	offset = (agno * xal->agblocks + agbno) * xal->blocksize;
+	offset = (agno * xal->sb.agblocks + agbno) * xal->sb.blocksize;
 
-	return offset + (agbino * xal->inodesize);
+	return offset + (agbino * xal->sb.inodesize);
 }
 
 void
-xal_close(struct xal *mp)
+xal_close(struct xal *xal)
 {
-	if (!mp) {
+	if (!xal) {
 		return;
 	}
 
-	close(mp->handle.fd);
+	xal_pool_unmap(&xal->pool);
+	close(xal->handle.fd);
+	free(xal);
 }
 
 int
@@ -92,7 +53,7 @@ xal_open(const char *path, struct xal **xal)
 {
 	struct xal base = {0};
 	char buf[BUF_NBYTES] = {0};
-	const struct xal_sb *psb = (void *)buf;
+	const struct xal_odf_sb *psb = (void *)buf;
 	struct xal *cand;
 	ssize_t nbytes;
 
@@ -110,17 +71,17 @@ xal_open(const char *path, struct xal **xal)
 	}
 
 	// Setup the Superblock information subset; using big-endian conversion
-	base.blocksize = be32toh(psb->blocksize);
-	base.sectsize = be16toh(psb->sectsize);
-	base.inodesize = be16toh(psb->inodesize);
-	base.inopblock = be16toh(psb->sb_inopblock);
-	base.inopblog = psb->sb_inopblog;
-	base.rootino = be64toh(psb->rootino);
-	base.agblocks = be32toh(psb->agblocks);
-	base.agblklog = psb->sb_agblklog;
-	base.agcount = be32toh(psb->agcount);
+	base.sb.blocksize = be32toh(psb->blocksize);
+	base.sb.sectsize = be16toh(psb->sectsize);
+	base.sb.inodesize = be16toh(psb->inodesize);
+	base.sb.inopblock = be16toh(psb->sb_inopblock);
+	base.sb.inopblog = psb->sb_inopblog;
+	base.sb.rootino = be64toh(psb->rootino);
+	base.sb.agblocks = be32toh(psb->agblocks);
+	base.sb.agblklog = psb->sb_agblklog;
+	base.sb.agcount = be32toh(psb->agcount);
 
-	cand = calloc(1, sizeof(*cand) + sizeof(*(cand->ags)) * base.agcount);
+	cand = calloc(1, sizeof(*cand) + sizeof(*(cand->ags)) * base.sb.agcount);
 	if (!cand) {
 		perror("Failed allocating Reading Primary Superblock failed.");
 		return -errno;
@@ -128,14 +89,14 @@ xal_open(const char *path, struct xal **xal)
 	*cand = base;
 
 	// Retrieve allocation-group meta, convert it, and store it.
-	for (uint32_t agno = 0; agno < cand->agcount; ++agno) {
-		struct xal_agf *agf = (void *)(buf + cand->sectsize);
-		struct xal_agi *agi = (void *)(buf + cand->sectsize * 2);
+	for (uint32_t agno = 0; agno < cand->sb.agcount; ++agno) {
+		struct xal_agf *agf = (void *)(buf + cand->sb.sectsize);
+		struct xal_agi *agi = (void *)(buf + cand->sb.sectsize * 2);
 		off_t offset;
 
 		memset(buf, 0, BUF_NBYTES);
 
-		offset = (off_t)agno * (off_t)cand->agblocks * (off_t)cand->blocksize;
+		offset = (off_t)agno * (off_t)cand->sb.agblocks * (off_t)cand->sb.blocksize;
 		nbytes = pread(cand->handle.fd, buf, BUF_NBYTES, offset);
 		if (nbytes != BUF_NBYTES) {
 			perror("Reading AG Headers failed");
@@ -162,14 +123,13 @@ xal_open(const char *path, struct xal **xal)
 	return 0;
 }
 
-
-
 int
-xal_dir_from_shortform(void *inode, struct xal_inode **dir)
+process_inode_shortform(struct xal *xal, void *inode, struct xal_inode *self)
 {
+	struct xal_inode *children = self->children;
 	uint8_t *cursor = inode;
 	uint8_t count, i8count;
-	struct xal_inode *cand;
+	int err;
 
 	cursor += sizeof(struct xal_dinode); ///< Advance past inode data
 
@@ -181,36 +141,36 @@ xal_dir_from_shortform(void *inode, struct xal_inode **dir)
 
 	cursor += i8count ? 8 : 4; ///< Advance past parent inode number
 
-	cand = calloc(1, count * sizeof(*cand->children) + sizeof(*cand));
-	if (!cand) {
-		return -errno;
+	err = xal_pool_claim(&xal->pool, count, &children);
+	if (err) {
+		return err;
 	}
-	cand->count = count;
 
 	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
 	for (int i = 0; i < count; ++i) {
-		struct xal_inode *entry = cand->children[i];
+		struct xal_inode *child = children;
 
-		entry->namelen = *cursor;
+		child->namelen = *cursor;
 		cursor += 1 + 2; ///< Advance past 'namelen' and 'offset[2]'
 
-		memcpy(entry->name, cursor, entry->namelen);
-		cursor += entry->namelen; ///< Advance past 'name'
+		memcpy(child->name, cursor, child->namelen);
+		cursor += child->namelen; ///< Advance past 'name'
 
-		entry->ftype = *cursor;
+		child->ftype = *cursor;
 		cursor += 1; ///< Advance past 'ftype'
 
 		if (i8count) {
 			i8count--;
-			entry->ino = be64toh(*(uint64_t *)cursor);
+			child->ino = be64toh(*(uint64_t *)cursor);
 			cursor += 8; ///< Advance past 64-bit inode number
 		} else {
-			entry->ino = be32toh(*(uint32_t *)cursor);
+			child->ino = be32toh(*(uint32_t *)cursor);
 			cursor += 4; ///< Advance past 32-bit inode number
 		}
-	}
 
-	*dir = cand; ///< Promote the candidate
+		// Now process this node
+		
+	}
 
 	return 0;
 }
@@ -268,7 +228,7 @@ xal_decode_extents(void *buf)
  * Internal helper recursively traversing the on-disk-format to build an index of the file-system
  */
 int
-process_inode(struct xal *xal, uint64_t ino, struct xal_inode *index)
+process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 {
 	uint8_t buf[BUF_NBYTES] = {0};
 	struct xal_dinode *dinode;
@@ -277,8 +237,8 @@ process_inode(struct xal *xal, uint64_t ino, struct xal_inode *index)
 	printf("\n## ino(0x%08" PRIX64 ")\n", ino);
 
 	///< Read the on-disk inode data
-	nbytes = pread(xal->handle.fd, buf, xal->sectsize, xal_get_inode_offset(xal, ino));
-	if (nbytes != xal->sectsize) {
+	nbytes = pread(xal->handle.fd, buf, xal->sb.sectsize, xal_get_inode_offset(xal, ino));
+	if (nbytes != xal->sb.sectsize) {
 		return -EIO;
 	}
 
@@ -298,14 +258,8 @@ process_inode(struct xal *xal, uint64_t ino, struct xal_inode *index)
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
 	{
-		struct xal_inode *dir;
-
-		xal_dir_from_shortform(buf, &dir);
-		xal_inode_pp(dir);
-		for (uint8_t i = 0; i < dir->count; ++i) {
-			struct xal_inode *child = dir->children[i];
-			process_inode(xal, child->ino, index);
-		}
+		process_inode_shortform(xal, buf, self);
+		xal_inode_pp(self);
 	} break;
 
 	case XAL_DINODE_FMT_UUID:
@@ -318,9 +272,22 @@ process_inode(struct xal *xal, uint64_t ino, struct xal_inode *index)
 int
 xal_get_index(struct xal *xal, struct xal_inode **index)
 {
-	printf("xal_get_index(): not implemented. xal(%p), index(%p)\n", (void *)xal,
-	       (void *)index);
-	return 0;
+	struct xal_inode *root;
+	int err;
+
+	err = xal_pool_claim(&xal->pool, 1, &root);
+	if (err) {
+		return err;
+	}
+
+	root->ino = xal->sb.rootino;
+	root->ftype = XAL_XFS_DIR3_FT_REG_FILE;
+	root->namelen = 1;
+	root->count = 0;
+	snprintf(root->name, root->namelen, "/");
+
+	///< To set nchildren and populate children delegate to process_ino()
+	return process_inode_ino(xal, root->ino, root);
 }
 
 int
