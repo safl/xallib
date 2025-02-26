@@ -16,6 +16,9 @@
 
 #define BUF_NBYTES 4096
 
+int
+process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
+
 uint64_t
 xal_get_inode_offset(struct xal *xal, uint64_t ino)
 {
@@ -172,8 +175,8 @@ process_inode_shortform(struct xal *xal, void *inode, struct xal_inode *self)
 			cursor += 4; ///< Advance past 32-bit inode number
 		}
 
-		// Now process this node
-		
+		xal_inode_pp(child);
+		process_inode_ino(xal, child->ino, child);
 	}
 
 	return 0;
