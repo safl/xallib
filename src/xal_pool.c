@@ -67,9 +67,12 @@ xal_pool_claim(struct xal_pool *pool, size_t count, struct xal_inode **inode)
 		return -EINVAL;
 	}
 
-	err = xal_pool_grow(pool, pool->growby);
-	if (err) {
-		return err;
+	if (pool->allocated == pool->free) {
+		err = xal_pool_grow(pool, pool->growby);
+		if (err) {
+			printf("xal_pool_grow(); err(%d)", err);
+			return err;
+		}
 	}
 
 	*inode = &pool->inodes[pool->free++];
