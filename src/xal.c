@@ -137,7 +137,7 @@ xal_open(const char *path, struct xal **xal)
 int
 process_inode_shortform(struct xal *xal, void *inode, struct xal_inode *self)
 {
-	struct xal_inode *children = self->children;
+	struct xal_inode *children;
 	uint8_t *cursor = inode;
 	uint8_t count, i8count;
 	int err;
@@ -156,6 +156,7 @@ process_inode_shortform(struct xal *xal, void *inode, struct xal_inode *self)
 	if (err) {
 		return err;
 	}
+	self->children = children;
 	self->nchildren = count;
 
 	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
