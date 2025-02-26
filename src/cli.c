@@ -31,7 +31,6 @@ main(int argc, char *argv[])
 	if (err < 0) {
 		return -err;
 	}
-	xal_pp(xal);
 
 	err = xal_get_index(xal, &index);
 	if (err) {

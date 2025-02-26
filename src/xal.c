@@ -175,7 +175,6 @@ process_inode_shortform(struct xal *xal, void *inode, struct xal_inode *self)
 			cursor += 4; ///< Advance past 32-bit inode number
 		}
 
-		xal_inode_pp(child);
 		process_inode_ino(xal, child->ino, child);
 	}
 
@@ -250,8 +249,6 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	}
 
 	dinode = (void *)buf;
-	xal_dinode_pp(buf);
-
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_DEV: ///< What is this?
 		break;
@@ -264,10 +261,8 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		break;
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
-	{
 		process_inode_shortform(xal, buf, self);
-		xal_inode_pp(self);
-	} break;
+		break;
 
 	case XAL_DINODE_FMT_UUID:
 		break;
