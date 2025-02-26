@@ -42,16 +42,19 @@ main(int argc, char *argv[])
 
 	err = xal_open(argv[argc - 1], &xal);
 	if (err < 0) {
+		printf("xal_open(...); err(%d)\n", err);
 		return -err;
 	}
 
 	err = xal_get_index(xal, &index);
 	if (err) {
+		printf("xal_get_index(...); err(%d)\n", err);
 		goto exit;
 	}
 
 	err = xal_walk(index, node_inspector, NULL);
 	if (err) {
+		printf("xal_walk(...); err(%d)\n", err);
 		goto exit;
 	}
 
