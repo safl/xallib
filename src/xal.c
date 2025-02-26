@@ -281,7 +281,7 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 }
 
 int
-xal_get_index(struct xal *xal, struct xal_inode **index)
+xal_index(struct xal *xal, struct xal_inode **index)
 {
 	struct xal_inode *root;
 	int err;

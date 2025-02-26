@@ -138,6 +138,9 @@ struct xal {
 	struct xal_ag ags[]; ///< Array of 'agcount' number of allocation-groups
 };
 
+int
+xal_pp(struct xal *xal);
+
 /**
  * Open the block device at 'path'
  *
@@ -153,11 +156,11 @@ xal_open(const char *path, struct xal **xal);
 void
 xal_close(struct xal *xal);
 
+/**
+ * Produce an index of the directory and files stored on the device
+ */
 int
-xal_get_index(struct xal *xal, struct xal_inode **index);
-
-int
-xal_pp(struct xal *xal);
+xal_index(struct xal *xal, struct xal_inode **index);
 
 /**
  * Recursively walk the given directory

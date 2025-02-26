@@ -46,7 +46,7 @@ main(int argc, char *argv[])
 		return -err;
 	}
 
-	err = xal_get_index(xal, &index);
+	err = xal_index(xal, &index);
 	if (err) {
 		printf("xal_get_index(...); err(%d)\n", err);
 		goto exit;
