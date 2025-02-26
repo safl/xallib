@@ -148,6 +148,7 @@ process_inode_shortform(struct xal *xal, void *inode, struct xal_inode *self)
 	if (err) {
 		return err;
 	}
+	self->nchildren = count;
 
 	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
 	for (int i = 0; i < count; ++i) {
