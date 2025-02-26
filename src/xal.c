@@ -195,7 +195,7 @@ decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 }
 
 int
-xal_decode_extents(void *buf)
+process_inode_extents(struct xal *xal, void *buf, struct xal_inode *self)
 {
 	struct xal_dinode *dinode = buf;
 	uint8_t *cursor = buf;
@@ -209,9 +209,15 @@ xal_decode_extents(void *buf)
 	nextents =
 	    (dinode->di_nextents) ? be32toh(dinode->di_nextents) : be64toh(dinode->di_big_nextents);
 
+	/** Ensure that the buffer contains the on-disk format */
+	assert(dinode->di_magic == 0x4E49);
+
+	/** Multiple extents are not implemented yet; add a memory-pool for them */
+	assert(nextents <= 1);
+
+	printf("ino: 0x%016"PRIX64"\n", self->ino);
 	printf("nextents: %" PRIu64 "\n", nextents);
-	printf("dinode->magic: 0x%04" PRIX32 "\n", dinode->di_magic);
-	printf("dinode->di_size: %" PRIu64 "\n", be64toh(dinode->di_size));
+	printf("size: %" PRIu64 "\n", be64toh(dinode->di_size));
 
 	cursor += sizeof(struct xal_dinode); ///< Advance past inode data
 
@@ -224,7 +230,7 @@ xal_decode_extents(void *buf)
 		l1 = be64toh(*((uint64_t *)cursor));
 		cursor += 8;
 
-		decode_xfs_extent(l0, l1, NULL);
+		decode_xfs_extent(l0, l1, &self->extent);
 	}
 
 	return 0;
@@ -237,10 +243,8 @@ int
 process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 {
 	uint8_t buf[BUF_NBYTES] = {0};
-	struct xal_dinode *dinode;
+	struct xal_dinode *dinode = (void *)buf;
 	ssize_t nbytes;
-
-	printf("\n## ino(0x%08" PRIX64 ")\n", ino);
 
 	///< Read the on-disk inode data
 	nbytes = pread(xal->handle.fd, buf, xal->sb.sectsize, xal_get_inode_offset(xal, ino));
@@ -248,7 +252,6 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		return -EIO;
 	}
 
-	dinode = (void *)buf;
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_DEV: ///< What is this?
 		break;
@@ -257,7 +260,7 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		break;
 
 	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
-		xal_decode_extents(buf);
+		process_inode_extents(xal, buf, self);
 		break;
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
@@ -290,8 +293,6 @@ xal_get_index(struct xal *xal, struct xal_inode **index)
 
 	*index = root;
 
-
-	///< To set nchildren and populate children delegate to process_ino()
 	return process_inode_ino(xal, root->ino, root);
 }
 

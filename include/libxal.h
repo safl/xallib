@@ -43,7 +43,7 @@ struct xal_inode {
 	uint8_t ftype;	 ///< File-type (directory, filename, symlink etc.)
 	uint8_t namelen; ///< Length of the name; not counting nul-termination
 	uint32_t nextents;	 ///< Number of extents
-	struct xal_extent head; ///< First extent
+	struct xal_extent extent; ///< First extent
 	char name[256];		///< Name; not including nul-termination
 	uint8_t rsvd[8];
 	uint16_t nchildren; ///< Number of children; for directories
