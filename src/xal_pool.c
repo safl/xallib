@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <xal_pool.h>
+#include <stdio.h>
 
 int
 xal_pool_unmap(struct xal_pool *pool)
@@ -18,7 +19,8 @@ xal_pool_grow(struct xal_pool *pool, size_t growby)
 	size_t growby_nbytes = growby * sizeof(*pool->inodes);
 	size_t allocated_nbytes = growby_nbytes + pool->allocated * sizeof(*pool->inodes);
 
-	if (mprotect(pool, allocated_nbytes, PROT_READ | PROT_WRITE)) {
+	if (mprotect(pool->inodes, allocated_nbytes, PROT_READ | PROT_WRITE)) {
+		printf("mprotect(...); err(%d)", errno);
 		return -errno;
 	}
 	memset(&pool->inodes[pool->free], 0, growby_nbytes);
