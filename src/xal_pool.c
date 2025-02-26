@@ -20,7 +20,7 @@ xal_pool_grow(struct xal_pool *pool, size_t growby)
 	size_t allocated_nbytes = growby_nbytes + pool->allocated * sizeof(*pool->inodes);
 
 	if (mprotect(pool->inodes, allocated_nbytes, PROT_READ | PROT_WRITE)) {
-		printf("mprotect(...); err(%d)", errno);
+		printf("mprotect(...); errno(%d)\n", errno);
 		return -errno;
 	}
 	memset(&pool->inodes[pool->free], 0, growby_nbytes);
@@ -36,11 +36,11 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated)
 	int err;
 
 	if (pool->reserved) {
-		printf("xal_pool_map(),validate; err(%d)", EINVAL);
+		printf("xal_pool_map(...); errno(%d)\n", EINVAL);
 		return -EINVAL;
 	}
 	if (allocated > reserved) {
-		printf("xal_pool_map(),validate; err(%d)", EINVAL);
+		printf("xal_pool_map(...); errno(%d)\n", EINVAL);
 		return -EINVAL;
 	}
 
