@@ -303,7 +303,7 @@ xal_index(struct xal *xal, struct xal_inode **index)
 }
 
 int
-xal_walk(struct xal_inode *inode, xal_callback cb_func, void *cb_data)
+xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 {
 	if (cb_func) {
 		cb_func(inode, cb_data);

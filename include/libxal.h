@@ -53,7 +53,7 @@ struct xal_inode {
 int
 xal_inode_pp(struct xal_inode *inode);
 
-typedef void (*xal_callback)(struct xal_inode *inode, void *cb_args);
+typedef void (*xal_walk_cb)(struct xal_inode *inode, void *cb_args);
 
 struct xal_pool {
 	size_t reserved; ///< Maximum number of inodes in the pool
@@ -174,4 +174,4 @@ xal_index(struct xal *xal, struct xal_inode **index);
  * Returns 0 on success. On error, negative errno is returned to indicate the error.
  */
 int
-xal_walk(struct xal_inode *inode, xal_callback cb_func, void *cb_data);
+xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data);
