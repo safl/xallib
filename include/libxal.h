@@ -175,11 +175,3 @@ xal_index(struct xal *xal, struct xal_inode **index);
  */
 int
 xal_walk(struct xal_inode *inode, xal_callback cb_func, void *cb_data);
-
-/**
- * Pretty-print the given directory
- *
- * Returns 0 on success. On error, negative errno is returned to indicate the error.
- */
-int
-xal_dir_pp(struct xal_inode *dir);
