@@ -285,7 +285,7 @@ xal_get_index(struct xal *xal, struct xal_inode **index)
 	}
 
 	root->ino = xal->sb.rootino;
-	root->ftype = XAL_XFS_DIR3_FT_REG_FILE;
+	root->ftype = XAL_XFS_DIR3_FT_DIR;
 	root->namelen = 1;
 	root->nextents = 0;
 	snprintf(root->name, root->namelen, "/");
