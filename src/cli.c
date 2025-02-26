@@ -15,6 +15,19 @@
 
 #define BUF_NBYTES 4096
 
+void node_inspector(struct xal_inode *inode, void *cb_args)
+{
+	switch (inode->ftype) {
+	case XAL_XFS_DIR3_FT_DIR:
+		printf("# '%.*s'\n", inode->namelen, inode->name);
+		break;
+
+	case XAL_XFS_DIR3_FT_REG_FILE:
+		printf("'%.*s'\n", inode->namelen, inode->name);
+		break;
+	}
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -37,7 +50,7 @@ main(int argc, char *argv[])
 		goto exit;
 	}
 
-	err = xal_dir_walk(index, NULL, NULL);
+	err = xal_walk(index, node_inspector, NULL);
 	if (err) {
 		goto exit;
 	}

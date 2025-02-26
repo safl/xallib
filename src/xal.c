@@ -303,10 +303,30 @@ xal_get_index(struct xal *xal, struct xal_inode **index)
 }
 
 int
-xal_dir_walk(struct xal_inode *dir, void *cb_func, void *cb_data)
+xal_walk(struct xal_inode *inode, xal_callback cb_func, void *cb_data)
 {
-	printf("xal_dir_walk(): not implemented; dir(%p), func(%p), data(%p)\n", (void *)dir,
-	       (void *)cb_func, (void *)cb_data);
+	if (cb_func) {
+		cb_func(inode, cb_data);
+	}
+	
+	switch(inode->ftype) {
+	case XAL_XFS_DIR3_FT_DIR:
+		{
+			struct xal_inode *children = inode->children;
+			
+			for(uint16_t i = 0; i < inode->nchildren; ++i) {
+				xal_walk(&children[i], cb_func, cb_data);
+			}
+		}
+		break;
 
-	return -ENOSYS;
+	case XAL_XFS_DIR3_FT_REG_FILE:
+		return 0;
+
+	default:
+		printf("Unknown / unsupported ftype: %d", inode->ftype);
+		return -EINVAL;
+	}
+
+	return 0;
 }
