@@ -59,6 +59,7 @@ xal_open(const char *path, struct xal **xal)
 	const struct xal_odf_sb *psb = (void *)buf;
 	struct xal *cand;
 	ssize_t nbytes;
+	int err;
 
 	base.handle.fd = open(path, O_RDONLY);
 	if (-1 == base.handle.fd) {
@@ -121,7 +122,11 @@ xal_open(const char *path, struct xal **xal)
 	}
 
 	// Setup inode memory-pool
-	xal_pool_map(&cand->pool, 40000000UL, 100000UL);
+	err = xal_pool_map(&cand->pool, 40000000UL, 100000UL);
+	if (err) {
+		printf("xal_pool_map(...); err(%d)\n", err);
+		return err;
+	}
 
 	// All is good; promote the candidate
 	*xal = cand;
