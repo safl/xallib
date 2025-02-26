@@ -53,6 +53,8 @@ struct xal_inode {
 int
 xal_inode_pp(struct xal_inode *inode);
 
+typedef void (*xal_callback)(struct xal_inode *inode, void *cb_args);
+
 struct xal_pool {
 	size_t reserved; ///< Maximum number of inodes in the pool
 	size_t allocated; ///< Number of reserved inodes that are allocated
