@@ -293,6 +293,8 @@ xal_get_index(struct xal *xal, struct xal_inode **index)
 	root->nextents = 0;
 	memcpy(root->name, "/", 1);
 
+	*index = root;
+
 
 	///< To set nchildren and populate children delegate to process_ino()
 	return process_inode_ino(xal, root->ino, root);
