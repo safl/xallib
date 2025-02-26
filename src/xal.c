@@ -160,7 +160,7 @@ process_inode_shortform(struct xal *xal, void *inode, struct xal_inode *self)
 
 	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
 	for (int i = 0; i < count; ++i) {
-		struct xal_inode *child = children;
+		struct xal_inode *child = &children[i];
 
 		child->namelen = *cursor;
 		cursor += 1 + 2; ///< Advance past 'namelen' and 'offset[2]'
