@@ -33,7 +33,7 @@ xal_pool_grow(struct xal_pool *pool, size_t growby)
 int
 xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated)
 {
-	struct xal_inode *cand;
+	int err;
 
 	if (pool->reserved) {
 		printf("xal_pool_map(),validate; err(%d)", EINVAL);
@@ -49,14 +49,18 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated)
 	pool->growby = allocated;
 	pool->free = 0;
 
-	cand = mmap(NULL, reserved * sizeof(*cand), PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (MAP_FAILED == cand) {
-		printf("xal_pool_map(),validate; err(%d)", EINVAL);
+	pool->inodes = mmap(NULL, reserved * sizeof(*pool->inodes), PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (MAP_FAILED == pool->inodes) {
+		printf("mmap(...); errno(%d)\n", errno);
 		return -errno;
 	}
-	xal_pool_grow(pool, allocated);
 
-	pool->inodes = cand;
+	err = xal_pool_grow(pool, allocated);
+	if (err) {
+		printf("xal_pool_grow(...); err(%d)\n", err);
+		xal_pool_unmap(pool);
+		return err;
+	}
 
 	return 0;
 }
