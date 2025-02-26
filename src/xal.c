@@ -283,7 +283,7 @@ xal_get_index(struct xal *xal, struct xal_inode **index)
 	root->ino = xal->sb.rootino;
 	root->ftype = XAL_XFS_DIR3_FT_REG_FILE;
 	root->namelen = 1;
-	root->count = 0;
+	root->nextents = 0;
 	snprintf(root->name, root->namelen, "/");
 
 	///< To set nchildren and populate children delegate to process_ino()

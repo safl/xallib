@@ -148,9 +148,9 @@ xal_inode_pp(struct xal_inode *inode)
 	wrtn += printf("  ftype: %" PRIu8 "\n", inode->ftype);
 	wrtn += printf("  namelen: %" PRIu8 "\n", inode->namelen);
 	wrtn += printf("  name: '%.256s'\n", inode->name);
-	wrtn += printf("  nchildren: %u\n", inode->count);
+	wrtn += printf("  nchildren: %u\n", inode->nextents);
 
-	for (uint8_t i = 0; i < inode->count; ++i) {
+	for (uint8_t i = 0; i < inode->nextents; ++i) {
 		struct xal_inode *children = inode->children;
 
 		xal_inode_pp(&children[i]);

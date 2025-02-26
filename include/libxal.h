@@ -42,7 +42,7 @@ struct xal_inode {
 	uint64_t ino;	 ///< Inode number of the directory entry; Should the AG be added here?
 	uint8_t ftype;	 ///< File-type (directory, filename, symlink etc.)
 	uint8_t namelen; ///< Length of the name; not counting nul-termination
-	uint32_t count;	 ///< Number of extents
+	uint32_t nextents;	 ///< Number of extents
 	struct xal_extent head; ///< First extent
 	char name[256];		///< Name; not including nul-termination
 	uint8_t rsvd[8];
