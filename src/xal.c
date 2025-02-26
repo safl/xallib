@@ -117,6 +117,9 @@ xal_open(const char *path, struct xal **xal)
 		assert(agno == be32toh(agf->seqno));
 	}
 
+	// Setup inode memory-pool
+	xal_pool_map(&cand->pool, 40000000UL, 100000UL);
+
 	// All is good; promote the candidate
 	*xal = cand;
 
