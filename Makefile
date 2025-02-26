@@ -21,6 +21,12 @@ install:
 
 .PHONY: run
 run:
-#	sudo chown safl:safl /dev/sda1
-#	sudo mount -o nodatacow /dev/sda1
+	./$(builddir)/xal /dev/sda1
+
+.PHONY: run-valgrind
+run-valgrind:
 	valgrind ./$(builddir)/xal /dev/sda1
+
+.PHONY: run-gdb
+run-gdb:
+	gdb run --args ./$(builddir)/xal /dev/sda1
