@@ -221,10 +221,6 @@ process_inode_extents(struct xal *xal, void *buf, struct xal_inode *self)
 	/** Multiple extents are not implemented yet; add a memory-pool for them */
 	assert(nextents <= 1);
 
-	printf("ino: 0x%016"PRIX64"\n", self->ino);
-	printf("nextents: %" PRIu64 "\n", nextents);
-	printf("size: %" PRIu64 "\n", be64toh(dinode->di_size));
-
 	cursor += sizeof(struct xal_dinode); ///< Advance past inode data
 
 	for (uint64_t i = 0; i < nextents; ++i) {
