@@ -36,9 +36,11 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated)
 	struct xal_inode *cand;
 
 	if (pool->reserved) {
+		printf("xal_pool_map(),validate; err(%d)", EINVAL);
 		return -EINVAL;
 	}
 	if (allocated > reserved) {
+		printf("xal_pool_map(),validate; err(%d)", EINVAL);
 		return -EINVAL;
 	}
 
@@ -49,6 +51,7 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated)
 
 	cand = mmap(NULL, reserved * sizeof(*cand), PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (MAP_FAILED == cand) {
+		printf("xal_pool_map(),validate; err(%d)", EINVAL);
 		return -errno;
 	}
 	xal_pool_grow(pool, allocated);
