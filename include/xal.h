@@ -360,3 +360,15 @@ struct xal_xfs_dir2_sf_hdr {
 	uint8_t i8count;   /* Count of 8-byte inode numbers (vs 4-byte) */
 	uint8_t parent[8]; /* Parent directory inode number */
 } __attribute__((packed));
+
+
+struct xal_ofd_btree_block {
+    __be32  bb_magic;      // 'IAB3' for inode B+Tree
+    __be16  bb_level;      // Tree level (0 = leaf, >0 = interior)
+    __be16  bb_numrecs;    // Number of records in this node
+    __be64  bb_leftsib;    // Left sibling block (AG-relative)
+    __be64  bb_rightsib;   // Right sibling block (AG-relative)
+    uuid_t  bb_uuid;       // Filesystem UUID
+    __be64  bb_blkno;      // Absolute disk block number
+    __be64  bb_lsn;        // Last write sequence number
+};
