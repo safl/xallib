@@ -279,6 +279,7 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
 		process_inode_shortform(xal, buf, self);
+		/// This could also be a small file?
 		break;
 
 	case XAL_DINODE_FMT_UUID:

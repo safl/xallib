@@ -10,12 +10,49 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <xal.h>
 
 #define BUF_NBYTES 4096
 
-void node_inspector(struct xal_inode *inode, void *cb_args)
+struct xal_cli_args {
+	int verbose;
+	char *filename;
+};
+
+int
+parse_args(int argc, char *argv[], struct xal_cli_args *args)
+{
+	args->verbose = 0;
+	args->filename = NULL;
+
+	if (argc < 2) {
+		fprintf(stderr, "Usage: %s [-v | --verbose] <filename>\n", argv[0]);
+		return -EINVAL;
+	}
+
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
+			args->verbose = 1;
+		} else if (args->filename == NULL) {
+			args->filename = argv[i];
+		} else {
+			fprintf(stderr, "Unexpected argument: %s\n", argv[i]);
+			return -EINVAL;
+		}
+	}
+
+	if (args->filename == NULL) {
+		fprintf(stderr, "Error: Filename is required\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+void
+node_inspector(struct xal_inode *inode, void *cb_args)
 {
 	switch (inode->ftype) {
 	case XAL_XFS_DIR3_FT_DIR:
@@ -31,13 +68,14 @@ void node_inspector(struct xal_inode *inode, void *cb_args)
 int
 main(int argc, char *argv[])
 {
+	struct xal_cli_args args = {0};
 	struct xal_inode *index;
 	struct xal *xal;
 	int err;
 
-	if (argc != 2) {
-		printf("Invalid input; argc(%d)\n", argc);
-		return EINVAL;
+	err = parse_args(argc, argv, &args);
+	if (err) {
+		return err;
 	}
 
 	err = xal_open(argv[argc - 1], &xal);
@@ -46,16 +84,22 @@ main(int argc, char *argv[])
 		return -err;
 	}
 
+	if (args.verbose) {
+		xal_pp(xal);
+	}
+
 	err = xal_index(xal, &index);
 	if (err) {
 		printf("xal_get_index(...); err(%d)\n", err);
 		goto exit;
 	}
 
-	err = xal_walk(index, node_inspector, NULL);
-	if (err) {
-		printf("xal_walk(...); err(%d)\n", err);
-		goto exit;
+	if (args.verbose) {
+		err = xal_walk(index, args.verbose ? node_inspector : NULL, NULL);
+		if (err) {
+			printf("xal_walk(...); err(%d)\n", err);
+			goto exit;
+		}
 	}
 
 exit:
