@@ -106,7 +106,7 @@ struct xal_ag {
 	uint32_t seqno;
 	uint32_t agf_length; ///< Size of allocation group, in blocks
 	uint32_t agi_count;  ///< Number of allocated inodes, counting from 1
-	uint32_t agi_root;   ///< root of inode btree, format?
+	uint32_t agi_root;   ///< Block number positioned relative to the AG
 	uint32_t agi_level;  ///< levels in inode btree
 };
 
