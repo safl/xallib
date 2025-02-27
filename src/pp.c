@@ -21,7 +21,7 @@ xal_ag_pp(struct xal_ag *ag)
 	wrtn += printf("  offset: %" PRIu32 "\n", ag->offset);
 	wrtn += printf("  agf_length: %" PRIu32 "\n", ag->agf_length);
 	wrtn += printf("  agi_count: %" PRIu32 "\n", ag->agi_count);
-	wrtn += printf("  agi_root: 0x%016" PRIx32 "\n", ag->agi_root);
+	wrtn += printf("  agi_root: %" PRIu32 "\n", ag->agi_root);
 	wrtn += printf("  agi_level: %" PRIu32 "\n", ag->agi_level);
 
 	return wrtn;
