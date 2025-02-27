@@ -94,13 +94,12 @@ xal_open(const char *path, struct xal **xal)
 
 	// Retrieve allocation-group meta, convert it, and store it.
 	for (uint32_t agno = 0; agno < cand->sb.agcount; ++agno) {
+		off_t offset = (off_t)agno * (off_t)cand->sb.agblocks * (off_t)cand->sb.blocksize;
 		struct xal_agf *agf = (void *)(buf + cand->sb.sectsize);
 		struct xal_agi *agi = (void *)(buf + cand->sb.sectsize * 2);
-		off_t offset;
 
 		memset(buf, 0, BUF_NBYTES);
 
-		offset = (off_t)agno * (off_t)cand->sb.agblocks * (off_t)cand->sb.blocksize;
 		nbytes = pread(cand->handle.fd, buf, BUF_NBYTES, offset);
 		if (nbytes != BUF_NBYTES) {
 			perror("Reading AG Headers failed");
@@ -109,6 +108,7 @@ xal_open(const char *path, struct xal **xal)
 		}
 
 		cand->ags[agno].seqno = agno;
+		cand->ags[agno].offset = offset;
 		cand->ags[agno].agf_length = be32toh(agf->length);
 		cand->ags[agno].agi_count = be32toh(agi->agi_count);
 		cand->ags[agno].agi_level = be32toh(agi->agi_level);

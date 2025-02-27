@@ -26,6 +26,7 @@
  *
  */
 #include <inttypes.h>
+#include <sys/types.h>
 #include <stddef.h>
 
 struct xal_extent {
@@ -104,6 +105,7 @@ union xal_handle {
  */
 struct xal_ag {
 	uint32_t seqno;
+	off_t offset; ///< Offset on disk in bytes; seqno * agblocks * blocksize
 	uint32_t agf_length; ///< Size of allocation group, in blocks
 	uint32_t agi_count;  ///< Number of allocated inodes, counting from 1
 	uint32_t agi_root;   ///< Block number positioned relative to the AG
