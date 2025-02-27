@@ -201,7 +201,7 @@ decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 }
 
 int
-process_inode_extents(struct xal *xal, void *buf, struct xal_inode *self)
+process_inode_extents(void *buf, struct xal_inode *self)
 {
 	struct xal_dinode *dinode = buf;
 	uint8_t *cursor = buf;
@@ -262,7 +262,7 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		break;
 
 	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
-		process_inode_extents(xal, buf, self);
+		process_inode_extents(buf, self);
 		break;
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
