@@ -121,6 +121,7 @@ struct xal_sb {
 	uint16_t inodesize; ///< inode size, in bytes
 	uint16_t inopblock; ///< inodes per block
 	uint8_t inopblog;   ///< log2 of inopblock
+	uint64_t icount;    ///< allocated inodes
 	uint64_t rootino;   ///< root inode number, in global-address format
 	uint32_t agblocks;  ///< Size of an allocation group, in blocks
 	uint8_t agblklog;   ///< log2 of 'agblocks' (rounded up)

@@ -80,6 +80,7 @@ xal_open(const char *path, struct xal **xal)
 	base.sb.inodesize = be16toh(psb->inodesize);
 	base.sb.inopblock = be16toh(psb->sb_inopblock);
 	base.sb.inopblog = psb->sb_inopblog;
+	base.sb.icount = be64toh(psb->sb_icount);
 	base.sb.rootino = be64toh(psb->rootino);
 	base.sb.agblocks = be32toh(psb->agblocks);
 	base.sb.agblklog = psb->sb_agblklog;
@@ -122,7 +123,7 @@ xal_open(const char *path, struct xal **xal)
 	}
 
 	// Setup inode memory-pool
-	err = xal_pool_map(&cand->pool, 40000000UL, 100000UL);
+	err = xal_pool_map(&cand->pool, 40000000UL, cand->sb.icount);
 	if (err) {
 		printf("xal_pool_map(...); err(%d)\n", err);
 		return err;
