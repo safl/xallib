@@ -16,6 +16,11 @@
 
 #define BUF_NBYTES 4096
 
+struct xal_nodeinspector_stats {
+	uint64_t ndirs;
+	uint64_t nfiles;
+};
+
 struct xal_cli_args {
 	int verbose;
 	char *filename;
@@ -54,12 +59,16 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 void
 node_inspector(struct xal_inode *inode, void *cb_args)
 {
+	struct xal_nodeinspector_stats *stats = cb_args;
+
 	switch (inode->ftype) {
 	case XAL_XFS_DIR3_FT_DIR:
+		stats->ndirs += 1;
 		printf("# '%.*s'\n", inode->namelen, inode->name);
 		break;
 
 	case XAL_XFS_DIR3_FT_REG_FILE:
+		stats->nfiles += 1;
 		printf("'%.*s'\n", inode->namelen, inode->name);
 		break;
 	}
@@ -69,6 +78,7 @@ int
 main(int argc, char *argv[])
 {
 	struct xal_cli_args args = {0};
+	struct xal_nodeinspector_stats cb_args = {0};
 	struct xal_inode *index;
 	struct xal *xal;
 	int err;
@@ -94,12 +104,14 @@ main(int argc, char *argv[])
 		goto exit;
 	}
 
+	err = xal_walk(index, args.verbose ? node_inspector : NULL, args.verbose ? &cb_args : NULL);
+	if (err) {
+		printf("xal_walk(...); err(%d)\n", err);
+		goto exit;
+	}
+
 	if (args.verbose) {
-		err = xal_walk(index, args.verbose ? node_inspector : NULL, NULL);
-		if (err) {
-			printf("xal_walk(...); err(%d)\n", err);
-			goto exit;
-		}
+		printf("ndirs(%" PRIu64 "); nfiles(%" PRIu64 ")", cb_args.ndirs, cb_args.nfiles);
 	}
 
 exit:
