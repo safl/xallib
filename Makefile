@@ -21,7 +21,7 @@ install:
 
 .PHONY: run
 run:
-	./$(builddir)/xal /dev/sda1
+	./$(builddir)/xal --verbose /dev/sda1
 
 .PHONY: run-valgrind
 run-valgrind:
