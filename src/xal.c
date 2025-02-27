@@ -238,6 +238,17 @@ process_inode_extents(void *buf, struct xal_inode *self)
 	return 0;
 }
 
+int
+process_inode_btree(struct xal *xal, void *buf, struct xal_inode *self)
+{
+	struct xal_dinode *dinode = buf;
+	uint8_t *cursor = buf;
+
+	
+
+	return 0;
+}
+
 /**
  * Internal helper recursively traversing the on-disk-format to build an index of the file-system
  */
@@ -259,6 +270,7 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		break;
 
 	case XAL_DINODE_FMT_BTREE: ///< Recursively walk the btree
+		process_inode_btree(xal, buf, self);
 		break;
 
 	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
