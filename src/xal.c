@@ -318,17 +318,15 @@ xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 	if (cb_func) {
 		cb_func(inode, cb_data);
 	}
-	
-	switch(inode->ftype) {
-	case XAL_XFS_DIR3_FT_DIR:
-		{
-			struct xal_inode *children = inode->children;
-			
-			for(uint16_t i = 0; i < inode->nchildren; ++i) {
-				xal_walk(&children[i], cb_func, cb_data);
-			}
+
+	switch (inode->ftype) {
+	case XAL_XFS_DIR3_FT_DIR: {
+		struct xal_inode *children = inode->children;
+
+		for (uint16_t i = 0; i < inode->nchildren; ++i) {
+			xal_walk(&children[i], cb_func, cb_data);
 		}
-		break;
+	} break;
 
 	case XAL_XFS_DIR3_FT_REG_FILE:
 		return 0;
