@@ -111,7 +111,7 @@ main(int argc, char *argv[])
 	}
 
 	if (args.verbose) {
-		printf("ndirs(%" PRIu64 "); nfiles(%" PRIu64 ")", cb_args.ndirs, cb_args.nfiles);
+		printf("ndirs(%" PRIu64 "); nfiles(%" PRIu64 ")\n", cb_args.ndirs, cb_args.nfiles);
 	}
 
 exit:
