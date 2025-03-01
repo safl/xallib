@@ -290,11 +290,91 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	return 0;
 }
 
+/**
+ * Observation(s)
+ * ==============
+ *
+ * siblings
+ * It looks like the inode-allocation-block-tree (iab3) uses the short-form for sibling block
+ * numbers. This seems to make sense since the iab3 described inodes within the allocation-group,
+ * and as such, need to only represent block numbers relative to the ag, and thus, only need 32bit
+ * per sibling.
+ *
+ * 'blkno'
+ * The 'blkno' field in the btree is an absolute block number, that is, unlike the block numbers of
+ * siblings, then this 'blkno' is absolute. Also, this number is described in units of sectors!
+ *
+ * This wrinkles my brain but I guess there are good reasons to do so, must be something related
+ * to quickly verifying that a block retrieved from disk using fs-wide addressed is the expected
+ * block.
+ * 
+ * The really convenient thing about this field is that it helped me understand that the siblings
+ * where short-form. When looking at the data on disk, then I thought it has:
+ *
+ *  leftsibling = 0xFF...F
+ *
+ * and the rightsibling was block-address.
+ */
+int
+preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
+{
+	char buf[BUF_NBYTES] = {0};
+	struct xal_ofd_btree_iab3_sfmt *iab3 = (void *)buf;
+	ssize_t nbytes;
+	off_t offset = blkno * xal->sb.blocksize;
+
+	if (blkno == ag->agi_root) {
+		offset += ag->offset;
+	}
+
+	nbytes = pread(xal->handle.fd, buf, BUF_NBYTES, offset);
+	if (nbytes != BUF_NBYTES) {
+		printf("pread(); nbytes(%" PRIu64 "), offset(%" PRIu64 "), blkno(%" PRIu64 ");\n",
+		       nbytes, offset, blkno);
+		return -EIO;
+	}
+
+	iab3->magic.num = iab3->magic.num;
+	iab3->level = be16toh(iab3->level);
+	iab3->numrecs = be16toh(iab3->numrecs);
+	iab3->leftsib = be32toh(iab3->leftsib);
+	iab3->rightsib = be32toh(iab3->rightsib);
+	iab3->blkno = be64toh(iab3->blkno);
+
+	printf("blkno(%" PRIu64 ", 0x%" PRIX64 "), offset(%" PRIu64 "): ", blkno, blkno, offset);
+	xal_ofd_btree_iab3_sfmt_pp(iab3);
+
+	if (iab3->level) {
+		return 0;
+	}
+
+	if (iab3->rightsib != 0xFFFFFFFF) {
+		printf("Going deeper on the right\n");
+		preprocess_inodes_iabt3(xal, ag, iab3->rightsib);
+	}
+
+	return 0;
+}
+
+int
+preprocess_inodes(struct xal *xal)
+{
+	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
+		struct xal_ag *ag = &xal->ags[seqno];
+
+		preprocess_inodes_iabt3(xal, ag, ag->agi_root);
+	}
+
+	return 0;
+}
+
 int
 xal_index(struct xal *xal, struct xal_inode **index)
 {
 	struct xal_inode *root;
 	int err;
+
+	preprocess_inodes(xal);
 
 	err = xal_pool_claim(&xal->pool, 1, &root);
 	if (err) {
