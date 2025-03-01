@@ -192,3 +192,28 @@ xal_extent_pp(struct xal_extent *extent)
 
 	return wrtn;
 }
+
+
+
+int
+xal_ofd_btree_iab3_sfmt_pp(struct xal_ofd_btree_iab3_sfmt *iab3)
+{
+	int wrtn = 0;
+
+	if (!iab3) {
+		wrtn += printf("xal_ofd_btree_iab3: ~\n");
+		return wrtn;
+	}
+
+	wrtn += printf("xal_ofd_btree_iab3:\n");
+	wrtn += printf("  magic: 0x%08" PRIX32 " / '%.4s'\n", iab3->magic.num, iab3->magic.text);
+	wrtn += printf("  level: %" PRIu16 "\n", iab3->level);
+	wrtn += printf("  numrecs: %" PRIu16 "\n", iab3->numrecs);
+	wrtn += printf("  leftsib: 0x%08" PRIX32 "\n", iab3->leftsib);
+	wrtn += printf("  rightsib: 0x%08" PRIX32 "\n", iab3->rightsib);
+
+	wrtn += printf("  blkno: %" PRIu64 "\n", iab3->blkno / 8);
+	
+
+	return wrtn;
+}

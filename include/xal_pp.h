@@ -15,3 +15,6 @@ xal_agi_pp(void *buf);
 
 int
 xal_agfl_pp(void *buf);
+
+int
+xal_ofd_btree_iab3_sfmt_pp(struct xal_ofd_btree_iab3_sfmt *iab3);

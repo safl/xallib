@@ -361,14 +361,36 @@ struct xal_xfs_dir2_sf_hdr {
 	uint8_t parent[8]; /* Parent directory inode number */
 } __attribute__((packed));
 
+union xal_magic {
+	uint32_t num;
+	char text[4];
+};
 
-struct xal_ofd_btree_block {
-    __be32  bb_magic;      // 'IAB3' for inode B+Tree
-    __be16  bb_level;      // Tree level (0 = leaf, >0 = interior)
-    __be16  bb_numrecs;    // Number of records in this node
-    __be64  bb_leftsib;    // Left sibling block (AG-relative)
-    __be64  bb_rightsib;   // Right sibling block (AG-relative)
-    uuid_t  bb_uuid;       // Filesystem UUID
-    __be64  bb_blkno;      // Absolute disk block number
-    __be64  bb_lsn;        // Last write sequence number
+struct xal_ofd_btree_iab3_sfmt {
+	union xal_magic magic; // 'IAB3' for inode B+Tree
+	uint16_t level;	       // Tree level (0 = leaf, >0 = interior)
+	uint16_t numrecs;      // Number of records in this node
+	uint32_t leftsib;      // Left sibling block (AG-relative)
+	uint32_t rightsib;     // Right sibling block (AG-relative)
+
+	uint64_t blkno; ///< blkno; seems like this is only filled when mkfs use-crc; also reported
+			///< in unit of SECTORS!
+	uint64_t bb_lsn;
+	uuid_t bb_uuid;
+	uint32_t bb_owner;
+	uint32_t bb_crc; ///< In little-endian
+};
+
+struct xal_ofd_btree_iab3_lfmt {
+	union xal_magic magic; // 'IAB3' for inode B+Tree
+	uint16_t level;	       // Tree level (0 = leaf, >0 = interior)
+	uint16_t numrecs;      // Number of records in this node
+	uint64_t leftsib;      // Left sibling block (AG-relative)
+	uint64_t rightsib;     // Right sibling block (AG-relative)
+
+	uint64_t blkno; ///< blkno; seems like this is only filled when mkfs use-crc
+	uint64_t bb_lsn;
+	uuid_t bb_uuid;
+	uint32_t bb_owner;
+	uint32_t bb_crc; ///< In little-endian
 };
