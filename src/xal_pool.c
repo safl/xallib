@@ -1,11 +1,11 @@
 #define _GNU_SOURCE
 #include <errno.h>
 #include <libxal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <xal_pool.h>
-#include <stdio.h>
 
 int
 xal_pool_unmap(struct xal_pool *pool)
@@ -49,7 +49,8 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated)
 	pool->growby = allocated;
 	pool->free = 0;
 
-	pool->inodes = mmap(NULL, reserved * sizeof(*pool->inodes), PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	pool->inodes = mmap(NULL, reserved * sizeof(*pool->inodes), PROT_NONE,
+			    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (MAP_FAILED == pool->inodes) {
 		printf("mmap(...); errno(%d)\n", errno);
 		return -errno;

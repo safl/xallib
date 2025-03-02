@@ -26,8 +26,8 @@
  *
  */
 #include <inttypes.h>
-#include <sys/types.h>
 #include <stddef.h>
+#include <sys/types.h>
 
 struct xal_extent {
 	uint64_t start_offset;
@@ -40,12 +40,12 @@ int
 xal_extent_pp(struct xal_extent *extent);
 
 struct xal_inode {
-	uint64_t ino;	 ///< Inode number of the directory entry; Should the AG be added here?
-	uint8_t ftype;	 ///< File-type (directory, filename, symlink etc.)
-	uint8_t namelen; ///< Length of the name; not counting nul-termination
-	uint32_t nextents;	 ///< Number of extents
+	uint64_t ino;	   ///< Inode number of the directory entry; Should the AG be added here?
+	uint8_t ftype;	   ///< File-type (directory, filename, symlink etc.)
+	uint8_t namelen;   ///< Length of the name; not counting nul-termination
+	uint32_t nextents; ///< Number of extents
 	struct xal_extent extent; ///< First extent
-	char name[256];		///< Name; not including nul-termination
+	char name[256];		  ///< Name; not including nul-termination
 	uint8_t rsvd[8];
 	uint16_t nchildren; ///< Number of children; for directories
 	void *children;	    ///< Pointer to array of 'struct xal_inode'
@@ -57,10 +57,10 @@ xal_inode_pp(struct xal_inode *inode);
 typedef void (*xal_walk_cb)(struct xal_inode *inode, void *cb_args);
 
 struct xal_pool {
-	size_t reserved; ///< Maximum number of inodes in the pool
+	size_t reserved;  ///< Maximum number of inodes in the pool
 	size_t allocated; ///< Number of reserved inodes that are allocated
-	size_t growby; ///< Number of reserved inodes to allocate at a time
-	size_t free; /// Index the next free inode
+	size_t growby;	  ///< Number of reserved inodes to allocate at a time
+	size_t free;	  /// Index the next free inode
 	struct xal_inode *inodes;
 };
 
@@ -105,7 +105,7 @@ union xal_handle {
  */
 struct xal_ag {
 	uint32_t seqno;
-	off_t offset; ///< Offset on disk in bytes; seqno * agblocks * blocksize
+	off_t offset;	     ///< Offset on disk in bytes; seqno * agblocks * blocksize
 	uint32_t agf_length; ///< Size of allocation group, in blocks
 	uint32_t agi_count;  ///< Number of allocated inodes, counting from 1
 	uint32_t agi_root;   ///< Block number positioned relative to the AG
