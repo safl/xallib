@@ -217,3 +217,23 @@ xal_ofd_btree_iab3_sfmt_pp(struct xal_ofd_btree_iab3_sfmt *iab3)
 
 	return wrtn;
 }
+
+int
+xal_ofd_inobt_rec_pp(struct xal_ofd_inobt_rec *rec)
+{
+	int wrtn = 0;
+
+	if (!rec) {
+		wrtn += printf("xal_ofd_inobt_rec: ~\n");
+		return wrtn;
+	}
+
+	wrtn += printf("xal_ofd_inobt_rec:\n");
+	wrtn += printf("  startino: %"PRIu32"\n", rec->startino);
+	wrtn += printf("  holemask: %" PRIu16 "\n", rec->holemask);
+	wrtn += printf("  count: %" PRIu8 "\n", rec->count);
+	wrtn += printf("  freecount: %" PRIu8 "\n", rec->freecount);
+	wrtn += printf("  free: %" PRIu64 "\n", rec->free);
+
+	return wrtn;
+}

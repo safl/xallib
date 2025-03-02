@@ -353,6 +353,20 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 		preprocess_inodes_iabt3(xal, ag, iab3->rightsib);
 	}
 
+	{
+		for (uint16_t i = 0; i < iab3->numrecs; ++i) {
+			struct xal_ofd_inobt_rec *rec = (void*)(buf + sizeof(*iab3) + i * sizeof(*rec));
+
+			rec->startino = be32toh(rec->startino);
+			rec->holemask = be16toh(rec->holemask);
+			//rec->count = be32toh(rec->count);
+			//rec->freecount = be32toh(rec->freecount);
+			rec->free = be64toh(rec->free);
+
+			xal_ofd_inobt_rec_pp(rec);
+		}
+	}
+
 	return 0;
 }
 

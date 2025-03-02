@@ -394,3 +394,15 @@ struct xal_ofd_btree_iab3_lfmt {
 	uint32_t bb_owner;
 	uint32_t bb_crc; ///< In little-endian
 };
+
+struct xal_ofd_inobt_rec {
+	uint32_t startino; ///< The lowest-numbered inode in this chunk, rounded down to the nearest
+			   ///< multiple of 64, even if the start of this chunk is sparse.
+	uint16_t holemask; ///< A 16 element bitmap showing which parts of the chunk are not
+			   ///< allocated to inodes. Each bit represents four inodes; if a bit is
+			   ///< marked here, the corresponding bits in ir_free must also be marked.
+	uint8_t count;	   ///< Number of inodes allocated to this chunk
+	uint8_t freecount; ///< Number of free inodes in this chunk
+	uint64_t free; ///< A 64 element bitmap showing which inodes in this chunk are not available
+		       ///< for allocation
+};
