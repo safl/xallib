@@ -4,7 +4,7 @@
 #include <libxal.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <xal.h>
+#include <xal_odf.h>
 
 int
 xal_ag_pp(struct xal_ag *ag)

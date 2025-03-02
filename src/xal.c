@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <xal.h>
+#include <xal_odf.h>
 #include <xal_pool.h>
 #include <xal_pp.h>
 
