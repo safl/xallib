@@ -30,15 +30,6 @@ typedef uint32_t xfs_nlink_t; // NOTE: This is defined as '__u32'
 #include <xfs/xfs_types.h>
 
 /**
- * These are not defined in xfs_types.h; thus, providing them here.
- */
-typedef uint8_t __u8;
-typedef uint16_t __be16;
-typedef uint32_t __be32;
-typedef uint32_t __le32;
-typedef uint64_t __be64;
-
-/**
  * We do not want to depend on a library providing uuid_t since we are not using
  * it for anything but basic printing and byte-wise comparison. Thus, this
  * simple representation here.
@@ -52,14 +43,14 @@ typedef struct {
 /**
  * Maximum size of the filesystem label, no terminating NULL
  */
-#define XALLABEL_MAX 12
+#define XAL_ODF_LABEL_MAX 12
 
-#define XAL_AGF_MAGIC 0x58414746  /* 'XAGF' */
-#define XAL_AGI_MAGIC 0x58414749  /* 'XAGI' */
-#define XAL_AGFL_MAGIC 0x5841464c /* 'XAFL' */
+#define XAL_ODF_AGF_MAGIC 0x58414746  /* 'XAGF' */
+#define XAL_ODF_AGI_MAGIC 0x58414749  /* 'XAGI' */
+#define XAL_ODF_AGFL_MAGIC 0x5841464c /* 'XAFL' */
 
-#define XAL_XFS_DIR3_FT_REG_FILE 1
-#define XAL_XFS_DIR3_FT_DIR 2
+#define XAL_ODF_DIR3_FT_REG_FILE 1
+#define XAL_ODF_DIR3_FT_DIR 2
 
 /**
  * The XFS Superblock on-disk representation in v5 format
@@ -92,7 +83,7 @@ struct xal_odf_sb {
 
 	uint16_t sb_inopblock; /* inodes per block */
 
-	char sb_fname[XALLABEL_MAX]; /* file system name */
+	char sb_fname[XAL_ODF_LABEL_MAX]; /* file system name */
 
 	uint8_t sb_blocklog;   /* log2 of sb_blocksize */
 	uint8_t sb_sectlog;    /* log2 of sb_sectsize */
@@ -158,51 +149,51 @@ struct xal_odf_sb {
 	/* must be padded to 64 bit alignment */
 };
 
-struct xal_agf {
+struct xal_odf_agf {
 	/*
 	 * Common allocation group header information
 	 */
-	__be32 magicnum;       /* magic number == XAL_AGF_MAGIC */
-	__be32 agf_versionnum; /* header version == XAL_AGF_VERSION */
-	__be32 seqno;	       /* sequence # starting from 0 */
-	__be32 length;	       /* size in blocks of a.g. */
+	uint32_t magicnum;	 /* magic number == XAL_ODF_AGF_MAGIC */
+	uint32_t agf_versionnum; /* header version == XAL_ODF_AGF_VERSION */
+	uint32_t seqno;		 /* sequence # starting from 0 */
+	uint32_t length;	 /* size in blocks of a.g. */
 	/*
 	 * Freespace and rmap information
 	 */
-	__be32 agf_bno_root;  /* bnobt root block */
-	__be32 agf_cnt_root;  /* cntbt root block */
-	__be32 agf_rmap_root; /* rmapbt root block */
+	uint32_t agf_bno_root;	/* bnobt root block */
+	uint32_t agf_cnt_root;	/* cntbt root block */
+	uint32_t agf_rmap_root; /* rmapbt root block */
 
-	__be32 agf_bno_level;  /* bnobt btree levels */
-	__be32 agf_cnt_level;  /* cntbt btree levels */
-	__be32 agf_rmap_level; /* rmapbt btree levels */
+	uint32_t agf_bno_level;	 /* bnobt btree levels */
+	uint32_t agf_cnt_level;	 /* cntbt btree levels */
+	uint32_t agf_rmap_level; /* rmapbt btree levels */
 
-	__be32 agf_flfirst;  /* first freelist block's index */
-	__be32 agf_fllast;   /* last freelist block's index */
-	__be32 agf_flcount;  /* count of blocks in freelist */
-	__be32 agf_freeblks; /* total free blocks */
+	uint32_t agf_flfirst;  /* first freelist block's index */
+	uint32_t agf_fllast;   /* last freelist block's index */
+	uint32_t agf_flcount;  /* count of blocks in freelist */
+	uint32_t agf_freeblks; /* total free blocks */
 
-	__be32 agf_longest;   /* longest free space */
-	__be32 agf_btreeblks; /* # of blocks held in AGF btrees */
-	uuid_t agf_uuid;      /* uuid of filesystem */
+	uint32_t agf_longest;	/* longest free space */
+	uint32_t agf_btreeblks; /* # of blocks held in AGF btrees */
+	uuid_t agf_uuid;	/* uuid of filesystem */
 
-	__be32 agf_rmap_blocks;	    /* rmapbt blocks used */
-	__be32 agf_refcount_blocks; /* refcountbt blocks used */
+	uint32_t agf_rmap_blocks;     /* rmapbt blocks used */
+	uint32_t agf_refcount_blocks; /* refcountbt blocks used */
 
-	__be32 agf_refcount_root;  /* refcount tree root block */
-	__be32 agf_refcount_level; /* refcount btree levels */
+	uint32_t agf_refcount_root;  /* refcount tree root block */
+	uint32_t agf_refcount_level; /* refcount btree levels */
 
 	/*
 	 * reserve some contiguous space for future logged fields before we add
 	 * the unlogged fields. This makes the range logging via flags and
 	 * structure offsets much simpler.
 	 */
-	__be64 agf_spare64[14];
+	uint64_t agf_spare64[14];
 
 	/* unlogged fields, written during buffer writeback. */
-	__be64 agf_lsn; /* last write sequence */
-	__be32 agf_crc; /* crc of agf sector */
-	__be32 agf_spare2;
+	uint64_t agf_lsn; /* last write sequence */
+	uint32_t agf_crc; /* crc of agf sector */
+	uint32_t agf_spare2;
 
 	/* structure must be padded to 64 bit alignment */
 };
@@ -212,57 +203,60 @@ struct xal_agf {
  */
 #define XAL_AGI_UNLINKED_BUCKETS 64
 
-struct xal_agi {
+struct xal_odf_agi {
 	/*
 	 * Common allocation group header information
 	 */
-	__be32 magicnum;   /* magic number == XAL_AGI_MAGIC */
-	__be32 versionnum; /* header version == XAL_AGI_VERSION */
-	__be32 seqno;	   /* sequence # starting from 0 */
-	__be32 length;	   /* size in blocks of a.g. */
+	uint32_t magicnum;   /* magic number == XAL_AGI_MAGIC */
+	uint32_t versionnum; /* header version == XAL_AGI_VERSION */
+	uint32_t seqno;	     /* sequence # starting from 0 */
+	uint32_t length;     /* size in blocks of a.g. */
 	/*
 	 * Inode information
 	 * Inodes are mapped by interpreting the inode number, so no
 	 * mapping data is needed here.
 	 */
-	__be32 agi_count;     /* count of allocated inodes */
-	__be32 agi_root;      /* root of inode btree */
-	__be32 agi_level;     /* levels in inode btree */
-	__be32 agi_freecount; /* number of free inodes */
+	uint32_t agi_count;	/* count of allocated inodes */
+	uint32_t agi_root;	/* root of inode btree */
+	uint32_t agi_level;	/* levels in inode btree */
+	uint32_t agi_freecount; /* number of free inodes */
 
-	__be32 agi_newino; /* new inode just allocated */
-	__be32 agi_dirino; /* last directory inode chunk */
+	uint32_t agi_newino; /* new inode just allocated */
+	uint32_t agi_dirino; /* last directory inode chunk */
 	/*
 	 * Hash table of inodes which have been unlinked but are
 	 * still being referenced.
 	 */
-	__be32 agi_unlinked[XAL_AGI_UNLINKED_BUCKETS];
+	uint32_t agi_unlinked[XAL_AGI_UNLINKED_BUCKETS];
 	/*
 	 * This marks the end of logging region 1 and start of logging region 2.
 	 */
-	uuid_t agi_uuid; /* uuid of filesystem */
-	__be32 agi_crc;	 /* crc of agi sector */
-	__be32 agi_pad32;
-	__be64 agi_lsn; /* last write sequence */
+	uuid_t agi_uuid;  /* uuid of filesystem */
+	uint32_t agi_crc; /* crc of agi sector */
+	uint32_t agi_pad32;
+	uint64_t agi_lsn; /* last write sequence */
 
-	__be32 agi_free_root;  /* root of the free inode btree */
-	__be32 agi_free_level; /* levels in free inode btree */
+	uint32_t agi_free_root;	 /* root of the free inode btree */
+	uint32_t agi_free_level; /* levels in free inode btree */
 
-	__be32 agi_iblocks; /* inobt blocks used */
-	__be32 agi_fblocks; /* finobt blocks used */
+	uint32_t agi_iblocks; /* inobt blocks used */
+	uint32_t agi_fblocks; /* finobt blocks used */
 
 	/* structure must be padded to 64 bit alignment */
 };
 
-struct xal_xfs_agfl {
-	__be32 magicnum;
-	__be32 seqno;
+struct xal_odf_agfl {
+	uint32_t magicnum;
+	uint32_t seqno;
 	uuid_t agfl_uuid;
-	__be64 agfl_lsn;
-	__be32 agfl_crc;
+	uint64_t agfl_lsn;
+	uint32_t agfl_crc;
 } __attribute__((packed));
 
-typedef __be64 xfs_timestamp_t;
+/**
+ * These are in big-endian format
+ */
+typedef uint64_t xfs_timestamp_t;
 
 #define XAL_DINODE_MAGIC 0x494e /* 'IN' */
 
@@ -272,7 +266,7 @@ typedef __be64 xfs_timestamp_t;
  * This enum is used in string mapping in xfs_trace.h; please keep the
  * TRACE_DEFINE_ENUMs for it up to date.
  */
-enum xal_dinode_fmt {
+enum xal_odf_dinode_fmt {
 	XAL_DINODE_FMT_DEV,	/* xfs_dev_t */
 	XAL_DINODE_FMT_LOCAL,	/* bulk data */
 	XAL_DINODE_FMT_EXTENTS, /* struct xfs_bmbt_rec */
@@ -283,95 +277,95 @@ enum xal_dinode_fmt {
 #define XAL_DIFLAG2_NREXT64_BIT 4 /* large extent counters */
 #define XAL_DIFLAG2_NREXT64 (1 << XAL_DIFLAG2_NREXT64_BIT)
 
-struct xal_dinode {
-	__be16 di_magic;     /* inode magic # = XFS_DINODE_MAGIC */
-	__be16 di_mode;	     /* mode and type of file */
-	__u8 di_version;     /* inode version */
-	__u8 di_format;	     /* format of di_c data */
-	__be16 di_onlink;    /* old number of links to file */
-	__be32 di_uid;	     /* owner's user id */
-	__be32 di_gid;	     /* owner's group id */
-	__be32 di_nlink;     /* number of links to file */
-	__be16 di_projid_lo; /* lower part of owner's project id */
-	__be16 di_projid_hi; /* higher part owner's project id */
+struct xal_odf_dinode {
+	uint16_t di_magic;     /* inode magic # = XFS_DINODE_MAGIC */
+	uint16_t di_mode;      /* mode and type of file */
+	uint8_t di_version;    /* inode version */
+	uint8_t di_format;     /* format of di_c data */
+	uint16_t di_onlink;    /* old number of links to file */
+	uint32_t di_uid;       /* owner's user id */
+	uint32_t di_gid;       /* owner's group id */
+	uint32_t di_nlink;     /* number of links to file */
+	uint16_t di_projid_lo; /* lower part of owner's project id */
+	uint16_t di_projid_hi; /* higher part owner's project id */
 	union {
 		/* Number of data fork extents if NREXT64 is set */
-		__be64 di_big_nextents;
+		uint64_t di_big_nextents;
 
 		/* Padding for V3 inodes without NREXT64 set. */
-		__be64 di_v3_pad;
+		uint64_t di_v3_pad;
 
 		/* Padding and inode flush counter for V2 inodes. */
 		struct {
-			__u8 di_v2_pad[6];
-			__be16 di_flushiter;
+			uint8_t di_v2_pad[6];
+			uint16_t di_flushiter;
 		};
 	};
 	xfs_timestamp_t di_atime; /* time last accessed */
 	xfs_timestamp_t di_mtime; /* time last modified */
 	xfs_timestamp_t di_ctime; /* time created/inode modified */
-	__be64 di_size;		  /* number of bytes in file */
-	__be64 di_nblocks;	  /* # of direct & btree blocks used */
-	__be32 di_extsize;	  /* basic/minimum extent size for file */
+	uint64_t di_size;	  /* number of bytes in file */
+	uint64_t di_nblocks;	  /* # of direct & btree blocks used */
+	uint32_t di_extsize;	  /* basic/minimum extent size for file */
 	union {
 		/*
 		 * For V2 inodes and V3 inodes without NREXT64 set, this
 		 * is the number of data and attr fork extents.
 		 */
 		struct {
-			__be32 di_nextents;
-			__be16 di_anextents;
+			uint32_t di_nextents;
+			uint16_t di_anextents;
 		} __attribute__((packed));
 
 		/* Number of attr fork extents if NREXT64 is set. */
 		struct {
-			__be32 di_big_anextents;
-			__be16 di_nrext64_pad;
+			uint32_t di_big_anextents;
+			uint16_t di_nrext64_pad;
 		} __attribute__((packed));
 	} __attribute__((packed));
-	__u8 di_forkoff;     /* attr fork offs, <<3 for 64b align */
-	u_int8_t di_aformat; /* format of attr fork's data */
-	__be32 di_dmevmask;  /* DMIG event mask */
-	__be16 di_dmstate;   /* DMIG state info */
-	__be16 di_flags;     /* random flags, XFS_DIFLAG_... */
-	__be32 di_gen;	     /* generation number */
+	uint8_t di_forkoff;   /* attr fork offs, <<3 for 64b align */
+	uint8_t di_aformat;   /* format of attr fork's data */
+	uint32_t di_dmevmask; /* DMIG event mask */
+	uint16_t di_dmstate;  /* DMIG state info */
+	uint16_t di_flags;    /* random flags, XFS_DIFLAG_... */
+	uint32_t di_gen;      /* generation number */
 
 	/* di_next_unlinked is the only non-core field in the old dinode */
-	__be32 di_next_unlinked; /* agi unlinked list ptr */
+	uint32_t di_next_unlinked; /* agi unlinked list ptr */
 
 	/* start of the extended dinode, writable fields */
-	__le32 di_crc;	       /* CRC of the inode */
-	__be64 di_changecount; /* number of attribute changes */
-	__be64 di_lsn;	       /* flush sequence */
-	__be64 di_flags2;      /* more random flags */
-	__be32 di_cowextsize;  /* basic cow extent size for file */
-	__u8 di_pad2[12];      /* more padding for future expansion */
+	uint32_t di_crc;	 /* LITTLE-ENDIAN: CRC of the inode */
+	uint64_t di_changecount; /* number of attribute changes */
+	uint64_t di_lsn;	 /* flush sequence */
+	uint64_t di_flags2;	 /* more random flags */
+	uint32_t di_cowextsize;	 /* basic cow extent size for file */
+	uint8_t di_pad2[12];	 /* more padding for future expansion */
 
 	/* fields only written to during inode creation */
 	xfs_timestamp_t di_crtime; /* time created */
-	__be64 di_ino;		   /* inode number */
+	uint64_t di_ino;	   /* inode number */
 	uuid_t di_uuid;		   /* UUID of the filesystem */
 
 	/* structure must be padded to 64 bit alignment */
 };
 
-struct xal_xfs_dir2_sf_hdr {
+struct xal_odf_dir2_sf_hdr {
 	uint8_t count;	   /* Number of directory entries */
 	uint8_t i8count;   /* Count of 8-byte inode numbers (vs 4-byte) */
 	uint8_t parent[8]; /* Parent directory inode number */
 } __attribute__((packed));
 
-union xal_magic {
+union xal_odf_btree_iab3_magic {
 	uint32_t num;
 	char text[4];
 };
 
-struct xal_ofd_btree_iab3_sfmt {
-	union xal_magic magic; // 'IAB3' for inode B+Tree
-	uint16_t level;	       // Tree level (0 = leaf, >0 = interior)
-	uint16_t numrecs;      // Number of records in this node
-	uint32_t leftsib;      // Left sibling block (AG-relative)
-	uint32_t rightsib;     // Right sibling block (AG-relative)
+struct xal_odf_btree_iab3_sfmt {
+	union xal_odf_btree_iab3_magic magic; // 'IAB3' for inode B+Tree
+	uint16_t level;			      // Tree level (0 = leaf, >0 = interior)
+	uint16_t numrecs;		      // Number of records in this node
+	uint32_t leftsib;		      // Left sibling block (AG-relative)
+	uint32_t rightsib;		      // Right sibling block (AG-relative)
 
 	uint64_t blkno; ///< blkno; seems like this is only filled when mkfs use-crc; also reported
 			///< in unit of SECTORS!
@@ -381,12 +375,12 @@ struct xal_ofd_btree_iab3_sfmt {
 	uint32_t bb_crc; ///< In little-endian
 };
 
-struct xal_ofd_btree_iab3_lfmt {
-	union xal_magic magic; // 'IAB3' for inode B+Tree
-	uint16_t level;	       // Tree level (0 = leaf, >0 = interior)
-	uint16_t numrecs;      // Number of records in this node
-	uint64_t leftsib;      // Left sibling block (AG-relative)
-	uint64_t rightsib;     // Right sibling block (AG-relative)
+struct xal_odf_btree_iab3_lfmt {
+	union xal_odf_btree_iab3_magic magic; // 'IAB3' for inode B+Tree
+	uint16_t level;			      // Tree level (0 = leaf, >0 = interior)
+	uint16_t numrecs;		      // Number of records in this node
+	uint64_t leftsib;		      // Left sibling block (AG-relative)
+	uint64_t rightsib;		      // Right sibling block (AG-relative)
 
 	uint64_t blkno; ///< blkno; seems like this is only filled when mkfs use-crc
 	uint64_t bb_lsn;
@@ -395,7 +389,7 @@ struct xal_ofd_btree_iab3_lfmt {
 	uint32_t bb_crc; ///< In little-endian
 };
 
-struct xal_ofd_inobt_rec {
+struct xal_odf_inobt_rec {
 	uint32_t startino; ///< The lowest-numbered inode in this chunk, rounded down to the nearest
 			   ///< multiple of 64, even if the start of this chunk is sparse.
 	uint16_t holemask; ///< A 16 element bitmap showing which parts of the chunk are not

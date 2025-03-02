@@ -96,8 +96,8 @@ xal_open(const char *path, struct xal **xal)
 	// Retrieve allocation-group meta, convert it, and store it.
 	for (uint32_t agno = 0; agno < cand->sb.agcount; ++agno) {
 		off_t offset = (off_t)agno * (off_t)cand->sb.agblocks * (off_t)cand->sb.blocksize;
-		struct xal_agf *agf = (void *)(buf + cand->sb.sectsize);
-		struct xal_agi *agi = (void *)(buf + cand->sb.sectsize * 2);
+		struct xal_odf_agf *agf = (void *)(buf + cand->sb.sectsize);
+		struct xal_odf_agi *agi = (void *)(buf + cand->sb.sectsize * 2);
 
 		memset(buf, 0, BUF_NBYTES);
 
@@ -116,8 +116,8 @@ xal_open(const char *path, struct xal **xal)
 		cand->ags[agno].agi_root = be32toh(agi->agi_root);
 
 		/** minimalistic verification of headers **/
-		assert(be32toh(agf->magicnum) == XAL_AGF_MAGIC);
-		assert(be32toh(agi->magicnum) == XAL_AGI_MAGIC);
+		assert(be32toh(agf->magicnum) == XAL_ODF_AGF_MAGIC);
+		assert(be32toh(agi->magicnum) == XAL_ODF_AGI_MAGIC);
 		assert(agno == be32toh(agi->seqno));
 		assert(agno == be32toh(agf->seqno));
 	}
@@ -143,7 +143,7 @@ process_inode_shortform(struct xal *xal, void *inode, struct xal_inode *self)
 	uint8_t count, i8count;
 	int err;
 
-	cursor += sizeof(struct xal_dinode); ///< Advance past inode data
+	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
 	count = *cursor;
 	cursor += 1; ///< Advance past count
@@ -204,7 +204,7 @@ decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 int
 process_inode_extents(void *buf, struct xal_inode *self)
 {
-	struct xal_dinode *dinode = buf;
+	struct xal_odf_dinode *dinode = buf;
 	uint8_t *cursor = buf;
 	uint64_t nextents;
 
@@ -222,7 +222,7 @@ process_inode_extents(void *buf, struct xal_inode *self)
 	/** Multiple extents are not implemented yet; add a memory-pool for them */
 	assert(nextents <= 1);
 
-	cursor += sizeof(struct xal_dinode); ///< Advance past inode data
+	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
 	for (uint64_t i = 0; i < nextents; ++i) {
 		uint64_t l0, l1;
@@ -242,10 +242,8 @@ process_inode_extents(void *buf, struct xal_inode *self)
 int
 process_inode_btree(struct xal *xal, void *buf, struct xal_inode *self)
 {
-	struct xal_dinode *dinode = buf;
+	struct xal_odf_dinode *dinode = buf;
 	uint8_t *cursor = buf;
-
-	
 
 	return 0;
 }
@@ -257,7 +255,7 @@ int
 process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 {
 	uint8_t buf[BUF_NBYTES] = {0};
-	struct xal_dinode *dinode = (void *)buf;
+	struct xal_odf_dinode *dinode = (void *)buf;
 	ssize_t nbytes;
 
 	///< Read the on-disk inode data
@@ -307,7 +305,7 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
  * This wrinkles my brain but I guess there are good reasons to do so, must be something related
  * to quickly verifying that a block retrieved from disk using fs-wide addressed is the expected
  * block.
- * 
+ *
  * The really convenient thing about this field is that it helped me understand that the siblings
  * where short-form. When looking at the data on disk, then I thought it has:
  *
@@ -319,7 +317,7 @@ int
 preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 {
 	char buf[BUF_NBYTES] = {0};
-	struct xal_ofd_btree_iab3_sfmt *iab3 = (void *)buf;
+	struct xal_odf_btree_iab3_sfmt *iab3 = (void *)buf;
 	ssize_t nbytes;
 	off_t offset = blkno * xal->sb.blocksize;
 
@@ -342,7 +340,7 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 	iab3->blkno = be64toh(iab3->blkno);
 
 	printf("blkno(%" PRIu64 ", 0x%" PRIX64 "), offset(%" PRIu64 "): ", blkno, blkno, offset);
-	xal_ofd_btree_iab3_sfmt_pp(iab3);
+	xal_odf_btree_iab3_sfmt_pp(iab3);
 
 	if (iab3->level) {
 		return 0;
@@ -355,15 +353,16 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 
 	{
 		for (uint16_t i = 0; i < iab3->numrecs; ++i) {
-			struct xal_ofd_inobt_rec *rec = (void*)(buf + sizeof(*iab3) + i * sizeof(*rec));
+			struct xal_odf_inobt_rec *rec =
+			    (void *)(buf + sizeof(*iab3) + i * sizeof(*rec));
 
 			rec->startino = be32toh(rec->startino);
 			rec->holemask = be16toh(rec->holemask);
-			//rec->count = be32toh(rec->count);
-			//rec->freecount = be32toh(rec->freecount);
+			// rec->count = be32toh(rec->count);
+			// rec->freecount = be32toh(rec->freecount);
 			rec->free = be64toh(rec->free);
 
-			xal_ofd_inobt_rec_pp(rec);
+			xal_odf_inobt_rec_pp(rec);
 		}
 	}
 
@@ -396,7 +395,7 @@ xal_index(struct xal *xal, struct xal_inode **index)
 	}
 
 	root->ino = xal->sb.rootino;
-	root->ftype = XAL_XFS_DIR3_FT_DIR;
+	root->ftype = XAL_ODF_DIR3_FT_DIR;
 	root->namelen = 1;
 	root->nextents = 0;
 	memcpy(root->name, "/", 1);
@@ -414,7 +413,7 @@ xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 	}
 
 	switch (inode->ftype) {
-	case XAL_XFS_DIR3_FT_DIR: {
+	case XAL_ODF_DIR3_FT_DIR: {
 		struct xal_inode *children = inode->children;
 
 		for (uint16_t i = 0; i < inode->nchildren; ++i) {
@@ -422,7 +421,7 @@ xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 		}
 	} break;
 
-	case XAL_XFS_DIR3_FT_REG_FILE:
+	case XAL_ODF_DIR3_FT_REG_FILE:
 		return 0;
 
 	default:

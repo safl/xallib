@@ -62,12 +62,12 @@ node_inspector(struct xal_inode *inode, void *cb_args)
 	struct xal_nodeinspector_stats *stats = cb_args;
 
 	switch (inode->ftype) {
-	case XAL_XFS_DIR3_FT_DIR:
+	case XAL_ODF_DIR3_FT_DIR:
 		stats->ndirs += 1;
 		printf("# '%.*s'\n", inode->namelen, inode->name);
 		break;
 
-	case XAL_XFS_DIR3_FT_REG_FILE:
+	case XAL_ODF_DIR3_FT_REG_FILE:
 		stats->nfiles += 1;
 		printf("'%.*s'\n", inode->namelen, inode->name);
 		break;

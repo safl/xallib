@@ -57,7 +57,7 @@ xal_pp(struct xal *xal)
 }
 
 int
-xal_sb_pp(void *buf)
+xal_odf_sb_pp(void *buf)
 {
 	struct xal_odf_sb *sb = buf;
 	int wrtn = 0;
@@ -70,18 +70,18 @@ xal_sb_pp(void *buf)
 	wrtn += printf("  agcount: %" PRIx32 "d\n", be32toh(sb->agcount));
 	wrtn += printf("  sectsize: %" PRIx16 "u\n", be16toh(sb->sectsize));
 	wrtn += printf("  inodesize: %" PRIx16 "u\n", be16toh(sb->inodesize));
-	wrtn += printf("  fname: '%.*s'\n", XALLABEL_MAX, sb->sb_fname);
+	wrtn += printf("  fname: '%.*s'\n", XAL_ODF_LABEL_MAX, sb->sb_fname);
 
 	return wrtn;
 }
 
 int
-xal_agf_pp(void *buf)
+xal_odf_agf_pp(void *buf)
 {
-	struct xal_agf *agf = buf;
+	struct xal_odf_agf *agf = buf;
 	int wrtn = 0;
 
-	wrtn += printf("xal_agf:\n");
+	wrtn += printf("xal_odf_agf:\n");
 	wrtn += printf("  magicnum: 0x%x\n", be32toh(agf->magicnum));
 	wrtn += printf("  seqno: 0x%x\n", be32toh(agf->seqno));
 	wrtn += printf("  length: 0x%x\n", be32toh(agf->length));
@@ -90,9 +90,9 @@ xal_agf_pp(void *buf)
 }
 
 int
-xal_agi_pp(void *buf)
+xal_odf_agi_pp(void *buf)
 {
-	struct xal_agi *agi = buf;
+	struct xal_odf_agi *agi = buf;
 	int wrtn = 0;
 
 	wrtn += printf("xal_agi:\n");
@@ -104,12 +104,12 @@ xal_agi_pp(void *buf)
 }
 
 int
-xal_agfl_pp(void *buf)
+xal_odf_agfl_pp(void *buf)
 {
-	struct xal_xfs_agfl *agfl = buf;
+	struct xal_odf_agfl *agfl = buf;
 	int wrtn = 0;
 
-	wrtn += printf("xal_agfl:\n");
+	wrtn += printf("xal_odf_agfl:\n");
 	wrtn += printf("  magicnum: 0x%x\n", agfl->magicnum);
 	wrtn += printf("  seqno: 0x%x\n", agfl->seqno);
 
@@ -117,7 +117,7 @@ xal_agfl_pp(void *buf)
 }
 
 const char *
-xal_dinode_format_str(int val)
+xal_odf_dinode_format_str(int val)
 {
 	switch (val) {
 	case XAL_DINODE_FMT_BTREE:
@@ -162,15 +162,15 @@ xal_inode_pp(struct xal_inode *inode)
 }
 
 int
-xal_dinode_pp(void *buf)
+xal_odf_dinode_pp(void *buf)
 {
-	struct xal_dinode *dinode = buf;
+	struct xal_odf_dinode *dinode = buf;
 	int wrtn = 0;
 
 	wrtn += printf("xal_dinode:\n");
 	wrtn += printf("  magic: 0x%x | 0x%x\n", dinode->di_magic, XAL_DINODE_MAGIC);
 	wrtn += printf("  format: 0x%x\n", dinode->di_format);
-	wrtn += printf("  format_str: '%s'\n", xal_dinode_format_str(dinode->di_format));
+	wrtn += printf("  format_str: '%s'\n", xal_odf_dinode_format_str(dinode->di_format));
 
 	return wrtn;
 }
@@ -193,10 +193,8 @@ xal_extent_pp(struct xal_extent *extent)
 	return wrtn;
 }
 
-
-
 int
-xal_ofd_btree_iab3_sfmt_pp(struct xal_ofd_btree_iab3_sfmt *iab3)
+xal_odf_btree_iab3_sfmt_pp(struct xal_odf_btree_iab3_sfmt *iab3)
 {
 	int wrtn = 0;
 
@@ -213,13 +211,12 @@ xal_ofd_btree_iab3_sfmt_pp(struct xal_ofd_btree_iab3_sfmt *iab3)
 	wrtn += printf("  rightsib: 0x%08" PRIX32 "\n", iab3->rightsib);
 
 	wrtn += printf("  blkno: %" PRIu64 "\n", iab3->blkno / 8);
-	
 
 	return wrtn;
 }
 
 int
-xal_ofd_inobt_rec_pp(struct xal_ofd_inobt_rec *rec)
+xal_odf_inobt_rec_pp(struct xal_odf_inobt_rec *rec)
 {
 	int wrtn = 0;
 
@@ -229,7 +226,7 @@ xal_ofd_inobt_rec_pp(struct xal_ofd_inobt_rec *rec)
 	}
 
 	wrtn += printf("xal_ofd_inobt_rec:\n");
-	wrtn += printf("  startino: %"PRIu32"\n", rec->startino);
+	wrtn += printf("  startino: %" PRIu32 "\n", rec->startino);
 	wrtn += printf("  holemask: %" PRIu16 "\n", rec->holemask);
 	wrtn += printf("  count: %" PRIu8 "\n", rec->count);
 	wrtn += printf("  freecount: %" PRIu8 "\n", rec->freecount);

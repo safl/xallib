@@ -1,23 +1,23 @@
 const char *
-xal_dinode_format_str(int val);
+xal_odf_dinode_format_str(int val);
 
 int
-xal_dinode_pp(void *buf);
+xal_odf_dinode_pp(void *buf);
 
 int
-xal_sb_pp(void *buf);
+xal_odf_sb_pp(void *buf);
 
 int
-xal_agf_pp(void *buf);
+xal_odf_agf_pp(void *buf);
 
 int
-xal_agi_pp(void *buf);
+xal_odf_agi_pp(void *buf);
 
 int
-xal_agfl_pp(void *buf);
+xal_odf_agfl_pp(void *buf);
 
 int
-xal_ofd_btree_iab3_sfmt_pp(struct xal_ofd_btree_iab3_sfmt *iab3);
+xal_odf_btree_iab3_sfmt_pp(struct xal_odf_btree_iab3_sfmt *iab3);
 
 int
-xal_ofd_inobt_rec_pp(struct xal_ofd_inobt_rec *rec);
+xal_odf_inobt_rec_pp(struct xal_odf_inobt_rec *rec);
