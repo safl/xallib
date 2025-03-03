@@ -355,6 +355,7 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 		for (uint16_t i = 0; i < iab3->numrecs; ++i) {
 			struct xal_odf_inobt_rec *rec =
 			    (void *)(buf + sizeof(*iab3) + i * sizeof(*rec));
+			off_t chunk_offset;
 
 			rec->startino = be32toh(rec->startino);
 			rec->holemask = be16toh(rec->holemask);
@@ -363,6 +364,22 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 			rec->free = be64toh(rec->free);
 
 			xal_odf_inobt_rec_pp(rec);
+
+			// The inode area starts at a fixed location, after eight blocks of
+			// meta-data for sb, ag and the root nodes / blocks for agi, agf, and agfl
+			chunk_offset = (ag->seqno * xal->sb.agblocks + 16) * xal->sb.blocksize;
+
+			for (uint8_t i = 0; i < rec->count; ++i) {
+				uint8_t inodebuf[BUF_NBYTES] = {0};
+
+				nbytes = pread(xal->handle.fd, inodebuf, xal->sb.sectsize,
+					       chunk_offset + i * xal->sb.inodesize);
+				if (nbytes != xal->sb.sectsize) {
+					return -EIO;
+				}
+
+				xal_odf_dinode_pp(inodebuf);
+			}
 		}
 	}
 
