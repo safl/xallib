@@ -279,8 +279,8 @@ enum xal_odf_dinode_fmt {
 
 struct xal_odf_dinode {
 	uint16_t di_magic;     /* inode magic # = XFS_DINODE_MAGIC */
-	uint16_t di_mode;      /* mode and type of file */
-	uint8_t di_version;    /* inode version */
+	uint16_t di_mode;      /* mode and type of file; see stat.h */
+	uint8_t di_version;    /* inode version; one of these [1,2,3]*/
 	uint8_t di_format;     /* format of di_c data */
 	uint16_t di_onlink;    /* old number of links to file */
 	uint32_t di_uid;       /* owner's user id */

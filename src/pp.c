@@ -4,6 +4,7 @@
 #include <libxal.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include <xal_odf.h>
 
 int
@@ -161,6 +162,19 @@ xal_inode_pp(struct xal_inode *inode)
 	return wrtn;
 }
 
+const char *
+mode_to_type_str(uint32_t mode)
+{
+	if (S_ISDIR(mode)) {
+		return "directory";
+	}
+	if (S_ISREG(mode)) {
+		return "file";
+	}
+
+	return "UNEXPECTED";
+}
+
 int
 xal_odf_dinode_pp(void *buf)
 {
@@ -168,9 +182,11 @@ xal_odf_dinode_pp(void *buf)
 	int wrtn = 0;
 
 	wrtn += printf("xal_dinode:\n");
-	wrtn += printf("  magic: 0x%x | 0x%x\n", dinode->di_magic, XAL_DINODE_MAGIC);
-	wrtn += printf("  format: 0x%x\n", dinode->di_format);
-	wrtn += printf("  format_str: '%s'\n", xal_odf_dinode_format_str(dinode->di_format));
+	wrtn += printf("  magic: 0x%x | 0x%x\n", be16toh(dinode->di_magic), XAL_DINODE_MAGIC);
+	wrtn +=
+	    printf("  mode: 0x%" PRIx16 " | '%s'\n", be16toh(dinode->di_mode), mode_to_type_str(be16toh(dinode->di_mode)));
+	wrtn += printf("  format: 0x%" PRIu8 " | '%s'\n", dinode->di_format,
+		       xal_odf_dinode_format_str(dinode->di_format));
 
 	return wrtn;
 }
