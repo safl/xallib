@@ -152,6 +152,59 @@ When i8count is set, then the first i8count number of inode numbers are 64bit.
 - Does this mean that they have the AG encoded?
 - When "normalizing" it, should it encode the AG then?
 
+Inode Allocation
+================
+
+The superblock keeps a initial count (sb.icount) of allocated inodes. However,
+as inodes are allocated and freed during the lifetime of the file-system, then
+it seems like this on-disk value is not updated.
+However, it seems like the counter in each allocation group get updated. Thus,
+to determine the number of currently allocated iondes, then one can do:
+
+  icount = sum((ag.agi_count for ag in sb.ags))
+
+This would be a sensible value to use for the inode-memory pool.
+
+Inode Numbers (Encoding)
+========================
+
+The inode numbers in XFS are not simply increasing continously rising integer
+values. Rather they are encodings of location information and come in the form
+of absolute an relative location information.
+
+* **Absolute** Inode Numbers (64bit)
+
+  - Consists of: "AG | Block in AG | Inode in Block"
+  - This representation is used in the superblock
+  - This representation is used in directory entries
+
+* **Relative** Inode Numbers (32bit)
+
+  - Consists of: "Block in AG | Inode in Block"
+  - This representation is found in AG inode structures ? Give examples here...
+
+To decode the above, then one can use the superblock data of:
+
+sb.agblklog
+  The size of an allocation group in unit of **blocks** represented as a log2
+  value rounded up.
+
+sb.inoblog
+  The number of inodes per block, equivalent to blocksize / inodesize,
+  represented as a log2 value rounded up.
+
+Thus encoded on the form::
+
+      ┌────────────────────────────────┐    
+      │ Inode Number                   │    
+      ┌────────────────────────────────┐    
+  MSB │ AG# │ sb.agblklog │ sb.inoblog │ LSB
+      └────────────────────────────────┘    
+            │ Always fits in 32 bit    │    
+      ┌─────┴──────────────────────────┤    
+      │ May fit in 32 bit              │    
+      └────────────────────────────────┘    
+
 
 Appendix
 ========
