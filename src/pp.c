@@ -188,6 +188,8 @@ xal_odf_dinode_pp(void *buf)
 	wrtn += printf("  format: 0x%" PRIu8 " | '%s'\n", dinode->di_format,
 		       xal_odf_dinode_format_str(dinode->di_format));
 
+	wrtn += printf("  ino: %" PRIu64 "\n", be64toh(dinode->di_ino));
+
 	return wrtn;
 }
 

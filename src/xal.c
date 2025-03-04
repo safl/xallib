@@ -19,22 +19,43 @@
 int
 process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
+uint32_t ino_abs_to_rel(struct xal *xal, uint64_t inoabs) {
+	return inoabs & ((1ULL << (xal->sb.agblklog + xal->sb.inopblog)) - 1);
+}
+
+void
+xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint32_t *agbno, uint32_t *agbino)
+{
+	// Block Number relative to Allocation Group
+	*agbno = (ino >> xal->sb.inopblog) & ((1ULL << xal->sb.agblklog) - 1);
+
+	// Inode number relative to Block
+	*agbino = ino & ((1ULL << xal->sb.inopblog) - 1);
+}
+
+void
+xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint32_t *agbno,
+			uint32_t *agbino)
+{
+	// Allocation Group Number -- represented usually stored in 'ag.seqno'
+	*seqno = ino >> (xal->sb.inopblog + xal->sb.agblklog);
+
+	xal_ino_decode_relative(xal, ino, agbno, agbino);
+}
+
 uint64_t
 xal_get_inode_offset(struct xal *xal, uint64_t ino)
 {
-	uint64_t agno, agbno, agbino, offset;
+	uint32_t seqno, agbno, agbino;
+	uint64_t offset;
 
-	// Allocation Group Number
-	agno = ino >> xal->sb.agblklog;
+	xal_ino_decode_absolute(xal, ino, &seqno, &agbno, &agbino);
 
-	// Block Number relative to Allocation Group
-	agbno = (ino & ((1ULL << xal->sb.agblklog) - 1)) >> xal->sb.inopblog;
-
-	// Inode number relative to Block in Allocation Group
-	agbino = ino & ((1ULL << xal->sb.inopblog) - 1);
+	printf("seqno: %" PRIu32 ", agbno: %" PRIu32 ", agbino: %" PRIu32 ", ino: %" PRIu64 "\n",
+	       seqno, agbno, agbino, ino);
 
 	// Absolute Inode offset in bytes
-	offset = (agno * xal->sb.agblocks + agbno) * xal->sb.blocksize;
+	offset = (seqno * xal->sb.agblocks + agbno) * xal->sb.blocksize;
 
 	return offset + (agbino * xal->sb.inodesize);
 }
@@ -320,6 +341,7 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 	struct xal_odf_btree_iab3_sfmt *iab3 = (void *)buf;
 	ssize_t nbytes;
 	off_t offset = blkno * xal->sb.blocksize;
+	uint64_t ag_inode_count = 0;
 
 	if (blkno == ag->agi_root) {
 		offset += ag->offset;
@@ -352,15 +374,14 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 	}
 
 	{
-		for (uint16_t i = 0; i < iab3->numrecs; ++i) {
+		for (uint16_t reci = 0; reci < iab3->numrecs; ++reci) {
 			struct xal_odf_inobt_rec *rec =
-			    (void *)(buf + sizeof(*iab3) + i * sizeof(*rec));
+			    (void *)(buf + sizeof(*iab3) + reci * sizeof(*rec));
 			off_t chunk_offset;
 
 			rec->startino = be32toh(rec->startino);
 			rec->holemask = be16toh(rec->holemask);
-			// rec->count = be32toh(rec->count);
-			// rec->freecount = be32toh(rec->freecount);
+			// count is 1 byte, so no be-conversion
 			rec->free = be64toh(rec->free);
 
 			xal_odf_inobt_rec_pp(rec);
@@ -369,19 +390,51 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 			// meta-data for sb, ag and the root nodes / blocks for agi, agf, and agfl
 			chunk_offset = (ag->seqno * xal->sb.agblocks + 16) * xal->sb.blocksize;
 
-			for (uint8_t i = 0; i < rec->count; ++i) {
+			for (uint8_t chunk_index = 0; chunk_index < rec->count; ++chunk_index) {
 				uint8_t inodebuf[BUF_NBYTES] = {0};
+				uint32_t inorel = rec->startino + chunk_index;
 
 				nbytes = pread(xal->handle.fd, inodebuf, xal->sb.sectsize,
-					       chunk_offset + i * xal->sb.inodesize);
+					       chunk_offset + (chunk_index * xal->sb.inodesize) +
+						   (rec->startino - xal->sb.rootino) *
+						       xal->sb.inodesize);
+				/// How does these things work!?
 				if (nbytes != xal->sb.sectsize) {
 					return -EIO;
 				}
 
-				xal_odf_dinode_pp(inodebuf);
+				ag_inode_count++;
+
+				{
+					uint32_t seqno_abs, agbno_abs, agbino_abs = 0;
+					uint32_t seqno_rel, agbno_rel, agbino_rel = 0;
+					struct xal_odf_dinode *dinode = (void *)inodebuf;
+
+					xal_ino_decode_absolute(xal, be64toh(dinode->di_ino),
+								&seqno_abs, &agbno_abs,
+								&agbino_abs);
+
+					xal_ino_decode_relative(xal, inorel, &agbno_rel,
+								&agbino_rel);
+
+					printf("# startino: %" PRIu32 "\n", rec->startino);
+					printf("# inorel: %" PRIu32 "\n", ino_abs_to_rel(xal, be64toh(dinode->di_ino)));
+					printf("# startino + index: %" PRIu32 "\n", inorel);
+					xal_odf_dinode_pp(inodebuf);
+
+					printf("seqno: ag(%" PRIu32 "), abs(%" PRIu32
+					       "), rel(%" PRIu32 ")\n",
+					       ag->seqno, seqno_abs, seqno_rel);
+					printf("agbno: abs(%" PRIu32 "), rel(%" PRIu32 ")\n",
+					       agbno_abs, agbno_rel);
+					printf("agbino: abs(%" PRIu32 "), rel(%" PRIu32 ")\n",
+					       agbino_abs, agbino_rel);
+				}
 			}
 		}
 	}
+
+	printf("seqno: %" PRIu32 ", ag_inode_count: %" PRIu64 "\n", ag->seqno, ag_inode_count);
 
 	return 0;
 }
@@ -392,6 +445,7 @@ preprocess_inodes(struct xal *xal)
 	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
 		struct xal_ag *ag = &xal->ags[seqno];
 
+		printf("# seqno: %" PRIu32 "\n", seqno);
 		preprocess_inodes_iabt3(xal, ag, ag->agi_root);
 	}
 
