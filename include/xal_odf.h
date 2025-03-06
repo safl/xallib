@@ -343,7 +343,7 @@ struct xal_odf_dinode {
 
 	/* fields only written to during inode creation */
 	xfs_timestamp_t di_crtime; /* time created */
-	uint64_t di_ino;	   /* inode number */
+	uint64_t ino;	   ///< inode number in absolute format
 	uuid_t di_uuid;		   /* UUID of the filesystem */
 
 	/* structure must be padded to 64 bit alignment */

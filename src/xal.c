@@ -410,7 +410,7 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 					uint32_t seqno_rel, agbno_rel, agbino_rel = 0;
 					struct xal_odf_dinode *dinode = (void *)inodebuf;
 
-					xal_ino_decode_absolute(xal, be64toh(dinode->di_ino),
+					xal_ino_decode_absolute(xal, be64toh(dinode->ino),
 								&seqno_abs, &agbno_abs,
 								&agbino_abs);
 
@@ -418,7 +418,8 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 								&agbino_rel);
 
 					printf("# startino: %" PRIu32 "\n", rec->startino);
-					printf("# inorel: %" PRIu32 "\n", ino_abs_to_rel(xal, be64toh(dinode->di_ino)));
+					printf("# inorel: %" PRIu32 "\n",
+					       ino_abs_to_rel(xal, be64toh(dinode->ino)));
 					printf("# startino + index: %" PRIu32 "\n", inorel);
 					xal_odf_dinode_pp(inodebuf);
 
