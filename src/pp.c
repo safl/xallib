@@ -71,7 +71,7 @@ xal_odf_sb_pp(void *buf)
 	wrtn += printf("  agcount: %" PRIx32 "d\n", be32toh(sb->agcount));
 	wrtn += printf("  sectsize: %" PRIx16 "u\n", be16toh(sb->sectsize));
 	wrtn += printf("  inodesize: %" PRIx16 "u\n", be16toh(sb->inodesize));
-	wrtn += printf("  fname: '%.*s'\n", XAL_ODF_LABEL_MAX, sb->sb_fname);
+	wrtn += printf("  fname: '%.*s'\n", XAL_ODF_LABEL_MAX, sb->fname);
 
 	return wrtn;
 }

@@ -19,7 +19,9 @@
 int
 process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
-uint32_t ino_abs_to_rel(struct xal *xal, uint64_t inoabs) {
+uint32_t
+ino_abs_to_rel(struct xal *xal, uint64_t inoabs)
+{
 	return inoabs & ((1ULL << (xal->sb.agblklog + xal->sb.inopblog)) - 1);
 }
 
@@ -99,12 +101,12 @@ xal_open(const char *path, struct xal **xal)
 	base.sb.blocksize = be32toh(psb->blocksize);
 	base.sb.sectsize = be16toh(psb->sectsize);
 	base.sb.inodesize = be16toh(psb->inodesize);
-	base.sb.inopblock = be16toh(psb->sb_inopblock);
-	base.sb.inopblog = psb->sb_inopblog;
-	base.sb.icount = be64toh(psb->sb_icount);
+	base.sb.inopblock = be16toh(psb->inopblock);
+	base.sb.inopblog = psb->inopblog;
+	base.sb.icount = be64toh(psb->icount);
 	base.sb.rootino = be64toh(psb->rootino);
 	base.sb.agblocks = be32toh(psb->agblocks);
-	base.sb.agblklog = psb->sb_agblklog;
+	base.sb.agblklog = psb->agblklog;
 	base.sb.agcount = be32toh(psb->agcount);
 
 	cand = calloc(1, sizeof(*cand) + sizeof(*(cand->ags)) * base.sb.agcount);
@@ -407,7 +409,7 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 
 				{
 					uint32_t seqno_abs, agbno_abs, agbino_abs = 0;
-					uint32_t seqno_rel, agbno_rel, agbino_rel = 0;
+					uint32_t seqno_rel = ag->seqno, agbno_rel, agbino_rel = 0;
 					struct xal_odf_dinode *dinode = (void *)inodebuf;
 
 					xal_ino_decode_absolute(xal, be64toh(dinode->ino),
