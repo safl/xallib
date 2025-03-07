@@ -205,6 +205,29 @@ Thus encoded on the form::
       │ May fit in 32 bit              │    
       └────────────────────────────────┘    
 
+Directories
+===========
+
+An interesting experiment: On a nearly full mount point, repeatedly copy
+directories with large files. You'll see minimal space usage since the data
+isn't duplicated. The filesystem stores more data than physically fits, but no
+extra space is consumed because the data blocks are shared.
+
+However, in a directory listing, the same inode may appear multiple times. These
+listings generally take the form of tuples:
+
+  (name, ino)
+
+This behavior is due to the data-blocks being shared, the terms here are
+copy-on-write (cow) strategy and reflinking.
+
+Files
+=====
+
+In XFS, a logical block offset in a file doesn’t directly map to a physical
+disk block due to COW and reflinking. When data blocks are shared, extending
+or modifying a file creates a copy to preserve shared content, breaking the
+1:1 mapping.
 
 Appendix
 ========
