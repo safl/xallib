@@ -75,74 +75,149 @@ xal_close(struct xal *xal)
 }
 
 int
-xal_open(const char *path, struct xal **xal)
+read_4k(struct xal *xal, void *buf, off_t offset)
 {
-	struct xal base = {0};
-	char buf[BUF_NBYTES] = {0};
-	const struct xal_odf_sb *psb = (void *)buf;
-	struct xal *cand;
 	ssize_t nbytes;
-	int err;
 
-	base.handle.fd = open(path, O_RDONLY);
-	if (-1 == base.handle.fd) {
-		perror("Failed opening device");
-		return -errno;
-	}
-
-	// Read Primary Superblock and AG headers
-	nbytes = pread(base.handle.fd, buf, BUF_NBYTES, 0);
+	memset(buf, 0, BUF_NBYTES);
+	nbytes = pread(xal->handle.fd, buf, BUF_NBYTES, offset);
 	if (nbytes != BUF_NBYTES) {
-		perror("Reading Primary Superblock failed.");
+		perror("pread(...);\n");
 		return -EIO;
 	}
 
-	// Setup the Superblock information subset; using big-endian conversion
-	base.sb.blocksize = be32toh(psb->blocksize);
-	base.sb.sectsize = be16toh(psb->sectsize);
-	base.sb.inodesize = be16toh(psb->inodesize);
-	base.sb.inopblock = be16toh(psb->inopblock);
-	base.sb.inopblog = psb->inopblog;
-	base.sb.icount = be64toh(psb->icount);
-	base.sb.rootino = be64toh(psb->rootino);
-	base.sb.agblocks = be32toh(psb->agblocks);
-	base.sb.agblklog = psb->agblklog;
-	base.sb.agcount = be32toh(psb->agcount);
+	return 0;
+}
 
-	cand = calloc(1, sizeof(*cand) + sizeof(*(cand->ags)) * base.sb.agcount);
-	if (!cand) {
-		perror("Failed allocating Reading Primary Superblock failed.");
+/**
+ * Retrieve and decode the allocation group headers for a given allocation group
+ *
+ * This will retrieve the block containing the superblock and allocation-group headers. A subset of
+ * the allocation group headers is decoded and xal->ags[seqo] is populated with the decoded data.
+ *
+ * Assumes the following:
+ *
+ * - The handle (xal.handle) set setup
+ * - The superblock (xal.sb) is initiatialized
+ *
+ * @param buf IO buffer, sufficiently large to hold a block of data
+ * @param seqno The sequence number of the allocation group aka agno
+ *
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+retrieve_and_decode_allocation_group(uint32_t seqno, void *buf, struct xal *xal)
+{
+	uint8_t *cursor = buf;
+	off_t offset = (off_t)seqno * (off_t)xal->sb.agblocks * (off_t)xal->sb.blocksize;
+	struct xal_odf_agi *agi = (void *)(cursor + xal->sb.sectsize * 2);
+	struct xal_odf_agf *agf = (void *)(cursor + xal->sb.sectsize);
+	int err;
+
+	err = read_4k(xal, buf, offset);
+	if (err) {
+		perror("read_4k();\n");
+		return err;
+	}
+
+	xal->ags[seqno].seqno = seqno;
+	xal->ags[seqno].offset = offset;
+	xal->ags[seqno].agf_length = be32toh(agf->length);
+	xal->ags[seqno].agi_count = be32toh(agi->agi_count);
+	xal->ags[seqno].agi_level = be32toh(agi->agi_level);
+	xal->ags[seqno].agi_root = be32toh(agi->agi_root);
+
+	/** minimalistic verification of headers **/
+	assert(be32toh(agf->magicnum) == XAL_ODF_AGF_MAGIC);
+	assert(be32toh(agi->magicnum) == XAL_ODF_AGI_MAGIC);
+	assert(seqno == be32toh(agi->seqno));
+	assert(seqno == be32toh(agf->seqno));
+
+	return 0;
+}
+
+/**
+ * Retrieve the superblock from disk and decode the on-disk-format
+ *
+ * This will grow the memory backing 'xal' as it will make room for allocation-groups.
+ *
+ * @param buf IO buffer, sufficiently large to hold a block of data
+ * @param xal Double-pointer to the xal
+ *
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+retrieve_and_decode_primary_superblock(void *buf, struct xal **xal)
+{
+	const struct xal_odf_sb *psb = buf;
+	struct xal *cand;
+	int err;
+
+	err = read_4k(*xal, buf, 0);
+	if (err) {
+		perror("read_4k();\n");
 		return -errno;
 	}
-	*cand = base;
 
-	// Retrieve allocation-group meta, convert it, and store it.
-	for (uint32_t agno = 0; agno < cand->sb.agcount; ++agno) {
-		off_t offset = (off_t)agno * (off_t)cand->sb.agblocks * (off_t)cand->sb.blocksize;
-		struct xal_odf_agf *agf = (void *)(buf + cand->sb.sectsize);
-		struct xal_odf_agi *agi = (void *)(buf + cand->sb.sectsize * 2);
+	cand = realloc(*xal, sizeof(*cand) + sizeof(*(cand->ags)) * be32toh(psb->agcount));
+	if (!cand) {
+		perror("realloc();\n");
+		return -errno;
+	}
 
-		memset(buf, 0, BUF_NBYTES);
+	printf("cand: %p, xal: %p, %p\n", (void*)cand, (void*)xal, (void*)*xal);
 
-		nbytes = pread(cand->handle.fd, buf, BUF_NBYTES, offset);
-		if (nbytes != BUF_NBYTES) {
-			perror("Reading AG Headers failed");
-			free(cand);
-			return -EIO;
+	// Setup the Superblock information subset; using big-endian conversion
+	cand->sb.blocksize = be32toh(psb->blocksize);
+	cand->sb.sectsize = be16toh(psb->sectsize);
+	cand->sb.inodesize = be16toh(psb->inodesize);
+	cand->sb.inopblock = be16toh(psb->inopblock);
+	cand->sb.inopblog = psb->inopblog;
+	cand->sb.icount = be64toh(psb->icount);
+	cand->sb.rootino = be64toh(psb->rootino);
+	cand->sb.agblocks = be32toh(psb->agblocks);
+	cand->sb.agblklog = psb->agblklog;
+	cand->sb.agcount = be32toh(psb->agcount);
+
+	*xal = cand;
+
+	return 0;
+}
+
+int
+xal_open(const char *path, struct xal **xal)
+{
+	uint8_t buf[BUF_NBYTES];
+	struct xal *cand;
+	int err;
+
+	cand = calloc(1, sizeof(*cand));
+	if (!cand) {
+		perror("calloc();;\n");
+		return -errno;
+	}
+
+	cand->handle.fd = open(path, O_RDONLY);
+	if (-1 == cand->handle.fd) {
+		perror("Failed opening device;\n");
+		xal_close(cand);
+		return -errno;
+	}
+
+	err = retrieve_and_decode_primary_superblock(buf, &cand);
+	if (err) {
+		perror("_alloc_and_initialize_using_odf_buf();\n");
+		xal_close(cand);
+		return err;
+	}
+
+	for (uint32_t seqno = 0; seqno < cand->sb.agcount; ++seqno) {
+		// TODO: do error handling here
+		err = retrieve_and_decode_allocation_group(seqno, buf, cand);
+		if (err) {
+			xal_close(cand);
+			return err;
 		}
-
-		cand->ags[agno].seqno = agno;
-		cand->ags[agno].offset = offset;
-		cand->ags[agno].agf_length = be32toh(agf->length);
-		cand->ags[agno].agi_count = be32toh(agi->agi_count);
-		cand->ags[agno].agi_level = be32toh(agi->agi_level);
-		cand->ags[agno].agi_root = be32toh(agi->agi_root);
-
-		/** minimalistic verification of headers **/
-		assert(be32toh(agf->magicnum) == XAL_ODF_AGF_MAGIC);
-		assert(be32toh(agi->magicnum) == XAL_ODF_AGI_MAGIC);
-		assert(agno == be32toh(agi->seqno));
-		assert(agno == be32toh(agf->seqno));
 	}
 
 	// Setup inode memory-pool
@@ -339,23 +414,22 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 int
 preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 {
-	char buf[BUF_NBYTES] = {0};
-	struct xal_odf_btree_iab3_sfmt *iab3 = (void *)buf;
-	ssize_t nbytes;
+	char buf[BUF_NBYTES] = { 0 };
+	struct xal_odf_btree_iab3_sfmt *iab3 = (void*)buf;
 	off_t offset = blkno * xal->sb.blocksize;
 	uint64_t ag_inode_count = 0;
+	int err;
 
 	if (blkno == ag->agi_root) {
 		offset += ag->offset;
 	}
 
-	nbytes = pread(xal->handle.fd, buf, BUF_NBYTES, offset);
-	if (nbytes != BUF_NBYTES) {
-		printf("pread(); nbytes(%" PRIu64 "), offset(%" PRIu64 "), blkno(%" PRIu64 ");\n",
-		       nbytes, offset, blkno);
-		return -EIO;
+	err = read_4k(xal, buf, offset);
+	if (err) {
+		perror("read_4k();\n");
+		return err;
 	}
-
+	
 	iab3->magic.num = iab3->magic.num;
 	iab3->level = be16toh(iab3->level);
 	iab3->numrecs = be16toh(iab3->numrecs);
@@ -395,6 +469,7 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 			for (uint8_t chunk_index = 0; chunk_index < rec->count; ++chunk_index) {
 				uint8_t inodebuf[BUF_NBYTES] = {0};
 				uint32_t inorel = rec->startino + chunk_index;
+				ssize_t nbytes;
 
 				nbytes = pread(xal->handle.fd, inodebuf, xal->sb.sectsize,
 					       chunk_offset + (chunk_index * xal->sb.inodesize) +
