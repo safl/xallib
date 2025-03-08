@@ -1,7 +1,7 @@
 builddir = build
 
 .PHONY: all
-all: clean configure build run
+all: clean configure build test
 
 .PHONY: clean
 clean:
@@ -19,14 +19,8 @@ build:
 install:
 	meson install -C $(builddir)
 
-.PHONY: run
-run:
-	./$(builddir)/xal --verbose /dev/sda1
-
-.PHONY: run-valgrind
-run-valgrind:
-	valgrind ./$(builddir)/xal /dev/sda1
-
-.PHONY: run-gdb
-run-gdb:
-	gdb run --args ./$(builddir)/xal /dev/sda1
+.PHONY: test
+test:
+	cd cijoe && cijoe workflows/test.yaml \
+		--config configs/cijoe-config.toml \
+		--monitor
