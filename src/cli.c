@@ -98,6 +98,8 @@ main(int argc, char *argv[])
 		xal_pp(xal);
 	}
 
+	return 0;
+
 	err = xal_index(xal, &index);
 	if (err) {
 		printf("xal_get_index(...); err(%d)\n", err);
