@@ -75,13 +75,13 @@ xal_close(struct xal *xal)
 }
 
 int
-read_4k(struct xal *xal, void *buf, off_t offset)
+_pread(struct xal *xal, void *buf, size_t count, off_t offset)
 {
 	ssize_t nbytes;
 
-	memset(buf, 0, BUF_NBYTES);
-	nbytes = pread(xal->handle.fd, buf, BUF_NBYTES, offset);
-	if (nbytes != BUF_NBYTES) {
+	memset(buf, 0, count);
+	nbytes = pread(xal->handle.fd, buf, count, offset);
+	if ((nbytes == -1) || ((size_t)nbytes != count)) {
 		perror("pread(...);\n");
 		return -EIO;
 	}
@@ -114,9 +114,9 @@ retrieve_and_decode_allocation_group(uint32_t seqno, void *buf, struct xal *xal)
 	struct xal_odf_agf *agf = (void *)(cursor + xal->sb.sectsize);
 	int err;
 
-	err = read_4k(xal, buf, offset);
+	err = _pread(xal, buf, xal->sb.sectsize * 4, offset);
 	if (err) {
-		perror("read_4k();\n");
+		perror("_pread();\n");
 		return err;
 	}
 
@@ -153,9 +153,9 @@ retrieve_and_decode_primary_superblock(void *buf, struct xal **xal)
 	struct xal *cand;
 	int err;
 
-	err = read_4k(*xal, buf, 0);
+	err = _pread(*xal, buf, 4096, 0);
 	if (err) {
-		perror("read_4k();\n");
+		perror("_pread();\n");
 		return -errno;
 	}
 
@@ -164,8 +164,6 @@ retrieve_and_decode_primary_superblock(void *buf, struct xal **xal)
 		perror("realloc();\n");
 		return -errno;
 	}
-
-	printf("cand: %p, xal: %p, %p\n", (void*)cand, (void*)xal, (void*)*xal);
 
 	// Setup the Superblock information subset; using big-endian conversion
 	cand->sb.blocksize = be32toh(psb->blocksize);
@@ -424,7 +422,7 @@ preprocess_inodes_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 		offset += ag->offset;
 	}
 
-	err = read_4k(xal, buf, offset);
+	err = _pread(xal, buf, xal->sb.blocksize, offset);
 	if (err) {
 		perror("read_4k();\n");
 		return err;
