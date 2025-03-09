@@ -8,5 +8,5 @@ def test_open_close(cijoe):
 
     dev_path = cijoe.getconf("xal.dev_path", None)
     
-    err, state = cijoe.run(f"xal {dev_path}")
+    err, state = cijoe.run(f"xal -v {dev_path}")
     assert not err
