@@ -14,7 +14,7 @@
 #include <xal_pool.h>
 #include <xal_pp.h>
 
-#define BUF_NBYTES 4096
+#define BUF_NBYTES 4096 * 4
 
 int
 process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
