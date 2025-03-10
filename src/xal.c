@@ -16,7 +16,7 @@
 #include <xal_pp.h>
 
 #define BUF_NBYTES 4096 * 32UL ///< Number of bytes in a buffer
-#define CHUNK_NINO 64 ///< Number of inodes in a chunk
+#define CHUNK_NINO 64	       ///< Number of inodes in a chunk
 
 int
 process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
