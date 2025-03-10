@@ -497,7 +497,8 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 		 * Populate the inode-buffer with data from all the blocks
 		 */
 		{
-			uint64_t chunk_nbytes = (CHUNK_NINO / xal->sb.inopblock) * xal->sb.blocksize;
+			uint64_t chunk_nbytes =
+			    (CHUNK_NINO / xal->sb.inopblock) * xal->sb.blocksize;
 			off_t chunk_offset = agbno * xal->sb.blocksize + ag->offset;
 
 			printf("chunk_nbytes(%" PRIu64 "), buf_nbytes(%" PRIu64 ")\n", chunk_nbytes,
@@ -517,11 +518,19 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 		 */
 		for (uint8_t chunk_index = 0; chunk_index < rec->count; ++chunk_index) {
 			uint8_t *chunk_cursor = inodechunk + chunk_index * xal->sb.inodesize;
+			struct xal_odf_dinode *dinode = (void *)chunk_cursor;
+			uint32_t inode_seqno, inode_agbno, inode_agbino;
 			uint64_t is_unused = (rec->holemask & (1ULL << chunk_index)) >> chunk_index;
 			uint64_t is_free = (rec->free & (1ULL << chunk_index)) >> chunk_index;
 
+			xal_ino_decode_absolute(xal, be64toh(dinode->ino), &inode_seqno,
+						&inode_agbno, &inode_agbino);
+
 			printf("is_unused(%" PRIu64 "), is_free(%" PRIu64 ")\n", is_unused,
 			       is_free);
+
+			printf("seqno(%" PRIu32 "), agnbo(%" PRIu32 "), agbino(%" PRIu32 ")\n",
+			       inode_seqno, inode_agbno, inode_agbino);
 
 			if (is_unused || is_free) {
 				continue;
