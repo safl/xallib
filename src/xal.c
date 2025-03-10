@@ -27,6 +27,32 @@ ino_abs_to_rel(struct xal *xal, uint64_t inoabs)
 	return inoabs & ((1ULL << (xal->sb.agblklog + xal->sb.inopblog)) - 1);
 }
 
+/**
+ * Compute the ino-components given a contigous index
+ *
+ * This basically just treats it as as multi-dimensional array in row-major order:
+ *
+ *   inodes[seqno][agbno][agbino]
+ *
+ * With this and pre-processing of all inodes, then it becomes a lot simpler to do inode look-up.
+ */
+void
+index_to_comp(struct xal *xal, uint64_t index, uint32_t *seqno, uint32_t *agbno, uint32_t *agbino)
+{
+	*seqno = (index / (xal->sb.inopblock * xal->sb.agblocks)) % xal->sb.agcount;
+	*agbno = (index / xal->sb.inopblock) % xal->sb.agblocks;
+	*agbino = index % xal->sb.inopblock;
+}
+
+/**
+ * The inverse of 'index_to_comp'
+ */
+void
+comp_to_index(struct xal *xal, uint32_t seqno, uint32_t agbno, uint32_t agbino, uint64_t *index)
+{
+	*index = agbino + xal->sb.inopblock * agbno + xal->sb.inopblock * xal->sb.agblocks * seqno;
+}
+
 void
 xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint32_t *agbno, uint32_t *agbino)
 {
