@@ -165,7 +165,7 @@ struct xal_odf_agi {
 	 * mapping data is needed here.
 	 */
 	uint32_t agi_count;	/* count of allocated inodes */
-	uint32_t agi_root;	/* root of inode btree */
+	uint32_t agi_root;	///< The block containing the root of inode btree */
 	uint32_t agi_level;	/* levels in inode btree */
 	uint32_t agi_freecount; /* number of free inodes */
 
