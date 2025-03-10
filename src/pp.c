@@ -183,8 +183,8 @@ xal_odf_dinode_pp(void *buf)
 
 	wrtn += printf("xal_dinode:\n");
 	wrtn += printf("  magic: 0x%x | 0x%x\n", be16toh(dinode->di_magic), XAL_DINODE_MAGIC);
-	wrtn +=
-	    printf("  mode: 0x%" PRIx16 " | '%s'\n", be16toh(dinode->di_mode), mode_to_type_str(be16toh(dinode->di_mode)));
+	wrtn += printf("  mode: 0x%" PRIx16 " | '%s'\n", be16toh(dinode->di_mode),
+		       mode_to_type_str(be16toh(dinode->di_mode)));
 	wrtn += printf("  format: 0x%" PRIu8 " | '%s'\n", dinode->di_format,
 		       xal_odf_dinode_format_str(dinode->di_format));
 
