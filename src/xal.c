@@ -474,7 +474,8 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 
 		rec->startino = be32toh(rec->startino);
 		rec->holemask = be16toh(rec->holemask);
-		// count is 1 byte, so no be-conversion
+		rec->count = rec->count;
+		rec->freecount = rec->freecount;
 		rec->free = be64toh(rec->free);
 
 		xal_odf_inobt_rec_pp(rec);
