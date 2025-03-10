@@ -49,6 +49,8 @@ typedef struct {
 #define XAL_ODF_AGI_MAGIC 0x58414749  /* 'XAGI' */
 #define XAL_ODF_AGFL_MAGIC 0x5841464c /* 'XAFL' */
 
+#define XAL_ODF_IBT_CRC_MAGIC 0x49414233 ///< 'IAB3'
+
 #define XAL_ODF_DIR3_FT_REG_FILE 1
 #define XAL_ODF_DIR3_FT_DIR 2
 
