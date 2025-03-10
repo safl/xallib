@@ -185,6 +185,7 @@ retrieve_and_decode_primary_superblock(void *buf, struct xal **xal)
 int
 xal_open(const char *path, struct xal **xal)
 {
+	uint64_t nallocated = 0;
 	uint8_t buf[BUF_NBYTES];
 	struct xal *cand;
 	int err;
@@ -216,10 +217,12 @@ xal_open(const char *path, struct xal **xal)
 			xal_close(cand);
 			return err;
 		}
+
+		nallocated += cand->ags[seqno].agi_count;
 	}
 
 	// Setup inode memory-pool
-	err = xal_pool_map(&cand->pool, 40000000UL, cand->sb.icount);
+	err = xal_pool_map(&cand->pool, 40000000UL, nallocated);
 	if (err) {
 		printf("xal_pool_map(...); err(%d)\n", err);
 		return err;
