@@ -15,7 +15,8 @@
 #include <xal_pool.h>
 #include <xal_pp.h>
 
-#define BUF_NBYTES 4096 * 32ULL
+#define BUF_NBYTES 4096 * 32UL ///< Number of bytes in a buffer
+#define CHUNK_NINO 64 ///< Number of inodes in a chunk
 
 int
 process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
@@ -469,7 +470,7 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 		 * Populate the inode-buffer with data from all the blocks
 		 */
 		{
-			uint64_t chunk_nbytes = (64 / xal->sb.inopblock) * xal->sb.blocksize;
+			uint64_t chunk_nbytes = (CHUNK_NINO / xal->sb.inopblock) * xal->sb.blocksize;
 			off_t chunk_offset = agbno * xal->sb.blocksize + ag->offset;
 
 			printf("chunk_nbytes(%" PRIu64 "), buf_nbytes(%" PRIu64 ")\n", chunk_nbytes,
@@ -485,7 +486,7 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 		}
 
 		/**
-		 * Traverse the inodes in the chunk
+		 * Traverse the inodes in the chunk, skipping unused and free inodes.
 		 */
 		for (uint8_t chunk_index = 0; chunk_index < rec->count; ++chunk_index) {
 			uint8_t *chunk_cursor = inodechunk + chunk_index * xal->sb.inodesize;
@@ -519,7 +520,7 @@ xal_odf_process_inodes(struct xal *xal)
 	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
 		struct xal_ag *ag = &xal->ags[seqno];
 
-		icount_accumulated += xal->ags[seqno].agi_count;
+		icount_accumulated += ag->agi_count;
 	}
 
 	printf("# xal_odf_process_inodes(); icount_accumulated(%" PRIu64 ")\n", icount_accumulated);
