@@ -1,7 +1,7 @@
 builddir = build
 
 .PHONY: all
-all: clean configure build test
+all: clean configure build install test
 
 .PHONY: clean
 clean:
