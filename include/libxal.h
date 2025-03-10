@@ -178,3 +178,11 @@ xal_index(struct xal *xal, struct xal_inode **index);
  */
 int
 xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data);
+
+/**
+ * Retrieve inodes from disk and decode the on-disk-format of the retrieved data
+ *
+ * This currently does not have any side-effects, however, eventually it will.
+ */
+int
+xal_odf_process_inodes(struct xal *xal);

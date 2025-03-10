@@ -98,6 +98,8 @@ main(int argc, char *argv[])
 		xal_pp(xal);
 	}
 
+	xal_odf_process_inodes(xal);
+
 	return 0;
 
 	err = xal_index(xal, &index);
