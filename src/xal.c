@@ -1,4 +1,3 @@
-#include <stdatomic.h>
 #define _GNU_SOURCE
 #include <assert.h>
 #include <endian.h>
@@ -99,6 +98,7 @@ xal_close(struct xal *xal)
 
 	xal_pool_unmap(&xal->pool);
 	close(xal->handle.fd);
+	free(xal->inodes);
 	free(xal);
 }
 
@@ -557,6 +557,11 @@ xal_odf_process_inodes(struct xal *xal)
 		struct xal_ag *ag = &xal->ags[seqno];
 
 		icount_accumulated += ag->agi_count;
+	}
+
+	xal->inodes = calloc(1, icount_accumulated * xal->sb.inodesize);
+	if (!xal->inodes) {
+		return -errno;
 	}
 
 	printf("# xal_odf_process_inodes(); icount_accumulated(%" PRIu64 ")\n", icount_accumulated);
