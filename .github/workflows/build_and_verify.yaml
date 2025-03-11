@@ -1,0 +1,32 @@
+name: build_and_verify
+
+on:
+  push:
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PATH: ${{ env.HOME }}/.local/bin:${{ env.PATH }}
+
+jobs:
+  build_and_verify:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v4.2.2
+
+    - name: Prep, Packages
+      run: sudo ./toolbox/pkgs/ubuntu.sh
+
+    - name: Build
+      run: make clean configure build
+
+    - name: Install
+      run: sudo make install
+
+    - name: Test
+      run: sudo make test
