@@ -409,15 +409,13 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 {
 	char buf[BUF_NBYTES] = {0};
 	struct xal_odf_btree_iab3_sfmt *iab3 = (void *)buf;
-	uint64_t absblkno = xal->sb.agblocks * ag->seqno;
 	off_t offset;
 	int err;
 
-	printf("# process_iabt3(); seqno: %" PRIu32 "\n", ag->seqno);
+	printf("# retrieve_dinodes_via_iabt3(); seqno: %" PRIu32 "\n", ag->seqno);
 
-	absblkno += blkno;
-	offset = absblkno * xal->sb.blocksize;
-
+	/** Compute the absolute offset for the block and retrieve it **/
+	offset = (xal->sb.agblocks * ag->seqno + blkno) * xal->sb.blocksize;
 	err = _pread(xal, buf, xal->sb.blocksize, offset);
 	if (err) {
 		perror("_pread();\n");
