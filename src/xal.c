@@ -375,31 +375,6 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 }
 
 /**
- * Observation(s)
- * ==============
- *
- * siblings
- * It looks like the inode-allocation-block-tree (iab3) uses the short-form for sibling block
- * numbers. This seems to make sense since the iab3 described inodes within the allocation-group,
- * and as such, need to only represent block numbers relative to the ag, and thus, only need 32bit
- * per sibling.
- *
- * 'blkno'
- * The 'blkno' field in the btree is an absolute block number, that is, unlike the block numbers of
- * siblings, then this 'blkno' is absolute. Also, this number is described in units of sectors!
- *
- * This wrinkles my brain but I guess there are good reasons to do so, must be something related
- * to quickly verifying that a block retrieved from disk using fs-wide addressed is the expected
- * block.
- *
- * The really convenient thing about this field is that it helped me understand that the siblings
- * where short-form. When looking at the data on disk, then I thought it has:
- *
- *  leftsibling = 0xFF...F
- *
- * and the rightsibling was block-address.
- */
-/**
  * Retrieve all the allocated inodes stored within the give allocation group
  *
  * It is assumed that the inode-allocation-b+tree is rooted at the given 'blkno'
