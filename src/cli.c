@@ -98,7 +98,7 @@ main(int argc, char *argv[])
 		xal_pp(xal);
 	}
 
-	xal_odf_process_inodes(xal);
+	xal_dinodes_retrieve(xal);
 
 	return 0;
 

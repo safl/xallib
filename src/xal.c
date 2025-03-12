@@ -399,8 +399,13 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
  *
  * and the rightsibling was block-address.
  */
+/**
+ * Retrieve all the allocated inodes stored within the give allocation group
+ *
+ * It is assumed that the inode-allocation-b+tree is rooted at the given 'blkno'
+ */
 int
-process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
+retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
 {
 	char buf[BUF_NBYTES] = {0};
 	struct xal_odf_btree_iab3_sfmt *iab3 = (void *)buf;
@@ -492,14 +497,14 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *inde
 
 	if (iab3->rightsib != 0xFFFFFFFF) {
 		printf("Going deeper on the right\n");
-		process_iabt3(xal, ag, iab3->rightsib, index);
+		retrieve_dinodes_via_iabt3(xal, ag, iab3->rightsib, index);
 	}
 
 	return 0;
 }
 
 int
-xal_odf_process_inodes(struct xal *xal)
+xal_dinodes_retrieve(struct xal *xal)
 {
 	uint64_t index = 0;
 
@@ -511,7 +516,7 @@ xal_odf_process_inodes(struct xal *xal)
 	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
 		struct xal_ag *ag = &xal->ags[seqno];
 
-		process_iabt3(xal, ag, ag->agi_root, &index);
+		retrieve_dinodes_via_iabt3(xal, ag, ag->agi_root, &index);
 	}
 
 	return 0;
@@ -523,7 +528,7 @@ xal_index(struct xal *xal, struct xal_inode **index)
 	struct xal_inode *root;
 	int err;
 
-	xal_odf_process_inodes(xal);
+	xal_dinodes_retrieve(xal);
 
 	err = xal_pool_claim(&xal->pool, 1, &root);
 	if (err) {
