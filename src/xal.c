@@ -501,21 +501,12 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *inde
 int
 xal_odf_process_inodes(struct xal *xal)
 {
-	uint64_t icount_accumulated = 0;
 	uint64_t index = 0;
 
-	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
-		struct xal_ag *ag = &xal->ags[seqno];
-
-		icount_accumulated += ag->agi_count;
-	}
-
-	xal->dinodes = calloc(1, icount_accumulated * xal->sb.inodesize);
+	xal->dinodes = calloc(1, xal->sb.nallocated * xal->sb.inodesize);
 	if (!xal->dinodes) {
 		return -errno;
 	}
-
-	printf("# xal_odf_process_inodes(); icount_accumulated(%" PRIu64 ")\n", icount_accumulated);
 
 	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
 		struct xal_ag *ag = &xal->ags[seqno];
