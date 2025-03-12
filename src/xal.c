@@ -375,7 +375,7 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 }
 
 /**
- * Retrieve all the allocated inodes stored within the give allocation group
+ * Retrieve all the allocated inodes stored within the given allocation group
  *
  * It is assumed that the inode-allocation-b+tree is rooted at the given 'blkno'
  */
