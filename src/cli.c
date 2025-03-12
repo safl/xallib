@@ -98,9 +98,11 @@ main(int argc, char *argv[])
 		xal_pp(xal);
 	}
 
-	xal_dinodes_retrieve(xal);
-
-	return 0;
+	err = xal_dinodes_retrieve(xal);
+	if (err) {
+		printf("xal_dinodes_retrieve(...); err(%d)\n", err);
+		return err;
+	}
 
 	err = xal_index(xal, &index);
 	if (err) {

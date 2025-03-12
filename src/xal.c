@@ -503,7 +503,9 @@ xal_index(struct xal *xal, struct xal_inode **index)
 	struct xal_inode *root;
 	int err;
 
-	xal_dinodes_retrieve(xal);
+	if (!xal->dinodes) {
+		return -EINVAL;
+	}
 
 	err = xal_pool_claim(&xal->pool, 1, &root);
 	if (err) {
