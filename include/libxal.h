@@ -163,6 +163,10 @@ xal_close(struct xal *xal);
 
 /**
  * Produce an index of the directory and files stored on the device
+ *
+ * Assumes that you have retrieved all the inodes from disk via xal_dinodes_retrieve()
+ *
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
  */
 int
 xal_index(struct xal *xal, struct xal_inode **index);
