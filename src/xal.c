@@ -69,7 +69,7 @@ xal_close(struct xal *xal)
 
 	xal_pool_unmap(&xal->pool);
 	close(xal->handle.fd);
-	free(xal->inodes);
+	free(xal->dinodes);
 	free(xal);
 }
 
@@ -484,7 +484,7 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *inde
 				continue;
 			}
 
-			memcpy((void *)(&xal->inodes[*index * xal->sb.inodesize]),
+			memcpy((void *)(&xal->dinodes[*index * xal->sb.inodesize]),
 			       (void *)chunk_cursor, xal->sb.inodesize);
 			*index += 1;
 		}
@@ -510,8 +510,8 @@ xal_odf_process_inodes(struct xal *xal)
 		icount_accumulated += ag->agi_count;
 	}
 
-	xal->inodes = calloc(1, icount_accumulated * xal->sb.inodesize);
-	if (!xal->inodes) {
+	xal->dinodes = calloc(1, icount_accumulated * xal->sb.inodesize);
+	if (!xal->dinodes) {
 		return -errno;
 	}
 
