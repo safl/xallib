@@ -17,8 +17,9 @@ apt-get -qy autoclean
 apt-get -qy install \
  meson \
  pipx \
+ sudo \
  xfslibs-dev \
  xfsprogs
 
-pipx install cijoe
+pipx install cijoe==v0.9.51 --force
 pipx ensurepath

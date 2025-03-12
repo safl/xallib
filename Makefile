@@ -9,7 +9,7 @@ clean:
 
 .PHONY: configure
 configure:
-	meson setup $(builddir) --reconfigure
+	meson setup $(builddir)
 
 .PHONY: build
 build:
