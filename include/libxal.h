@@ -162,6 +162,16 @@ void
 xal_close(struct xal *xal);
 
 /**
+ * Retrieve inodes from disk and decode the on-disk-format of the retrieved data
+ *
+ * @param xal Pointer to the xal
+ *
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_dinodes_retrieve(struct xal *xal);
+
+/**
  * Produce an index of the directory and files stored on the device
  *
  * Assumes that you have retrieved all the inodes from disk via xal_dinodes_retrieve()
@@ -184,11 +194,3 @@ xal_index(struct xal *xal, struct xal_inode **index);
  */
 int
 xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data);
-
-/**
- * Retrieve inodes from disk and decode the on-disk-format of the retrieved data
- *
- * This currently does not have any side-effects, however, eventually it will.
- */
-int
-xal_dinodes_retrieve(struct xal *xal);
