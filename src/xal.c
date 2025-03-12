@@ -29,7 +29,8 @@ int
 dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
 {
 	for (uint64_t idx = 0; idx < xal->sb.nallocated; ++idx) {
-		const struct xal_odf_dinode *cand = (void*)(xal->dinodes + idx * xal->sb.inodesize);
+		const struct xal_odf_dinode *cand =
+		    (void *)(xal->dinodes + idx * xal->sb.inodesize);
 
 		if (be64toh(cand->ino) != ino) {
 			continue;
