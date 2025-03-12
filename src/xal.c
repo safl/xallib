@@ -261,7 +261,7 @@ xal_open(const char *path, struct xal **xal)
 int
 process_inode_shortform(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
-	uint8_t *cursor = (void*)dinode;
+	uint8_t *cursor = (void *)dinode;
 	struct xal_inode *children;
 	uint8_t count, i8count;
 	int err;
