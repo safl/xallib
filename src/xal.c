@@ -476,14 +476,9 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 		 * Traverse the inodes in the chunk, skipping unused and free inodes.
 		 */
 		for (uint8_t chunk_index = 0; chunk_index < rec->count; ++chunk_index) {
-			uint8_t *chunk_cursor = inodechunk + chunk_index * xal->sb.inodesize;
-			struct xal_odf_dinode *dinode = (void *)chunk_cursor;
-			uint32_t inode_seqno, inode_agbno, inode_agbino;
+			uint8_t *chunk_cursor = &inodechunk[chunk_index * xal->sb.inodesize];
 			uint64_t is_unused = (rec->holemask & (1ULL << chunk_index)) >> chunk_index;
 			uint64_t is_free = (rec->free & (1ULL << chunk_index)) >> chunk_index;
-
-			xal_ino_decode_absolute(xal, be64toh(dinode->ino), &inode_seqno,
-						&inode_agbno, &inode_agbino);
 
 			if (is_unused || is_free) {
 				continue;
