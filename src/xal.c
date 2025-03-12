@@ -420,7 +420,7 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 
 	err = _pread(xal, buf, xal->sb.blocksize, offset);
 	if (err) {
-		perror("read_4k();\n");
+		perror("_pread();\n");
 		return err;
 	}
 
