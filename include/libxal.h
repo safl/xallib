@@ -137,8 +137,8 @@ struct xal_sb {
  */
 struct xal {
 	union xal_handle handle;
-	uint8_t *dinodes;     ///< Array of inodes in on-disk-format
-	struct xal_pool pool; ///< Pool of inodes in host-native format
+	uint8_t *dinodes;	///< Array of inodes in on-disk-format
+	struct xal_pool pool;	///< Pool of inodes in host-native format
 	struct xal_inode *root; ///< Root of the file-system
 	struct xal_sb sb;
 	struct xal_ag ags[]; ///< Array of 'agcount' number of allocation-groups
