@@ -20,6 +20,29 @@
 int
 process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
+/**
+ * Find the dinode with inode number 'ino'
+ *
+ * @return On success, 0 is returned. On error, -errno is returned to indicate the error.
+ */
+int
+dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
+{
+	for (uint64_t idx = 0; idx < xal->sb.nallocated; ++idx) {
+		const struct xal_odf_dinode *cand = (void*)(xal->dinodes + idx * xal->sb.inodesize);
+
+		if (be64toh(cand->ino) != ino) {
+			continue;
+		}
+
+		*dinode = (void*)(xal->dinodes + idx * xal->sb.sectsize);
+		
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
 uint32_t
 ino_abs_to_rel(struct xal *xal, uint64_t inoabs)
 {
