@@ -45,6 +45,7 @@ xal_pp(struct xal *xal)
 	wrtn += printf("  sb.inopblock: %" PRIu16 "\n", xal->sb.inopblock);
 	wrtn += printf("  sb.inopblog: %" PRIu8 "\n", xal->sb.inopblog);
 	wrtn += printf("  sb.icount: %" PRIu64 "\n", xal->sb.icount);
+	wrtn += printf("  sb.nallocated: %" PRIu64 "\n", xal->sb.nallocated);
 	wrtn += printf("  sb.rootino: %" PRIu64 "\n", xal->sb.rootino);
 	wrtn += printf("  sb.agblocks: %" PRIu32 "\n", xal->sb.agblocks);
 	wrtn += printf("  sb.agblklog: %" PRIu8 "\n", xal->sb.agblklog);
