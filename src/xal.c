@@ -400,7 +400,7 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
  * and the rightsibling was block-address.
  */
 int
-process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
+process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
 {
 	char buf[BUF_NBYTES] = {0};
 	struct xal_odf_btree_iab3_sfmt *iab3 = (void *)buf;
@@ -484,12 +484,15 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 				continue;
 			}
 
+			memcpy((void *)(&xal->inodes[*index * xal->sb.inodesize]),
+			       (void *)chunk_cursor, xal->sb.inodesize);
+			*index += 1;
 		}
 	}
 
 	if (iab3->rightsib != 0xFFFFFFFF) {
 		printf("Going deeper on the right\n");
-		process_iabt3(xal, ag, iab3->rightsib);
+		process_iabt3(xal, ag, iab3->rightsib, index);
 	}
 
 	return 0;
@@ -499,6 +502,7 @@ int
 xal_odf_process_inodes(struct xal *xal)
 {
 	uint64_t icount_accumulated = 0;
+	uint64_t index = 0;
 
 	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
 		struct xal_ag *ag = &xal->ags[seqno];
@@ -516,7 +520,7 @@ xal_odf_process_inodes(struct xal *xal)
 	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
 		struct xal_ag *ag = &xal->ags[seqno];
 
-		process_iabt3(xal, ag, ag->agi_root);
+		process_iabt3(xal, ag, ag->agi_root, &index);
 	}
 
 	return 0;
