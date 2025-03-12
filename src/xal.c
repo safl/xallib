@@ -456,6 +456,13 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 		xal_ino_decode_relative(xal, rec->startino, &agbno, &agbino);
 
 		/**
+		 * Assumption: if the inode-offset is non-zero, then offset-calucations are
+		 *             incorrect as they do not account for the only the block where the
+		 *             inode-chunk is supposed to start.
+		 */
+		assert(agbino == 0);
+
+		/**
 		 * Populate the inode-buffer with data from all the blocks
 		 */
 		{
