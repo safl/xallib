@@ -54,9 +54,6 @@ xal_get_inode_offset(struct xal *xal, uint64_t ino)
 
 	xal_ino_decode_absolute(xal, ino, &seqno, &agbno, &agbino);
 
-	printf("seqno: %" PRIu32 ", agbno: %" PRIu32 ", agbino: %" PRIu32 ", ino: %" PRIu64 "\n",
-	       seqno, agbno, agbino, ino);
-
 	// Absolute Inode offset in bytes
 	offset = (seqno * xal->sb.agblocks + agbno) * xal->sb.blocksize;
 
@@ -429,10 +426,6 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 	iab3->rightsib = be32toh(iab3->rightsib);
 	iab3->blkno = be64toh(iab3->blkno);
 
-	printf("# absblkno(%" PRIu64 "), blkno(%" PRIu64 ", 0x%" PRIX64 "), offset(%" PRIu64 "):\n",
-	       absblkno, blkno, blkno, offset);
-	xal_odf_btree_iab3_sfmt_pp(iab3);
-
 	assert(be32toh(iab3->magic.num) == XAL_ODF_IBT_CRC_MAGIC);
 
 	if (iab3->level) {
@@ -450,20 +443,12 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 		rec->freecount = rec->freecount;
 		rec->free = be64toh(rec->free);
 
-		xal_odf_inobt_rec_pp(rec);
-
 		/**
 		 * Determine the block number relative to the allocation group
 		 *
 		 * This block should be the first block
 		 */
-		{
-			xal_ino_decode_relative(xal, rec->startino, &agbno, &agbino);
-
-			printf("agbno: %" PRIu32 ", agbino: %" PRIu32 "\n", agbno, agbino);
-
-			// agnbo should be the block containing the chunk of 64 inodes
-		}
+		xal_ino_decode_relative(xal, rec->startino, &agbno, &agbino);
 
 		/**
 		 * Populate the inode-buffer with data from all the blocks
@@ -472,9 +457,6 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 			uint64_t chunk_nbytes =
 			    (CHUNK_NINO / xal->sb.inopblock) * xal->sb.blocksize;
 			off_t chunk_offset = agbno * xal->sb.blocksize + ag->offset;
-
-			printf("chunk_nbytes(%" PRIu64 "), buf_nbytes(%" PRIu64 ")\n", chunk_nbytes,
-			       BUF_NBYTES);
 
 			assert(chunk_nbytes < BUF_NBYTES);
 
@@ -498,17 +480,10 @@ process_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno)
 			xal_ino_decode_absolute(xal, be64toh(dinode->ino), &inode_seqno,
 						&inode_agbno, &inode_agbino);
 
-			printf("is_unused(%" PRIu64 "), is_free(%" PRIu64 ")\n", is_unused,
-			       is_free);
-
-			printf("seqno(%" PRIu32 "), agnbo(%" PRIu32 "), agbino(%" PRIu32 ")\n",
-			       inode_seqno, inode_agbno, inode_agbino);
-
 			if (is_unused || is_free) {
 				continue;
 			}
 
-			xal_odf_dinode_pp((void *)chunk_cursor);
 		}
 	}
 
