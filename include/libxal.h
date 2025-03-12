@@ -180,7 +180,7 @@ xal_dinodes_retrieve(struct xal *xal);
  * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
  */
 int
-xal_index(struct xal *xal, struct xal_inode **index);
+xal_index(struct xal *xal);
 
 /**
  * Recursively walk the given directory

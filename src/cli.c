@@ -79,7 +79,6 @@ main(int argc, char *argv[])
 {
 	struct xal_cli_args args = {0};
 	struct xal_nodeinspector_stats cb_args = {0};
-	struct xal_inode *index;
 	struct xal *xal;
 	int err;
 
@@ -104,13 +103,13 @@ main(int argc, char *argv[])
 		return err;
 	}
 
-	err = xal_index(xal, &index);
+	err = xal_index(xal);
 	if (err) {
 		printf("xal_get_index(...); err(%d)\n", err);
 		goto exit;
 	}
 
-	err = xal_walk(index, args.verbose ? node_inspector : NULL, args.verbose ? &cb_args : NULL);
+	err = xal_walk(xal->root, args.verbose ? node_inspector : NULL, args.verbose ? &cb_args : NULL);
 	if (err) {
 		printf("xal_walk(...); err(%d)\n", err);
 		goto exit;

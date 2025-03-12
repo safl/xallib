@@ -498,29 +498,26 @@ xal_dinodes_retrieve(struct xal *xal)
 }
 
 int
-xal_index(struct xal *xal, struct xal_inode **index)
+xal_index(struct xal *xal)
 {
-	struct xal_inode *root;
 	int err;
 
 	if (!xal->dinodes) {
 		return -EINVAL;
 	}
 
-	err = xal_pool_claim(&xal->pool, 1, &root);
+	err = xal_pool_claim(&xal->pool, 1, &xal->root);
 	if (err) {
 		return err;
 	}
 
-	root->ino = xal->sb.rootino;
-	root->ftype = XAL_ODF_DIR3_FT_DIR;
-	root->namelen = 1;
-	root->nextents = 0;
-	memcpy(root->name, "/", 1);
+	xal->root->ino = xal->sb.rootino;
+	xal->root->ftype = XAL_ODF_DIR3_FT_DIR;
+	xal->root->namelen = 1;
+	xal->root->nextents = 0;
+	memcpy(xal->root->name, "/", 1);
 
-	*index = root;
-
-	return process_inode_ino(xal, root->ino, root);
+	return process_inode_ino(xal, xal->root->ino, xal->root);
 }
 
 int
