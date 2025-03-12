@@ -255,10 +255,10 @@ xal_open(const char *path, struct xal **xal)
 }
 
 int
-process_inode_shortform(struct xal *xal, void *inode, struct xal_inode *self)
+process_inode_shortform(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
+	uint8_t *cursor = (void*)dinode;
 	struct xal_inode *children;
-	uint8_t *cursor = inode;
 	uint8_t count, i8count;
 	int err;
 
@@ -364,15 +364,15 @@ process_inode_extents(void *buf, struct xal_inode *self)
 int
 process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 {
-	uint8_t buf[BUF_NBYTES] = {0};
-	struct xal_odf_dinode *dinode = (void *)buf;
-	ssize_t nbytes;
+	struct xal_odf_dinode *dinode;
+	int err;
 
-	///< Read the on-disk inode data
-	nbytes = pread(xal->handle.fd, buf, xal->sb.sectsize, xal_get_inode_offset(xal, ino));
-	if (nbytes != xal->sb.sectsize) {
-		return -EIO;
+	err = dinodes_get(xal, ino, (void**)&dinode);
+	if (err) {
+		return err;
 	}
+
+	xal_odf_dinode_pp(dinode);
 
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_DEV: ///< What is this?
@@ -382,11 +382,11 @@ process_inode_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		break;
 
 	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
-		process_inode_extents(buf, self);
+		process_inode_extents(dinode, self);
 		break;
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
-		process_inode_shortform(xal, buf, self);
+		process_inode_shortform(xal, dinode, self);
 		/// This could also be a small file?
 		break;
 
