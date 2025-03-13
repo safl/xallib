@@ -26,17 +26,18 @@ int
 dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
 {
 	for (uint64_t idx = 0; idx < xal->sb.nallocated; ++idx) {
-		const struct xal_odf_dinode *cand =
-		    (void *)(xal->dinodes + idx * xal->sb.inodesize);
+		struct xal_odf_dinode *cand = (void *)(xal->dinodes + idx * xal->sb.inodesize);
 
 		if (be64toh(cand->ino) != ino) {
 			continue;
 		}
+		printf("- ino(%" PRIu64 ") - dinode(%" PRIu64 ")\n", ino, be64toh(cand->ino));
 
 		/** Halt when the dinode is invalid */
 		assert(cand->di_magic == 0x4E49);
 
-		*dinode = (void *)(xal->dinodes + idx * xal->sb.sectsize);
+		//*dinode = (void *)(xal->dinodes + idx * xal->sb.sectsize);
+		*dinode = cand;
 
 		return 0;
 	}
@@ -243,7 +244,7 @@ xal_open(const char *path, struct xal **xal)
 	}
 
 	// Setup inode memory-pool
-	err = xal_pool_map(&cand->pool, 40000000UL, cand->sb.nallocated);
+	err = xal_pool_map(&cand->pool, 40000000UL, cand->sb.nallocated, sizeof(struct xal_inode));
 	if (err) {
 		printf("xal_pool_map(...); err(%d)\n", err);
 		return err;
@@ -362,7 +363,7 @@ process_dinode_extents(struct xal_odf_dinode *dinode, struct xal_inode *self)
  * Internal helper recursively traversing the on-disk-format to build an index of the file-system
  *
  * - Retrieve the dinode
- * - 
+ * -
  *
  */
 int
@@ -371,6 +372,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	struct xal_odf_dinode *dinode;
 	int err;
 
+	printf("## process_ino(%" PRIu64 ")\n", ino);
 	err = dinodes_get(xal, ino, (void **)&dinode);
 	if (err) {
 		perror("dinodes_get();\n");
@@ -381,21 +383,26 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_DEV: ///< What is this?
+		printf("# ino: %" PRIu64 "; DEV\n", ino);
 		break;
 
 	case XAL_DINODE_FMT_BTREE: ///< Recursively walk the btree
+		printf("# ino: %" PRIu64 "; BTREE\n", ino);
 		break;
 
 	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
+		printf("# ino: %" PRIu64 "; EXTENTS\n", ino);
 		process_dinode_extents(dinode, self);
 		break;
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
+		printf("# ino: %" PRIu64 "; LOCAL\n", ino);
 		process_dinode_shortform(xal, dinode, self);
 		/// This could also be a small file?
 		break;
 
 	case XAL_DINODE_FMT_UUID:
+		printf("# ino: %" PRIu64 "; UUID\n", ino);
 		break;
 	}
 

@@ -16,14 +16,15 @@ xal_pool_unmap(struct xal_pool *pool)
 int
 xal_pool_grow(struct xal_pool *pool, size_t growby)
 {
-	size_t growby_nbytes = growby * sizeof(*pool->inodes);
-	size_t allocated_nbytes = growby_nbytes + pool->allocated * sizeof(*pool->inodes);
+	size_t growby_nbytes = growby * pool->element_size;
+	size_t allocated_nbytes = growby_nbytes + pool->allocated * pool->element_size;
+	uint8_t *cursor = pool->memory;
 
-	if (mprotect(pool->inodes, allocated_nbytes, PROT_READ | PROT_WRITE)) {
+	if (mprotect(pool->memory, allocated_nbytes, PROT_READ | PROT_WRITE)) {
 		printf("mprotect(...); errno(%d)\n", errno);
 		return -errno;
 	}
-	memset(&pool->inodes[pool->free], 0, growby_nbytes);
+	memset(&cursor[pool->free * pool->element_size], 0, growby_nbytes);
 
 	pool->allocated += growby;
 
@@ -31,7 +32,7 @@ xal_pool_grow(struct xal_pool *pool, size_t growby)
 }
 
 int
-xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated)
+xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t element_size)
 {
 	int err;
 
@@ -47,11 +48,12 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated)
 	pool->reserved = reserved;
 	pool->allocated = 0;
 	pool->growby = allocated;
+	pool->element_size = element_size;
 	pool->free = 0;
 
-	pool->inodes = mmap(NULL, reserved * sizeof(*pool->inodes), PROT_NONE,
+	pool->memory = mmap(NULL, reserved * element_size, PROT_NONE,
 			    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (MAP_FAILED == pool->inodes) {
+	if (MAP_FAILED == pool->memory) {
 		printf("mmap(...); errno(%d)\n", errno);
 		return -errno;
 	}
@@ -69,6 +71,7 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated)
 int
 xal_pool_claim(struct xal_pool *pool, size_t count, struct xal_inode **inode)
 {
+	uint8_t *cursor = pool->memory;
 	int err;
 
 	if (count > pool->growby) {
@@ -83,7 +86,9 @@ xal_pool_claim(struct xal_pool *pool, size_t count, struct xal_inode **inode)
 		}
 	}
 
-	*inode = &pool->inodes[pool->free++];
+	*inode = (void*)&cursor[pool->free * pool->element_size];
+
+	pool->free++;
 
 	return 0;
 }
