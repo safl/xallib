@@ -92,7 +92,7 @@ xal_close(struct xal *xal)
 		return;
 	}
 
-	xal_pool_unmap(&xal->pool);
+	xal_pool_unmap(&xal->inodes);
 	close(xal->handle.fd);
 	free(xal->dinodes);
 	free(xal);
@@ -244,7 +244,7 @@ xal_open(const char *path, struct xal **xal)
 	}
 
 	// Setup inode memory-pool
-	err = xal_pool_map(&cand->pool, 40000000UL, cand->sb.nallocated, sizeof(struct xal_inode));
+	err = xal_pool_map(&cand->inodes, 40000000UL, cand->sb.nallocated, sizeof(struct xal_inode));
 	if (err) {
 		printf("xal_pool_map(...); err(%d)\n", err);
 		return err;
@@ -277,7 +277,7 @@ process_dinode_shortform(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 
 	cursor += i8count ? 8 : 4; ///< Advance past parent inode number
 
-	err = xal_pool_claim(&xal->pool, count, &children);
+	err = xal_pool_claim(&xal->inodes, count, &children);
 	if (err) {
 		return err;
 	}
@@ -541,7 +541,7 @@ xal_index(struct xal *xal)
 		return -EINVAL;
 	}
 
-	err = xal_pool_claim(&xal->pool, 1, &xal->root);
+	err = xal_pool_claim(&xal->inodes, 1, &xal->root);
 	if (err) {
 		return err;
 	}
