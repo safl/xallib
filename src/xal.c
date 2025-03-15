@@ -423,7 +423,11 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
 		printf("# ino: %" PRIu64 "; LOCAL\n", ino);
-		process_dinode_shortform_dentries(xal, dinode, self);
+		err = process_dinode_shortform_dentries(xal, dinode, self);
+		if (err) {
+			perror("process_dinode_shortform_dentries()\n");
+			return err;
+		}
 		/// This could also be a small file?
 		break;
 
