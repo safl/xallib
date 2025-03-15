@@ -6,10 +6,10 @@
 #include <libxal.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <xal_odf.h>
 #include <xal_pool.h>
@@ -268,7 +268,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
 int
 process_dinode_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode,
-				struct xal_inode *self)
+				  struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	struct xal_inode *inodes;
@@ -314,7 +314,11 @@ process_dinode_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode
 			cursor += 4; ///< Advance past 32-bit inode number
 		}
 
-		process_ino(xal, dentry->ino, dentry);
+		err = process_ino(xal, dentry->ino, dentry);
+		if (err) {
+			perror("process_ino()\n");
+			return err;
+		}
 	}
 
 	return 0;
@@ -406,7 +410,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	}
 
 	self->size = be64toh(dinode->di_size);
-	
+
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_DEV: ///< What is this?
 		printf("# ino: %" PRIu64 "; DEV\n", ino);
@@ -418,7 +422,11 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
 		printf("# ino: %" PRIu64 "; EXTENTS\n", ino);
-		process_dinode_extents(xal, dinode, self);
+		err = process_dinode_extents(xal, dinode, self);
+		if (err) {
+			perror("process_dinode_extents()\n");
+			return err;
+		}
 		break;
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
