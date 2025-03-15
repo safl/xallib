@@ -410,11 +410,11 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_DEV: ///< What is this?
 		printf("# ino: %" PRIu64 "; DEV\n", ino);
-		break;
+		return -ENOSYS;
 
 	case XAL_DINODE_FMT_BTREE: ///< Recursively walk the btree
 		printf("# ino: %" PRIu64 "; BTREE\n", ino);
-		break;
+		return -ENOSYS;
 
 	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
 		printf("# ino: %" PRIu64 "; EXTENTS\n", ino);
@@ -429,7 +429,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 	case XAL_DINODE_FMT_UUID:
 		printf("# ino: %" PRIu64 "; UUID\n", ino);
-		break;
+		return -ENOSYS;
 	}
 
 	return 0;
