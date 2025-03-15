@@ -31,7 +31,6 @@ dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
 		if (be64toh(cand->ino) != ino) {
 			continue;
 		}
-		printf("- ino(%" PRIu64 ") - dinode(%" PRIu64 ")\n", ino, be64toh(cand->ino));
 
 		/** Halt when the dinode is invalid */
 		assert(cand->di_magic == 0x4E49);
@@ -267,7 +266,8 @@ int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
 int
-process_dinode_shortform(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
+process_dinode_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode,
+				struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	struct xal_inode *inodes;
@@ -293,27 +293,27 @@ process_dinode_shortform(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 
 	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
 	for (int i = 0; i < count; ++i) {
-		struct xal_inode *child = &inodes[i];
+		struct xal_inode *dentry = &inodes[i];
 
-		child->namelen = *cursor;
+		dentry->namelen = *cursor;
 		cursor += 1 + 2; ///< Advance past 'namelen' and 'offset[2]'
 
-		memcpy(child->name, cursor, child->namelen);
-		cursor += child->namelen; ///< Advance past 'name'
+		memcpy(dentry->name, cursor, dentry->namelen);
+		cursor += dentry->namelen; ///< Advance past 'name'
 
-		child->ftype = *cursor;
+		dentry->ftype = *cursor;
 		cursor += 1; ///< Advance past 'ftype'
 
 		if (i8count) {
 			i8count--;
-			child->ino = be64toh(*(uint64_t *)cursor);
+			dentry->ino = be64toh(*(uint64_t *)cursor);
 			cursor += 8; ///< Advance past 64-bit inode number
 		} else {
-			child->ino = be32toh(*(uint32_t *)cursor);
+			dentry->ino = be32toh(*(uint32_t *)cursor);
 			cursor += 4; ///< Advance past 32-bit inode number
 		}
 
-		process_ino(xal, child->ino, child);
+		process_ino(xal, dentry->ino, dentry);
 	}
 
 	return 0;
@@ -408,7 +408,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
 		printf("# ino: %" PRIu64 "; LOCAL\n", ino);
-		process_dinode_shortform(xal, dinode, self);
+		process_dinode_shortform_dentries(xal, dinode, self);
 		/// This could also be a small file?
 		break;
 
