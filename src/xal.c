@@ -405,6 +405,8 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		}
 	}
 
+	self->size = be64toh(dinode->di_size);
+	
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_DEV: ///< What is this?
 		printf("# ino: %" PRIu64 "; DEV\n", ino);
