@@ -40,29 +40,29 @@ xal_extent_pp(struct xal_extent *extent);
 
 struct xal_inode;
 
-struct xal_inode_children {
-	uint32_t nchildren;	    ///< Number of children; for directories
-	struct xal_inode *children; ///< Pointer to array of 'struct xal_inode'
+struct xal_dentries {
+	struct xal_inode *inodes; ///< Pointer to array of 'struct xal_inode'
+	uint32_t count;		  ///< Number of children; for directories
 };
 
-struct xal_inode_extents {
-	uint32_t nextents;	   ///< Number of extents
+struct xal_extents {
 	struct xal_extent *extent; ///< Pointer to array of 'struct xal_extent'
+	uint32_t count;		   ///< Number of extents
 };
 
 union xal_inode_content {
-	struct xal_inode_children children;
-	struct xal_inode_extents extents;
+	struct xal_dentries dentries;
+	struct xal_extents extents;
 };
 
 struct xal_inode {
-	uint64_t ino;	 ///< Inode number of the directory entry; Should the AG be added here?
+	uint64_t ino; ///< Inode number of the directory entry; Should the AG be added here?
+	union xal_inode_content content;
 	uint8_t ftype;	 ///< File-type (directory, filename, symlink etc.)
 	uint8_t namelen; ///< Length of the name; not counting nul-termination
-	char name[256]; ///< Name; not including nul-termination
-	uint8_t rsvd[8];
-	union xal_inode_content content;
-} __attribute__((packed));
+	char name[256];	 ///< Name; not including nul-termination
+	uint8_t reserved[38];
+};
 
 int
 xal_inode_pp(struct xal_inode *inode);

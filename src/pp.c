@@ -149,13 +149,22 @@ xal_inode_pp(struct xal_inode *inode)
 
 	wrtn += printf("xal_inode:\n");
 	wrtn += printf("  ino: 0x%08" PRIX64 "\n", inode->ino);
-	wrtn += printf("  ftype: %" PRIu8 "\n", inode->ftype);
 	wrtn += printf("  namelen: %" PRIu8 "\n", inode->namelen);
 	wrtn += printf("  name: '%.256s'\n", inode->name);
-	wrtn += printf("  nextents: %u\n", inode->content.extents.nextents);
+	wrtn += printf("  ftype: %" PRIu8 "\n", inode->ftype);
 
-	for (uint8_t i = 0; i < inode->content.children.nchildren; ++i) {
-		struct xal_inode *children = inode->content.children.children;
+	switch(inode->ftype) {
+	case XAL_ODF_DIR3_FT_DIR:
+		wrtn += printf("  dentries.count: %u\n", inode->content.dentries.count);
+		break;
+		
+	case XAL_ODF_DIR3_FT_REG_FILE:
+		wrtn += printf("  extents.count: %u\n", inode->content.extents.count);
+		break;
+	}	
+
+	for (uint8_t i = 0; i < inode->content.dentries.count; ++i) {
+		struct xal_inode *children = inode->content.dentries.inodes;
 
 		xal_inode_pp(&children[i]);
 	}

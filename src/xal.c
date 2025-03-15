@@ -270,7 +270,7 @@ int
 process_dinode_shortform(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
-	struct xal_inode *children;
+	struct xal_inode *inodes;
 	uint8_t count, i8count;
 	int err;
 
@@ -284,16 +284,16 @@ process_dinode_shortform(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 
 	cursor += i8count ? 8 : 4; ///< Advance past parent inode number
 
-	err = xal_pool_claim_inodes(&xal->inodes, count, &children);
+	err = xal_pool_claim_inodes(&xal->inodes, count, &inodes);
 	if (err) {
 		return err;
 	}
-	self->content.children.children = children;
-	self->content.children.nchildren = count;
+	self->content.dentries.inodes = inodes;
+	self->content.dentries.count = count;
 
 	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
 	for (int i = 0; i < count; ++i) {
-		struct xal_inode *child = &children[i];
+		struct xal_inode *child = &inodes[i];
 
 		child->namelen = *cursor;
 		cursor += 1 + 2; ///< Advance past 'namelen' and 'offset[2]'
@@ -560,7 +560,7 @@ xal_index(struct xal *xal)
 	xal->root->ino = xal->sb.rootino;
 	xal->root->ftype = XAL_ODF_DIR3_FT_DIR;
 	xal->root->namelen = 1;
-	xal->root->content.extents.nextents = 0;
+	xal->root->content.extents.count = 0;
 	memcpy(xal->root->name, "/", 1);
 
 	return process_ino(xal, xal->root->ino, xal->root);
@@ -575,10 +575,10 @@ xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 
 	switch (inode->ftype) {
 	case XAL_ODF_DIR3_FT_DIR: {
-		struct xal_inode *children = inode->content.children.children;
+		struct xal_inode *inodes = inode->content.dentries.inodes;
 
-		for (uint16_t i = 0; i < inode->content.children.nchildren; ++i) {
-			xal_walk(&children[i], cb_func, cb_data);
+		for (uint16_t i = 0; i < inode->content.dentries.count; ++i) {
+			xal_walk(&inodes[i], cb_func, cb_data);
 		}
 	} break;
 

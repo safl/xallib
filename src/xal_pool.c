@@ -51,8 +51,8 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t el
 	pool->element_size = element_size;
 	pool->free = 0;
 
-	pool->memory = mmap(NULL, reserved * element_size, PROT_NONE,
-			    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	pool->memory =
+	    mmap(NULL, reserved * element_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (MAP_FAILED == pool->memory) {
 		printf("mmap(...); errno(%d)\n", errno);
 		return -errno;
@@ -86,7 +86,7 @@ xal_pool_claim_inodes(struct xal_pool *pool, size_t count, struct xal_inode **in
 		}
 	}
 
-	*inode = (void*)&cursor[pool->free * pool->element_size];
+	*inode = (void *)&cursor[pool->free * pool->element_size];
 
 	pool->free++;
 
@@ -111,7 +111,7 @@ xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **
 		}
 	}
 
-	*extents = (void*)&cursor[pool->free * pool->element_size];
+	*extents = (void *)&cursor[pool->free * pool->element_size];
 
 	pool->free++;
 
