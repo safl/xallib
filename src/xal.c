@@ -6,6 +6,7 @@
 #include <libxal.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -391,6 +392,18 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	}
 
 	xal_odf_dinode_pp(dinode);
+
+	if (!self->ftype) {
+		uint16_t mode = be16toh(dinode->di_mode);
+
+		if (S_ISDIR(mode)) {
+			self->ftype = XAL_ODF_DIR3_FT_DIR;
+		} else if (S_ISREG(mode)) {
+			self->ftype = XAL_ODF_DIR3_FT_REG_FILE;
+		} else {
+			return -EINVAL;
+		}
+	}
 
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_DEV: ///< What is this?
