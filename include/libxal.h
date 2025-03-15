@@ -33,22 +33,35 @@ struct xal_extent {
 	uint64_t start_offset;
 	uint64_t start_block;
 	uint64_t nblocks;
-	void *next;
 } __attribute__((packed));
 
 int
 xal_extent_pp(struct xal_extent *extent);
 
+struct xal_inode;
+
+struct xal_inode_children {
+	uint32_t nchildren;	    ///< Number of children; for directories
+	struct xal_inode *children; ///< Pointer to array of 'struct xal_inode'
+};
+
+struct xal_inode_extents {
+	uint32_t nextents;	   ///< Number of extents
+	struct xal_extent *extent; ///< Pointer to array of 'struct xal_extent'
+};
+
+union xal_inode_content {
+	struct xal_inode_children children;
+	struct xal_inode_extents extents;
+};
+
 struct xal_inode {
-	uint64_t ino;	   ///< Inode number of the directory entry; Should the AG be added here?
-	uint8_t ftype;	   ///< File-type (directory, filename, symlink etc.)
-	uint8_t namelen;   ///< Length of the name; not counting nul-termination
-	uint32_t nextents; ///< Number of extents
-	struct xal_extent extent; ///< First extent
-	char name[256];		  ///< Name; not including nul-termination
+	uint64_t ino;	 ///< Inode number of the directory entry; Should the AG be added here?
+	uint8_t ftype;	 ///< File-type (directory, filename, symlink etc.)
+	uint8_t namelen; ///< Length of the name; not counting nul-termination
+	char name[256]; ///< Name; not including nul-termination
 	uint8_t rsvd[8];
-	uint16_t nchildren; ///< Number of children; for directories
-	void *children;	    ///< Pointer to array of 'struct xal_inode'
+	union xal_inode_content content;
 } __attribute__((packed));
 
 int
@@ -64,12 +77,12 @@ typedef void (*xal_walk_cb)(struct xal_inode *inode, void *cb_args);
  * them, as one would otherwise have to do with malloc()/realloc().
  */
 struct xal_pool {
-	size_t reserved;  ///< Maximum number of elements in the pool
-	size_t allocated; ///< Number of reserved elements that are allocated
-	size_t growby;	  ///< Number of reserved elements to allocate at a time
-	size_t free; ///< Index / position of the next free element
+	size_t reserved;     ///< Maximum number of elements in the pool
+	size_t allocated;    ///< Number of reserved elements that are allocated
+	size_t growby;	     ///< Number of reserved elements to allocate at a time
+	size_t free;	     ///< Index / position of the next free element
 	size_t element_size; ///< Size of a single element in bytes
-	void *memory; ///< Memory space for elements
+	void *memory;	     ///< Memory space for elements
 };
 
 int
@@ -93,7 +106,10 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t el
  *
  */
 int
-xal_pool_claim(struct xal_pool *pool, size_t count, struct xal_inode **inode);
+xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **extents);
+
+int
+xal_pool_claim_inodes(struct xal_pool *pool, size_t count, struct xal_inode **inodes);
 
 /**
  * An encapsulation of the device handle, this is done preparation for using xNVMe
@@ -145,9 +161,10 @@ struct xal_sb {
  */
 struct xal {
 	union xal_handle handle;
-	uint8_t *dinodes;	///< Array of inodes in on-disk-format
-	struct xal_pool inodes;	///< Pool of inodes in host-native format
-	struct xal_inode *root; ///< Root of the file-system
+	uint8_t *dinodes;	 ///< Array of inodes in on-disk-format
+	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
+	struct xal_pool extents; ///< Pool of extents in host-native format
+	struct xal_inode *root;	 ///< Root of the file-system
 	struct xal_sb sb;
 	struct xal_ag ags[]; ///< Array of 'agcount' number of allocation-groups
 };

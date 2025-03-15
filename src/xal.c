@@ -243,10 +243,17 @@ xal_open(const char *path, struct xal **xal)
 		cand->sb.nallocated += cand->ags[seqno].agi_count;
 	}
 
-	// Setup inode memory-pool
-	err = xal_pool_map(&cand->inodes, 40000000UL, cand->sb.nallocated, sizeof(struct xal_inode));
+	err =
+	    xal_pool_map(&cand->inodes, 40000000UL, cand->sb.nallocated, sizeof(struct xal_inode));
 	if (err) {
-		printf("xal_pool_map(...); err(%d)\n", err);
+		printf("xal_pool_map(inodes); err(%d)\n", err);
+		return err;
+	}
+
+	err = xal_pool_map(&cand->extents, 40000000UL, cand->sb.nallocated,
+			   sizeof(struct xal_extent));
+	if (err) {
+		printf("xal_pool_map(extents); err(%d)\n", err);
 		return err;
 	}
 
@@ -277,12 +284,12 @@ process_dinode_shortform(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 
 	cursor += i8count ? 8 : 4; ///< Advance past parent inode number
 
-	err = xal_pool_claim(&xal->inodes, count, &children);
+	err = xal_pool_claim_inodes(&xal->inodes, count, &children);
 	if (err) {
 		return err;
 	}
-	self->children = children;
-	self->nchildren = count;
+	self->content.children.children = children;
+	self->content.children.nchildren = count;
 
 	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
 	for (int i = 0; i < count; ++i) {
@@ -326,10 +333,11 @@ decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 }
 
 int
-process_dinode_extents(struct xal_odf_dinode *dinode, struct xal_inode *self)
+process_dinode_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
+	int err;
 
 	/**
 	 * For some reason then di_big_nextents is populated. As far as i understand that should
@@ -339,8 +347,11 @@ process_dinode_extents(struct xal_odf_dinode *dinode, struct xal_inode *self)
 	nextents =
 	    (dinode->di_nextents) ? be32toh(dinode->di_nextents) : be64toh(dinode->di_big_nextents);
 
-	/** Multiple extents are not implemented yet; add a memory-pool for them */
-	assert(nextents <= 1);
+	err = xal_pool_claim_extents(&xal->extents, nextents, &self->content.extents.extent);
+	if (err) {
+		perror("xal_pool_claim()...\n");
+		return err;
+	}
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
@@ -353,7 +364,7 @@ process_dinode_extents(struct xal_odf_dinode *dinode, struct xal_inode *self)
 		l1 = be64toh(*((uint64_t *)cursor));
 		cursor += 8;
 
-		decode_xfs_extent(l0, l1, &self->extent);
+		decode_xfs_extent(l0, l1, &self->content.extents.extent[i]);
 	}
 
 	return 0;
@@ -392,7 +403,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
 		printf("# ino: %" PRIu64 "; EXTENTS\n", ino);
-		process_dinode_extents(dinode, self);
+		process_dinode_extents(xal, dinode, self);
 		break;
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
@@ -541,7 +552,7 @@ xal_index(struct xal *xal)
 		return -EINVAL;
 	}
 
-	err = xal_pool_claim(&xal->inodes, 1, &xal->root);
+	err = xal_pool_claim_inodes(&xal->inodes, 1, &xal->root);
 	if (err) {
 		return err;
 	}
@@ -549,7 +560,7 @@ xal_index(struct xal *xal)
 	xal->root->ino = xal->sb.rootino;
 	xal->root->ftype = XAL_ODF_DIR3_FT_DIR;
 	xal->root->namelen = 1;
-	xal->root->nextents = 0;
+	xal->root->content.extents.nextents = 0;
 	memcpy(xal->root->name, "/", 1);
 
 	return process_ino(xal, xal->root->ino, xal->root);
@@ -564,9 +575,9 @@ xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 
 	switch (inode->ftype) {
 	case XAL_ODF_DIR3_FT_DIR: {
-		struct xal_inode *children = inode->children;
+		struct xal_inode *children = inode->content.children.children;
 
-		for (uint16_t i = 0; i < inode->nchildren; ++i) {
+		for (uint16_t i = 0; i < inode->content.children.nchildren; ++i) {
 			xal_walk(&children[i], cb_func, cb_data);
 		}
 	} break;

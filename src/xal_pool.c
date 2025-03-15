@@ -69,7 +69,7 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t el
 }
 
 int
-xal_pool_claim(struct xal_pool *pool, size_t count, struct xal_inode **inode)
+xal_pool_claim_inodes(struct xal_pool *pool, size_t count, struct xal_inode **inode)
 {
 	uint8_t *cursor = pool->memory;
 	int err;
@@ -87,6 +87,31 @@ xal_pool_claim(struct xal_pool *pool, size_t count, struct xal_inode **inode)
 	}
 
 	*inode = (void*)&cursor[pool->free * pool->element_size];
+
+	pool->free++;
+
+	return 0;
+}
+
+int
+xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **extents)
+{
+	uint8_t *cursor = pool->memory;
+	int err;
+
+	if (count > pool->growby) {
+		return -EINVAL;
+	}
+
+	if (pool->allocated == pool->free) {
+		err = xal_pool_grow(pool, pool->growby);
+		if (err) {
+			printf("xal_pool_grow(); err(%d)", err);
+			return err;
+		}
+	}
+
+	*extents = (void*)&cursor[pool->free * pool->element_size];
 
 	pool->free++;
 
