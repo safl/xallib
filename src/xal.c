@@ -388,7 +388,6 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	struct xal_odf_dinode *dinode;
 	int err;
 
-	printf("## process_ino(%" PRIu64 ")\n", ino);
 	err = dinodes_get(xal, ino, (void **)&dinode);
 	if (err) {
 		perror("dinodes_get();\n");
@@ -411,36 +410,70 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 	self->size = be64toh(dinode->di_size);
 
-	switch (dinode->di_format) {
-	case XAL_DINODE_FMT_DEV: ///< What is this?
-		printf("# ino: %" PRIu64 "; DEV\n", ino);
-		return -ENOSYS;
+	printf("# ino: %" PRIu64 "\n", ino);
 
-	case XAL_DINODE_FMT_BTREE: ///< Recursively walk the btree
-		printf("# ino: %" PRIu64 "; BTREE\n", ino);
-		return -ENOSYS;
+	switch (dinode->di_format) {
+	case XAL_DINODE_FMT_BTREE:
+		switch (self->ftype) {
+		case XAL_ODF_DIR3_FT_DIR:
+			printf("# directory in BTREE fmt -- not implemented.\n");
+			return -ENOSYS;
+
+		case XAL_ODF_DIR3_FT_REG_FILE:
+			printf("# file in BTREE fmt -- not implemented.\n");
+			return -ENOSYS;
+
+		default:
+			printf("# Unsupported file-type in BTREE fmt\n");
+			return -ENOSYS;
+		}
+		break;
 
 	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
-		printf("# ino: %" PRIu64 "; EXTENTS\n", ino);
-		err = process_dinode_extents(xal, dinode, self);
-		if (err) {
-			perror("process_dinode_extents()\n");
-			return err;
+		switch (self->ftype) {
+		case XAL_ODF_DIR3_FT_DIR:
+			printf("# directory in EXTENTS fmt -- not implemented.\n");
+			return -ENOSYS;
+
+		case XAL_ODF_DIR3_FT_REG_FILE:
+			printf("# file in EXTENTS fmt -- setting up.\n");
+			err = process_dinode_extents(xal, dinode, self);
+			if (err) {
+				perror("process_dinode_extents()\n");
+				return err;
+			}
+			break;
+
+		default:
+			printf("# Unsupported file-type in EXTENTS fmt\n");
+			return -ENOSYS;
 		}
 		break;
 
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
-		printf("# ino: %" PRIu64 "; LOCAL\n", ino);
-		err = process_dinode_shortform_dentries(xal, dinode, self);
-		if (err) {
-			perror("process_dinode_shortform_dentries()\n");
-			return err;
+		switch (self->ftype) {
+		case XAL_ODF_DIR3_FT_DIR:
+			printf("# directory in LOCAL fmt -- setting up\n");
+			err = process_dinode_shortform_dentries(xal, dinode, self);
+			if (err) {
+				perror("process_dinode_shortform_dentries()\n");
+				return err;
+			}
+			break;
+
+		case XAL_ODF_DIR3_FT_REG_FILE:
+			printf("# file in LOCAL fmt -- not implemented.\n");
+			return -ENOSYS;
+
+		default:
+			printf("# Unsupported file-type in BTREE fmt\n");
+			return -ENOSYS;
 		}
-		/// This could also be a small file?
 		break;
 
+	case XAL_DINODE_FMT_DEV:
 	case XAL_DINODE_FMT_UUID:
-		printf("# ino: %" PRIu64 "; UUID\n", ino);
+		printf("# file: UUID\n");
 		return -ENOSYS;
 	}
 
