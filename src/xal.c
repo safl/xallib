@@ -375,6 +375,41 @@ process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, stru
 	return 0;
 }
 
+int
+process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *dinode,
+					struct xal_inode *self)
+{
+	uint8_t *cursor = (void *)dinode;
+	uint64_t nextents;
+	int err;
+
+	/**
+	 * For some reason then di_big_nextents is populated. As far as i understand that should
+	 * not happen for format=0x2 "extents" as this should have all extent-records inline in the
+	 * inode. Thus this abomination... just grabbing whatever has a value...
+	 */
+	nextents =
+	    (dinode->di_nextents) ? be32toh(dinode->di_nextents) : be64toh(dinode->di_big_nextents);
+
+	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
+
+	for (uint64_t i = 0; i < nextents; ++i) {
+		struct xal_extent extent = {0};
+		uint64_t l0, l1;
+
+		l0 = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+
+		l1 = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+
+		decode_xfs_extent(l0, l1, &extent);
+	}
+
+	printf("# process_dinode_inline_directory_extents() -- WIP\n");
+	return -ENOSYS;
+}
+
 /**
  * Internal helper recursively traversing the on-disk-format to build an index of the file-system
  *
@@ -429,17 +464,22 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		}
 		break;
 
-	case XAL_DINODE_FMT_EXTENTS: ///< Decode extent in inode
+	case XAL_DINODE_FMT_EXTENTS:
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			printf("# directory in EXTENTS fmt -- not implemented.\n");
-			return -ENOSYS;
+			printf("# directory in EXTENTS fmt -- setting up.\n");
+			err = process_dinode_inline_directory_extents(xal, dinode, self);
+			if (err) {
+				perror("process_dinode_inline_directory_extent()\n");
+				return err;
+			}
+			break;
 
 		case XAL_ODF_DIR3_FT_REG_FILE:
 			printf("# file in EXTENTS fmt -- setting up.\n");
 			err = process_dinode_file_extents(xal, dinode, self);
 			if (err) {
-				perror("process_dinode_extents()\n");
+				perror("process_dinode_file_extent()\n");
 				return err;
 			}
 			break;
