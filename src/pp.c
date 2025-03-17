@@ -217,6 +217,7 @@ xal_extent_pp(struct xal_extent *extent)
 	wrtn += printf("  start_offset: %" PRIu64 "\n", extent->start_offset);
 	wrtn += printf("  start_block: %" PRIu64 "\n", extent->start_block);
 	wrtn += printf("  nblocks: %" PRIu64 "\n", extent->nblocks);
+	wrtn += printf("  flag: %" PRIu8 "\n", extent->flag);
 
 	return wrtn;
 }

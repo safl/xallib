@@ -327,14 +327,16 @@ process_dinode_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode
 void
 decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 {
-	// Extract start offset (bits 9-62)
-	extent->start_offset = (l0 >> 9) & 0xFFFFFFFFFFFFF;
+	// Extract start offset (l0:9-62)
+	extent->start_offset = (l0 << 1) >> 10;
 
 	// Extract start block (l0:0-8 and l1:21-63)
 	extent->start_block = ((l0 & 0x1FF) << 43) | (l1 >> 21);
 
 	// Extract block count (l1:0-20)
 	extent->nblocks = l1 & 0x1FFFFF;
+
+	extent->flag = l1 >> 63;
 }
 
 int

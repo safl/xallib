@@ -33,6 +33,7 @@ struct xal_extent {
 	uint64_t start_offset;
 	uint64_t start_block;
 	uint64_t nblocks;
+	uint8_t flag;
 } __attribute__((packed));
 
 int
