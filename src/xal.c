@@ -338,7 +338,7 @@ decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 }
 
 int
-process_dinode_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
+process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
@@ -437,7 +437,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 		case XAL_ODF_DIR3_FT_REG_FILE:
 			printf("# file in EXTENTS fmt -- setting up.\n");
-			err = process_dinode_extents(xal, dinode, self);
+			err = process_dinode_file_extents(xal, dinode, self);
 			if (err) {
 				perror("process_dinode_extents()\n");
 				return err;
