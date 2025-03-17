@@ -338,7 +338,8 @@ decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 }
 
 int
-process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
+process_dinode_inline_file_extents(struct xal *xal, struct xal_odf_dinode *dinode,
+				   struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
@@ -381,7 +382,6 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 {
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
-	int err;
 
 	/**
 	 * For some reason then di_big_nextents is populated. As far as i understand that should
@@ -404,6 +404,8 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 		cursor += 8;
 
 		decode_xfs_extent(l0, l1, &extent);
+
+		xal_extent_pp(&extent);
 	}
 
 	printf("# process_dinode_inline_directory_extents() -- WIP\n");
@@ -477,9 +479,9 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 		case XAL_ODF_DIR3_FT_REG_FILE:
 			printf("# file in EXTENTS fmt -- setting up.\n");
-			err = process_dinode_file_extents(xal, dinode, self);
+			err = process_dinode_inline_file_extents(xal, dinode, self);
 			if (err) {
-				perror("process_dinode_file_extent()\n");
+				perror("process_dinode_inline_file_extents()\n");
 				return err;
 			}
 			break;
