@@ -553,7 +553,6 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 		}
 	}
 
-	printf("# process_dinode_inline_directory_extents() -- done\n");
 	return 0;
 }
 
@@ -592,8 +591,6 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 	self->size = be64toh(dinode->di_size);
 
-	printf("# ino: %" PRIu64 "\n", ino);
-
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_BTREE:
 		switch (self->ftype) {
@@ -614,7 +611,6 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_EXTENTS:
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			printf("# directory in EXTENTS fmt -- setting up.\n");
 			err = process_dinode_inline_directory_extents(xal, dinode, self);
 			if (err) {
 				perror("process_dinode_inline_directory_extent()\n");
@@ -623,7 +619,6 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 			break;
 
 		case XAL_ODF_DIR3_FT_REG_FILE:
-			printf("# file in EXTENTS fmt -- setting up.\n");
 			err = process_dinode_inline_file_extents(xal, dinode, self);
 			if (err) {
 				perror("process_dinode_inline_file_extents()\n");
@@ -640,7 +635,6 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			printf("# directory in LOCAL fmt -- setting up\n");
 			err = process_dinode_shortform_dentries(xal, dinode, self);
 			if (err) {
 				perror("process_dinode_shortform_dentries()\n");
@@ -679,8 +673,6 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	struct xal_odf_btree_iab3_sfmt *iab3 = (void *)buf;
 	off_t offset;
 	int err;
-
-	printf("# retrieve_dinodes_via_iabt3(); seqno: %" PRIu32 "\n", ag->seqno);
 
 	/** Compute the absolute offset for the block and retrieve it **/
 	offset = (xal->sb.agblocks * ag->seqno + blkno) * xal->sb.blocksize;
