@@ -54,6 +54,8 @@ typedef struct {
 #define XAL_ODF_DIR3_FT_REG_FILE 1
 #define XAL_ODF_DIR3_FT_DIR 2
 
+#define XAL_ODF_DIR3_DATA_MAGIC 0x58444433 /* XDD3: multiblock dirs */
+
 /**
  * The XFS Superblock on-disk representation in v5 format
  */
@@ -347,4 +349,14 @@ struct xal_odf_inobt_rec {
 	uint8_t freecount; ///< Number of free inodes in this chunk
 	uint64_t free; ///< A 64 element bitmap showing which inodes in this chunk are not available
 		       ///< for allocation
+};
+
+struct xfs_odf_dir_blk_hdr {
+	uint32_t magic;
+	uint32_t crc;
+	uint64_t blkno;
+	uint64_t lsn;
+	uuid_t uuid;
+	uint64_t owner;
+	uint8_t _pad[16];
 };
