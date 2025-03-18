@@ -410,12 +410,47 @@ decode_dentry(void *buf, struct xal_inode *dentry)
 	return nbytes;
 }
 
+/**
+ * Processing a multi-block directory with extents in inline format
+ * ================================================================
+ *
+ * - Extract and decode the extents embedded within the dinode
+ *
+ *   - Unlike data-extents, then these directory-extents will not be stored the tree
+ *
+ * - Retrieve the blocks, from disk, described by the extents
+ *
+ * - Decode the directory entry-descriptions into 'xal_inode'
+ *
+ *   - Initially setting up 'self.content.dentries.inodes'
+ *   - Incrementing 'self.content.dentries.count'
+ *   - WARNING: When this is running, then no one else should be claiming memory from the pool
+ *
+ * An upper bound on extents
+ * -------------------------
+ *
+ * There is an upper-bound of how many extents there can be in this case, that is, the amount that
+ * can reside inside the inode. An approximation to this amount is:
+ *
+ *   nextents_max = (xal.sb.inodesize - header) / 16
+ *
+ * Thus, with an inode-size of 512 and the dinode size of about 176, then there is room for at most
+ * 21 extents.
+ *
+ * An upper bound on directory entries
+ * -----------------------------------
+ *
+ * An extent can describe a very large range of blocks, thus, it seems like there is not a trivial
+ * way to put a useful upper-bound on it. E.g. even with a very small amount of extents, then each
+ * of these have a 'count' of blocks. This 200bits worth of blocks... thats an awful lot of blocks.
+ */
 int
 process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *dinode,
 					struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
+	int err;
 
 	/**
 	 * For some reason then di_big_nextents is populated. As far as i understand that should
@@ -426,6 +461,19 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 	    (dinode->di_nextents) ? be32toh(dinode->di_nextents) : be64toh(dinode->di_big_nextents);
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
+
+
+	/**
+	 * A single inode is claimed, this is to get the pointer to the start of the array,
+	 * additional calls to claim will be called as extents/dentries are decoded, however, only
+	 * the first call provides a pointer, since the start of the array, that consists of all
+	 * the children is only rooted once.
+	 */
+	err = xal_pool_claim_inodes(&xal->inodes, 1, &self->content.dentries.inodes);
+	if (err) {
+		printf("! xal_pool_claim_inodes(); err(%d)", err);
+		return err;
+	}
 
 	for (uint64_t i = 0; i < nextents; ++i) {
 		struct xal_extent extent = {0};
@@ -439,11 +487,74 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 
 		decode_xfs_extent(l0, l1, &extent);
 
-		xal_extent_pp(&extent);
+		for (size_t blk = 0; blk < extent.nblocks; ++blk) {
+			size_t ofz_disk = (extent.start_block + blk) * xal->sb.blocksize;
+			uint8_t buf[BUF_NBYTES];
+			struct xfs_odf_dir_blk_hdr *hdr = (void *)(buf);
+
+			err = _pread(xal, buf, xal->sb.blocksize, ofz_disk);
+			if (err) {
+				printf("!_pread(directory-extent)\n");
+				return -errno;
+			}
+			if (be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) {
+				continue;
+			}
+
+			for (uint64_t ofz = 64; ofz < xal->sb.blocksize;) {
+				uint8_t *dentry_cursor = buf + ofz;
+				struct xal_inode dentry = {0};
+
+				ofz += decode_dentry(dentry_cursor, &dentry);
+
+				/**
+				 * Seems like the only way to determine that there are no more
+				 * entries are if one start to decode uinvalid entries.
+				 * Such as a namelength of 0 or inode number 0.
+				 * Thus, checking for that here.
+				 */
+				if ((!dentry.ino) || (!dentry.namelen)) {
+					break;
+				}
+
+				/**
+				 * Skip processing the mandatory dentries: '.' and '..'
+				 */
+				if ((dentry.namelen == 1) && (dentry.name[0] == '.')) {
+					continue;
+				}
+				if ((dentry.namelen == 2) && (dentry.name[0] == '.') &&
+				    (dentry.name[1] == '.')) {
+					continue;
+				}
+
+				xal_inode_pp(&dentry);
+
+				self->content.dentries.inodes[self->content.dentries.count] =
+				    dentry;
+
+				err = process_ino(
+				    xal,
+				    self->content.dentries.inodes[self->content.dentries.count].ino,
+				    &self->content.dentries.inodes[self->content.dentries.count]);
+				if (err) {
+					printf("!process_ino(...)\n");
+					return err;
+				}
+
+				self->content.dentries.count += 1;
+
+				err = xal_pool_claim_inodes(&xal->inodes, 1, NULL);
+				if (err) {
+					printf("xal_pool_claim_inodes(...)...\n");
+					return err;
+				}
+			}
+		}
 	}
 
-	printf("# process_dinode_inline_directory_extents() -- WIP\n");
-	return -ENOSYS;
+	printf("# process_dinode_inline_directory_extents() -- done\n");
+	return 0;
 }
 
 /**
