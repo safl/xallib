@@ -378,6 +378,38 @@ process_dinode_inline_file_extents(struct xal *xal, struct xal_odf_dinode *dinod
 	return 0;
 }
 
+/**
+ * Decode the dentry starting at the given buffer
+ *
+ * @return The size, in bytes and including alignment padding, of the decoded directory entry.
+ */
+int
+decode_dentry(void *buf, struct xal_inode *dentry)
+{
+	uint8_t *cursor = buf;
+	uint16_t nbytes = 8 + 1 + 1 + 2;
+
+	dentry->ino = be64toh(*(uint64_t *)cursor);
+	cursor += 8;
+
+	dentry->namelen = *cursor;
+	cursor += 1;
+
+	memcpy(dentry->name, cursor, dentry->namelen);
+	cursor += dentry->namelen;
+
+	dentry->ftype = *cursor;
+	cursor += 1;
+
+	// NOTE: Read 2byte tag is skipped
+	// cursor += 2;
+
+	nbytes += dentry->namelen;
+	nbytes = ((nbytes + 7) / 8) * 8; ///< Ensure alignment to 8 byte boundary
+
+	return nbytes;
+}
+
 int
 process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *dinode,
 					struct xal_inode *self)
