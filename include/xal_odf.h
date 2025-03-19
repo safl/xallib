@@ -54,7 +54,8 @@ typedef struct {
 #define XAL_ODF_DIR3_FT_REG_FILE 1
 #define XAL_ODF_DIR3_FT_DIR 2
 
-#define XAL_ODF_DIR3_DATA_MAGIC 0x58444433 /* XDD3: multiblock dirs */
+#define XFS_ODF_DIR3_BLOCK_MAGIC 0x58444233 /* XDB3: single block dirs */
+#define XFS_ODF_DIR3_DATA_MAGIC 0x58444433  /* XDD3: multiblock dirs */
 
 /**
  * The XFS Superblock on-disk representation in v5 format
