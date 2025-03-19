@@ -810,7 +810,7 @@ xal_index(struct xal *xal)
 }
 
 int
-xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
+_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 {
 	if (cb_func) {
 		cb_func(inode, cb_data);
@@ -821,7 +821,8 @@ xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 		struct xal_inode *inodes = inode->content.dentries.inodes;
 
 		for (uint16_t i = 0; i < inode->content.dentries.count; ++i) {
-			xal_walk(&inodes[i], cb_func, cb_data);
+			printf("name: '%.*s'\n", XAL_ODF_LABEL_MAX + 1, inodes[i].name);
+			_walk(&inodes[i], cb_func, cb_data, depth + 1);
 		}
 	} break;
 
@@ -834,4 +835,12 @@ xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 	}
 
 	return 0;
+}
+
+int
+xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
+{
+	printf("Call this! xal_walk\n");
+
+	return _walk(inode, cb_func, cb_data, 0);
 }
