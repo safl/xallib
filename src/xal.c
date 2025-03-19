@@ -503,7 +503,8 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 				printf("!_pread(directory-extent)\n");
 				return -errno;
 			}
-			if (be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) {
+			if ((be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) &&
+			    (be32toh(hdr->magic) != XAL_ODF_DIR3_BLOCK_MAGIC)) {
 				continue;
 			}
 
