@@ -803,7 +803,8 @@ xal_index(struct xal *xal)
 	xal->root->ftype = XAL_ODF_DIR3_FT_DIR;
 	xal->root->namelen = 1;
 	xal->root->content.extents.count = 0;
-	memcpy(xal->root->name, "/", 1);
+	xal->root->content.dentries.count = 0;
+	xal->root->name[0] = '/';
 
 	return process_ino(xal, xal->root->ino, xal->root);
 }
