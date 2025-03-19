@@ -313,7 +313,10 @@ process_dinode_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode
 			dentry->ino = be32toh(*(uint32_t *)cursor);
 			cursor += 4; ///< Advance past 32-bit inode number
 		}
+	}
 
+	for (int i = 0; i < count; ++i) {
+		struct xal_inode *dentry = &self->content.dentries.inodes[i];
 		err = process_ino(xal, dentry->ino, dentry);
 		if (err) {
 			perror("process_ino()\n");
