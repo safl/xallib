@@ -14,13 +14,20 @@ from cijoe.core.command import Cijoe
 def populate(args: Namespace, cijoe: Cijoe):
 
     directories = [
-        ("few", "1", 3),
-        ("few", "512", 2),
-        ("few", "1G", 1),
-        ("few", "100K", 3),
-        ("many", "41K", 100),
-        ("many", "154K", 100),
-        ("many", "500K", 100),
+        ("fld_zero", "1", 3),
+        ("fld_zero", "512", 2),
+        ("fld_zero", "10M", 1),
+        ("fld_zero", "100K", 3),
+
+        ("fld_one", "10M", 1),
+        ("fld_one", "100K", 3),
+
+        ("fld_two", "154K", 10),
+        ("fld_two", "500K", 10),
+
+        ("fld_many", "41K", 10),
+        ("fld_many", "154K", 10),
+        ("fld_many", "500K", 10),
     ]
 
     for name, size, count in directories:
@@ -29,7 +36,7 @@ def populate(args: Namespace, cijoe: Cijoe):
         cijoe.run(f"mkdir -p {dir}")
 
         for cur in range(count):
-            filepath = dir / f"{size}-{cur}-{count}.bin"
+            filepath = dir / f"file-{name}-{size}-{cur}-{count}.bin"
             err, state = cijoe.run(
                 f"dd if=/dev/urandom of={filepath} bs={size} count=1"
             )
