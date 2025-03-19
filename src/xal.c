@@ -267,8 +267,8 @@ int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
 int
-process_dinode_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode,
-				  struct xal_inode *self)
+process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode,
+					 struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	struct xal_inode *inodes;
@@ -638,9 +638,9 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			err = process_dinode_shortform_dentries(xal, dinode, self);
+			err = process_dinode_inline_shortform_dentries(xal, dinode, self);
 			if (err) {
-				perror("process_dinode_shortform_dentries()\n");
+				perror("process_dinode_inline_shortform_dentries()\n");
 				return err;
 			}
 			break;
