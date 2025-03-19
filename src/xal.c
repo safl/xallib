@@ -271,7 +271,6 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 					 struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
-	struct xal_inode *inodes;
 	uint8_t count, i8count;
 	int err;
 
@@ -285,16 +284,18 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 
 	cursor += i8count ? 8 : 4; ///< Advance past parent inode number
 
-	err = xal_pool_claim_inodes(&xal->inodes, count, &inodes);
+	self->content.dentries.count = count;
+
+	printf("count: %" PRIu8 "\n", count);
+
+	err = xal_pool_claim_inodes(&xal->inodes, count, &self->content.dentries.inodes);
 	if (err) {
 		return err;
 	}
-	self->content.dentries.inodes = inodes;
-	self->content.dentries.count = count;
 
 	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
 	for (int i = 0; i < count; ++i) {
-		struct xal_inode *dentry = &inodes[i];
+		struct xal_inode *dentry = &self->content.dentries.inodes[i];
 
 		dentry->namelen = *cursor;
 		cursor += 1 + 2; ///< Advance past 'namelen' and 'offset[2]'
