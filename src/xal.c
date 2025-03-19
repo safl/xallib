@@ -466,13 +466,16 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
-
 	/**
 	 * A single inode is claimed, this is to get the pointer to the start of the array,
 	 * additional calls to claim will be called as extents/dentries are decoded, however, only
 	 * the first call provides a pointer, since the start of the array, that consists of all
 	 * the children is only rooted once.
 	 */
+
+	printf("count: %"PRIu32"\n", self->content.dentries.count);
+	printf("pointer: %p\n", (void*)&self->content.dentries.inodes);
+
 	err = xal_pool_claim_inodes(&xal->inodes, 1, &self->content.dentries.inodes);
 	if (err) {
 		printf("! xal_pool_claim_inodes(); err(%d)", err);
@@ -532,8 +535,6 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 					continue;
 				}
 
-				xal_inode_pp(&dentry);
-
 				self->content.dentries.inodes[self->content.dentries.count] =
 				    dentry;
 
@@ -573,13 +574,14 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	struct xal_odf_dinode *dinode;
 	int err;
 
+	printf("#### Procesing: 0x%" PRIx64 "\n", ino);
+	printf("## Named: '%.*s'\n", XAL_ODF_LABEL_MAX, self->name);
+
 	err = dinodes_get(xal, ino, (void **)&dinode);
 	if (err) {
 		perror("dinodes_get();\n");
 		return err;
 	}
-
-	xal_odf_dinode_pp(dinode);
 
 	if (!self->ftype) {
 		uint16_t mode = be16toh(dinode->di_mode);
