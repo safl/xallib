@@ -36,7 +36,6 @@ dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
 		/** Halt when the dinode is invalid */
 		assert(cand->di_magic == 0x4E49);
 
-		//*dinode = (void *)(xal->dinodes + idx * xal->sb.sectsize);
 		*dinode = cand;
 
 		return 0;
