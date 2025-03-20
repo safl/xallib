@@ -28,6 +28,8 @@
 #include <inttypes.h>
 #include <stddef.h>
 #include <sys/types.h>
+
+#define XAL_INODE_NAME_MAXLEN 255
 #include <libxal_util.h>
 
 struct xal_extent {
@@ -61,9 +63,9 @@ struct xal_inode {
 	uint64_t ino;  ///< Inode number of the directory entry; Should the AG be added here?
 	uint64_t size; ///< Size in bytes
 	union xal_inode_content content;
-	uint8_t ftype;	 ///< File-type (directory, filename, symlink etc.)
-	uint8_t namelen; ///< Length of the name; not counting nul-termination
-	char name[256];	 ///< Name; not including nul-termination
+	uint8_t ftype;			      ///< File-type (directory, filename, symlink etc.)
+	uint8_t namelen;		      ///< Length of the name; not counting nul-termination
+	char name[XAL_INODE_NAME_MAXLEN + 1]; ///< Name; not including nul-termination
 	uint8_t reserved[30];
 };
 
