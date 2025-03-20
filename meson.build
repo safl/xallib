@@ -4,6 +4,15 @@ project('xal', 'c',
   default_options: ['c_std=c11', 'warning_level=3']
 )
 
+conf_data = configuration_data()
+conf_data.set('XAL_DEBUG_ENABLED', get_option('buildtype') == 'debug')
+conf = configure_file(
+  configuration : conf_data,
+  output : 'xal_config.h',
+)
+
+add_project_arguments(['-include', 'xal_config.h'], language: 'c')
+
 public_headers = files(
   'include/libxal.h',
   'include/libxal_util.h',
