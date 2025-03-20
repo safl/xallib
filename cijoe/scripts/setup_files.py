@@ -25,9 +25,9 @@ def populate(args: Namespace, cijoe: Cijoe):
         ("fld_two", "154K", 10),
         ("fld_two", "500K", 10),
 
-        ("fld_many", "41K", 10),
-        ("fld_many", "154K", 10),
-        ("fld_many", "500K", 10),
+        ("many", "41K", 1200),
+        ("many", "154K", 1200),
+        ("many", "500K", 1200),
     ]
 
     for name, size, count in directories:
