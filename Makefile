@@ -1,4 +1,5 @@
 builddir = build
+BUILD_TYPE ?= release
 
 .PHONY: all
 all: clean configure build install test
@@ -9,7 +10,7 @@ clean:
 
 .PHONY: configure
 configure:
-	meson setup $(builddir)
+	meson setup $(builddir) --buildtype=$(BUILD_TYPE)
 
 .PHONY: build
 build:
