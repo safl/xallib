@@ -21,7 +21,7 @@ xal_pool_grow(struct xal_pool *pool, size_t growby)
 	uint8_t *cursor = pool->memory;
 
 	if (mprotect(pool->memory, allocated_nbytes, PROT_READ | PROT_WRITE)) {
-		printf("mprotect(...); errno(%d)\n", errno);
+		XAL_DEBUG("FAILED: mprotect(...); errno(%d)", errno);
 		return -errno;
 	}
 	memset(&cursor[pool->free * pool->element_size], 0, growby_nbytes);
@@ -37,11 +37,11 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t el
 	int err;
 
 	if (pool->reserved) {
-		printf("xal_pool_map(...); errno(%d)\n", EINVAL);
+		XAL_DEBUG("FAILED: xal_pool_map(...); errno(%d)", EINVAL);
 		return -EINVAL;
 	}
 	if (allocated > reserved) {
-		printf("xal_pool_map(...); errno(%d)\n", EINVAL);
+		XAL_DEBUG("FAILED: xal_pool_map(...); errno(%d)", EINVAL);
 		return -EINVAL;
 	}
 
@@ -54,13 +54,13 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t el
 	pool->memory =
 	    mmap(NULL, reserved * element_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (MAP_FAILED == pool->memory) {
-		printf("mmap(...); errno(%d)\n", errno);
+		XAL_DEBUG("FAILED: mmap(...); errno(%d)", errno);
 		return -errno;
 	}
 
 	err = xal_pool_grow(pool, allocated);
 	if (err) {
-		printf("xal_pool_grow(...); err(%d)\n", err);
+		XAL_DEBUG("FAILED: xal_pool_grow(...); err(%d)", err);
 		xal_pool_unmap(pool);
 		return err;
 	}
@@ -75,13 +75,14 @@ xal_pool_claim_inodes(struct xal_pool *pool, size_t count, struct xal_inode **in
 	int err;
 
 	if (count > pool->growby) {
+		XAL_DEBUG("FAILED: count > pool->growby");
 		return -EINVAL;
 	}
 
 	if (pool->allocated == pool->free) {
 		err = xal_pool_grow(pool, pool->growby);
 		if (err) {
-			printf("xal_pool_grow(); err(%d)", err);
+			XAL_DEBUG("FAILED: xal_pool_grow(); err(%d)", err);
 			return err;
 		}
 	}
@@ -101,13 +102,14 @@ xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **
 	int err;
 
 	if (count > pool->growby) {
+		XAL_DEBUG("FAILED: count > pool->growby");
 		return -EINVAL;
 	}
 
 	if (pool->allocated == pool->free) {
 		err = xal_pool_grow(pool, pool->growby);
 		if (err) {
-			printf("xal_pool_grow(); err(%d)", err);
+			XAL_DEBUG("xal_pool_grow(); err(%d)", err);
 			return err;
 		}
 	}

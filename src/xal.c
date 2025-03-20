@@ -105,7 +105,7 @@ _pread(struct xal *xal, void *buf, size_t count, off_t offset)
 	memset(buf, 0, count);
 	nbytes = pread(xal->handle.fd, buf, count, offset);
 	if ((nbytes == -1) || ((size_t)nbytes != count)) {
-		perror("pread(...);\n");
+		XAL_DEBUG("FAILED: pread(...);");
 		return -EIO;
 	}
 
@@ -139,7 +139,7 @@ retrieve_and_decode_allocation_group(uint32_t seqno, void *buf, struct xal *xal)
 
 	err = _pread(xal, buf, xal->sb.sectsize * 4, offset);
 	if (err) {
-		perror("_pread();\n");
+		XAL_DEBUG("FAILED: _pread()");
 		return err;
 	}
 
@@ -178,13 +178,13 @@ retrieve_and_decode_primary_superblock(void *buf, struct xal **xal)
 
 	err = _pread(*xal, buf, 4096, 0);
 	if (err) {
-		perror("_pread();\n");
+		XAL_DEBUG("FAILED: _pread()\n");
 		return -errno;
 	}
 
 	cand = realloc(*xal, sizeof(*cand) + sizeof(*(cand->ags)) * be32toh(psb->agcount));
 	if (!cand) {
-		perror("realloc();\n");
+		XAL_DEBUG("FAILED: realloc()\n");
 		return -errno;
 	}
 
@@ -214,20 +214,20 @@ xal_open(const char *path, struct xal **xal)
 
 	cand = calloc(1, sizeof(*cand));
 	if (!cand) {
-		perror("calloc();;\n");
+		XAL_DEBUG("FAILED: calloc();");
 		return -errno;
 	}
 
 	cand->handle.fd = open(path, O_RDONLY);
 	if (-1 == cand->handle.fd) {
-		perror("Failed opening device;\n");
+		XAL_DEBUG("FAILED: open(...)");
 		xal_close(cand);
 		return -errno;
 	}
 
 	err = retrieve_and_decode_primary_superblock(buf, &cand);
 	if (err) {
-		perror("_alloc_and_initialize_using_odf_buf();\n");
+		XAL_DEBUG("FAILED: _alloc_and_initialize_using_odf_buf();");
 		xal_close(cand);
 		return err;
 	}
@@ -245,14 +245,14 @@ xal_open(const char *path, struct xal **xal)
 	err =
 	    xal_pool_map(&cand->inodes, 40000000UL, cand->sb.nallocated, sizeof(struct xal_inode));
 	if (err) {
-		printf("xal_pool_map(inodes); err(%d)\n", err);
+		XAL_DEBUG("FAILED: xal_pool_map(inodes); err(%d)", err);
 		return err;
 	}
 
 	err = xal_pool_map(&cand->extents, 40000000UL, cand->sb.nallocated,
 			   sizeof(struct xal_extent));
 	if (err) {
-		printf("xal_pool_map(extents); err(%d)\n", err);
+		XAL_DEBUG("FAILED: xal_pool_map(extents); err(%d)", err);
 		return err;
 	}
 
@@ -284,8 +284,6 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 	cursor += i8count ? 8 : 4; ///< Advance past parent inode number
 
 	self->content.dentries.count = count;
-
-	printf("count: %" PRIu8 "\n", count);
 
 	err = xal_pool_claim_inodes(&xal->inodes, count, &self->content.dentries.inodes);
 	if (err) {
@@ -319,7 +317,7 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 		struct xal_inode *dentry = &self->content.dentries.inodes[i];
 		err = process_ino(xal, dentry->ino, dentry);
 		if (err) {
-			perror("process_ino()\n");
+			XAL_DEBUG("FAILED: process_ino()");
 			return err;
 		}
 	}
@@ -360,7 +358,7 @@ process_dinode_inline_file_extents(struct xal *xal, struct xal_odf_dinode *dinod
 
 	err = xal_pool_claim_extents(&xal->extents, nextents, &self->content.extents.extent);
 	if (err) {
-		perror("xal_pool_claim()...\n");
+		XAL_DEBUG("FAILED: xal_pool_claim()...");
 		return err;
 	}
 
@@ -472,12 +470,9 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 	 * the children is only rooted once.
 	 */
 
-	printf("count: %"PRIu32"\n", self->content.dentries.count);
-	printf("pointer: %p\n", (void*)&self->content.dentries.inodes);
-
 	err = xal_pool_claim_inodes(&xal->inodes, 1, &self->content.dentries.inodes);
 	if (err) {
-		printf("! xal_pool_claim_inodes(); err(%d)", err);
+		XAL_DEBUG("FAILED: !xal_pool_claim_inodes(); err(%d)", err)
 		return err;
 	}
 
@@ -500,7 +495,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 
 			err = _pread(xal, buf, xal->sb.blocksize, ofz_disk);
 			if (err) {
-				printf("!_pread(directory-extent)\n");
+				XAL_DEBUG("FAILED: !_pread(directory-extent)");
 				return -errno;
 			}
 			if ((be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) &&
@@ -543,7 +538,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 				    self->content.dentries.inodes[self->content.dentries.count].ino,
 				    &self->content.dentries.inodes[self->content.dentries.count]);
 				if (err) {
-					printf("!process_ino(...)\n");
+					XAL_DEBUG("FAILED: process_ino(...)")
 					return err;
 				}
 
@@ -551,7 +546,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 
 				err = xal_pool_claim_inodes(&xal->inodes, 1, NULL);
 				if (err) {
-					printf("xal_pool_claim_inodes(...)...\n");
+					XAL_DEBUG("FAILED: xal_pool_claim_inodes(...)");
 					return err;
 				}
 			}
@@ -574,12 +569,9 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	struct xal_odf_dinode *dinode;
 	int err;
 
-	printf("#### Procesing: 0x%" PRIx64 "\n", ino);
-	printf("## Named: '%.*s'\n", XAL_ODF_LABEL_MAX, self->name);
-
 	err = dinodes_get(xal, ino, (void **)&dinode);
 	if (err) {
-		perror("dinodes_get();\n");
+		XAL_DEBUG("FAILED: dinodes_get();");
 		return err;
 	}
 
@@ -601,15 +593,15 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_BTREE:
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			printf("# directory in BTREE fmt -- not implemented.\n");
+			XAL_DEBUG("FAILED: directory in BTREE fmt -- not implemented.");
 			return -ENOSYS;
 
 		case XAL_ODF_DIR3_FT_REG_FILE:
-			printf("# file in BTREE fmt -- not implemented.\n");
+			XAL_DEBUG("FAILED: file in BTREE fmt -- not implemented.");
 			return -ENOSYS;
 
 		default:
-			printf("# Unsupported file-type in BTREE fmt\n");
+			XAL_DEBUG("FAILED: Unsupported file-type in BTREE fmt");
 			return -ENOSYS;
 		}
 		break;
@@ -619,7 +611,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		case XAL_ODF_DIR3_FT_DIR:
 			err = process_dinode_inline_directory_extents(xal, dinode, self);
 			if (err) {
-				perror("process_dinode_inline_directory_extent()\n");
+				XAL_DEBUG("FAILED: process_dinode_inline_directory_extent()");
 				return err;
 			}
 			break;
@@ -627,13 +619,13 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		case XAL_ODF_DIR3_FT_REG_FILE:
 			err = process_dinode_inline_file_extents(xal, dinode, self);
 			if (err) {
-				perror("process_dinode_inline_file_extents()\n");
+				XAL_DEBUG("FAILED: process_dinode_inline_file_extents()");
 				return err;
 			}
 			break;
 
 		default:
-			printf("# Unsupported file-type in EXTENTS fmt\n");
+			XAL_DEBUG("FAILED: Unsupported file-type in EXTENTS fmt");
 			return -ENOSYS;
 		}
 		break;
@@ -643,24 +635,24 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		case XAL_ODF_DIR3_FT_DIR:
 			err = process_dinode_inline_shortform_dentries(xal, dinode, self);
 			if (err) {
-				perror("process_dinode_inline_shortform_dentries()\n");
+				XAL_DEBUG("FAILED: process_dinode_inline_shortform_dentries()");
 				return err;
 			}
 			break;
 
 		case XAL_ODF_DIR3_FT_REG_FILE:
-			printf("# file in LOCAL fmt -- not implemented.\n");
+			XAL_DEBUG("FAILED: file in LOCAL fmt -- not implemented.");
 			return -ENOSYS;
 
 		default:
-			printf("# Unsupported file-type in BTREE fmt\n");
+			XAL_DEBUG("FAILED: Unsupported file-type in BTREE fmt");
 			return -ENOSYS;
 		}
 		break;
 
 	case XAL_DINODE_FMT_DEV:
 	case XAL_DINODE_FMT_UUID:
-		printf("# file: UUID\n");
+		XAL_DEBUG("FAILED: Unsupported FMT_DEV or FMT_UUID");
 		return -ENOSYS;
 	}
 
@@ -684,7 +676,7 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	offset = (xal->sb.agblocks * ag->seqno + blkno) * xal->sb.blocksize;
 	err = _pread(xal, buf, xal->sb.blocksize, offset);
 	if (err) {
-		perror("_pread();\n");
+		XAL_DEBUG("FAILED: _pread()");
 		return err;
 	}
 
@@ -738,7 +730,7 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 
 			err = _pread(xal, inodechunk, chunk_nbytes, chunk_offset);
 			if (err) {
-				printf("_pread(chunk)\n");
+				XAL_DEBUG("FAILED: _pread(chunk)");
 				return err;
 			}
 		}
@@ -762,7 +754,7 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	}
 
 	if (iab3->rightsib != 0xFFFFFFFF) {
-		printf("Going deeper on the right\n");
+		XAL_DEBUG("FAILED: Going deeper on the right!");
 		retrieve_dinodes_via_iabt3(xal, ag, iab3->rightsib, index);
 	}
 
@@ -824,7 +816,7 @@ _walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 		struct xal_inode *inodes = inode->content.dentries.inodes;
 
 		for (uint16_t i = 0; i < inode->content.dentries.count; ++i) {
-			printf("name: '%.*s'\n", XAL_ODF_LABEL_MAX + 1, inodes[i].name);
+			XAL_DEBUG("FAILED: name: '%.*s'", XAL_INODE_NAME_MAXLEN, inodes[i].name);
 			_walk(&inodes[i], cb_func, cb_data, depth + 1);
 		}
 	} break;
@@ -833,7 +825,7 @@ _walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 		return 0;
 
 	default:
-		printf("Unknown / unsupported ftype: %d", inode->ftype);
+		XAL_DEBUG("FAILED: Unknown / unsupported ftype: %d", inode->ftype);
 		return -EINVAL;
 	}
 
@@ -843,7 +835,5 @@ _walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 int
 xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 {
-	printf("Call this! xal_walk\n");
-
 	return _walk(inode, cb_func, cb_data, 0);
 }

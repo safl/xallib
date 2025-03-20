@@ -26,11 +26,11 @@
  *
  */
 #include <inttypes.h>
+#include <libxal_util.h>
 #include <stddef.h>
 #include <sys/types.h>
 
 #define XAL_INODE_NAME_MAXLEN 255
-#include <libxal_util.h>
 
 struct xal_extent {
 	uint64_t start_offset;
