@@ -6,6 +6,7 @@ project('xal', 'c',
 
 public_headers = files(
   'include/libxal.h',
+  'include/libxal_util.h',
 )
 
 sources = files(

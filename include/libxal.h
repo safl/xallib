@@ -28,6 +28,7 @@
 #include <inttypes.h>
 #include <stddef.h>
 #include <sys/types.h>
+#include <libxal_util.h>
 
 struct xal_extent {
 	uint64_t start_offset;
@@ -57,7 +58,7 @@ union xal_inode_content {
 };
 
 struct xal_inode {
-	uint64_t ino; ///< Inode number of the directory entry; Should the AG be added here?
+	uint64_t ino;  ///< Inode number of the directory entry; Should the AG be added here?
 	uint64_t size; ///< Size in bytes
 	union xal_inode_content content;
 	uint8_t ftype;	 ///< File-type (directory, filename, symlink etc.)
