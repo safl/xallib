@@ -72,7 +72,7 @@ struct xal_inode {
 int
 xal_inode_pp(struct xal_inode *inode);
 
-typedef void (*xal_walk_cb)(struct xal_inode *inode, void *cb_args);
+typedef void (*xal_walk_cb)(struct xal_inode *inode, void *cb_args, int level);
 
 /**
  * A pool of mmap backed memory for fixed-size elements.

@@ -808,7 +808,7 @@ int
 _walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 {
 	if (cb_func) {
-		cb_func(inode, cb_data);
+		cb_func(inode, cb_data, depth);
 	}
 
 	switch (inode->ftype) {

@@ -57,20 +57,23 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 }
 
 void
-node_inspector(struct xal_inode *inode, void *cb_args)
+node_inspector(struct xal_inode *inode, void *cb_args, int level)
 {
 	struct xal_nodeinspector_stats *stats = cb_args;
 
 	switch (inode->ftype) {
 	case XAL_ODF_DIR3_FT_DIR:
 		stats->ndirs += 1;
-		printf("# '%.*s'\n", inode->namelen, inode->name);
+		printf("%*s%.*s [dir]\n", level * 2, "", inode->namelen, inode->name);
 		break;
 
 	case XAL_ODF_DIR3_FT_REG_FILE:
 		stats->nfiles += 1;
-		printf("'%.*s'\n", inode->namelen, inode->name);
+		printf("%*s%.*s [file]\n", level * 2, "", inode->namelen, inode->name);
 		break;
+	default:
+		printf("# UNKNOWN\n");
+		return;
 	}
 }
 
@@ -109,7 +112,8 @@ main(int argc, char *argv[])
 		goto exit;
 	}
 
-	err = xal_walk(xal->root, args.verbose ? node_inspector : NULL, args.verbose ? &cb_args : NULL);
+	err = xal_walk(xal->root, args.verbose ? node_inspector : NULL,
+		       args.verbose ? &cb_args : NULL);
 	if (err) {
 		printf("xal_walk(...); err(%d)\n", err);
 		goto exit;
