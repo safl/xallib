@@ -266,6 +266,23 @@ int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
 int
+process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
+			       struct xal_inode *self)
+{
+	XAL_DEBUG("FAILED: directory in BTREE fmt -- not implemented.");
+
+	return -ENOSYS;
+}
+
+int
+process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
+{
+	XAL_DEBUG("FAILED: file in BTREE fmt -- not implemented.");
+
+	return -ENOSYS;
+}
+
+int
 process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode,
 					 struct xal_inode *self)
 {
@@ -593,12 +610,20 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_BTREE:
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			XAL_DEBUG("FAILED: directory in BTREE fmt -- not implemented.");
-			return -ENOSYS;
+			err = process_dinode_directory_btree(xal, dinode, self);
+			if (err) {
+				XAL_DEBUG("FAILED: process_dinode_directory_btree()");
+				return err;
+			}
+			break;
 
 		case XAL_ODF_DIR3_FT_REG_FILE:
-			XAL_DEBUG("FAILED: file in BTREE fmt -- not implemented.");
-			return -ENOSYS;
+			err = process_dinode_file_btree(xal, dinode, self);
+			if (err) {
+				XAL_DEBUG("FAILED: process_dinode_file_btree()");
+				return err;
+			}
+			break;
 
 		default:
 			XAL_DEBUG("FAILED: Unsupported file-type in BTREE fmt");
