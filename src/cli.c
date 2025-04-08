@@ -83,6 +83,8 @@ main(int argc, char *argv[])
 {
 	struct xal_cli_args args = {0};
 	struct xal_nodeinspector_stats cb_args = {0};
+	struct xnvme_opts opts = {0};
+	struct xnvme_dev *dev;
 	struct xal *xal;
 	int err;
 
@@ -91,7 +93,15 @@ main(int argc, char *argv[])
 		return err;
 	}
 
-	err = xal_open(argv[argc - 1], &xal);
+	xnvme_opts_set_defaults(&opts);
+
+	dev = xnvme_dev_open(argv[argc - 1], &opts);
+	if (!dev) {
+		printf("xnvme_dev_open(...); err(%d)\n", errno);
+		return -errno;
+	}
+
+	err = xal_open(dev, &xal);
 	if (err < 0) {
 		printf("xal_open(...); err(%d)\n", err);
 		return -err;
@@ -126,6 +136,7 @@ main(int argc, char *argv[])
 
 exit:
 	xal_close(xal);
+	xnvme_dev_close(dev);
 
 	return -err;
 }

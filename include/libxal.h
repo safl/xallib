@@ -27,6 +27,7 @@
  */
 #include <inttypes.h>
 #include <libxal_util.h>
+#include <libxnvme.h>
 #include <stddef.h>
 #include <sys/types.h>
 
@@ -165,7 +166,7 @@ struct xal_sb {
  * pool of inodes.
  */
 struct xal {
-	union xal_handle handle;
+	struct xnvme_dev *dev;
 	uint8_t *dinodes;	 ///< Array of inodes in on-disk-format
 	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
 	struct xal_pool extents; ///< Pool of extents in host-native format
@@ -178,16 +179,19 @@ int
 xal_pp(struct xal *xal);
 
 /**
- * Open the block device at 'path'
+ * Open and decode the file-system meta-data on the given device
  *
  * This will retrieve the Superblock (sb) and Allocation Group (AG) headers for all AGs. These are
  * utilized to instantiate the 'struct xal' with a subset of the on-disk-format parsed to native
  * format.
  *
+ * @param dev Pointer to xnvme device handled as retrieved with xnvme_dev_open()
+ * @param xal Pointer
+ *
  * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
  */
 int
-xal_open(const char *path, struct xal **xal);
+xal_open(struct xnvme_dev *dev, struct xal **xal);
 
 void
 xal_close(struct xal *xal);
