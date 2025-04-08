@@ -228,15 +228,15 @@ xal_open(const char *path, struct xal **xal)
 	err = retrieve_and_decode_primary_superblock(buf, &cand);
 	if (err) {
 		XAL_DEBUG("FAILED: _alloc_and_initialize_using_odf_buf();");
-		xal_close(cand);
-		return err;
+		goto failed;
 	}
 
 	for (uint32_t seqno = 0; seqno < cand->sb.agcount; ++seqno) {
 		err = retrieve_and_decode_allocation_group(seqno, buf, cand);
 		if (err) {
-			xal_close(cand);
-			return err;
+			XAL_DEBUG("FAILED: retrieve_and_decode_allocation_group(inodes); err(%d)",
+				  err);
+			goto failed;
 		}
 
 		cand->sb.nallocated += cand->ags[seqno].agi_count;
@@ -246,20 +246,24 @@ xal_open(const char *path, struct xal **xal)
 	    xal_pool_map(&cand->inodes, 40000000UL, cand->sb.nallocated, sizeof(struct xal_inode));
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_map(inodes); err(%d)", err);
-		return err;
+		goto failed;
 	}
 
 	err = xal_pool_map(&cand->extents, 40000000UL, cand->sb.nallocated,
 			   sizeof(struct xal_extent));
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_map(extents); err(%d)", err);
-		return err;
+		goto failed;
 	}
 
-	// All is good; promote the candidate
-	*xal = cand;
+	*xal = cand; // All is good; promote the candidate
 
 	return 0;
+
+failed:
+	xal_close(cand);
+
+	return err;
 }
 
 int
