@@ -1,3 +1,4 @@
+#include <libxnvme.h>
 #define _GNU_SOURCE
 #include <assert.h>
 #include <endian.h>
@@ -92,7 +93,6 @@ xal_close(struct xal *xal)
 	}
 
 	xal_pool_unmap(&xal->inodes);
-	close(xal->handle.fd);
 	free(xal->dinodes);
 	free(xal);
 }
@@ -100,12 +100,30 @@ xal_close(struct xal *xal)
 int
 _pread(struct xal *xal, void *buf, size_t count, off_t offset)
 {
-	ssize_t nbytes;
+	struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(xal->dev);
+	const struct xnvme_geo *geo = xnvme_dev_get_geo(xal->dev);
+	int err;
+
+	if (count > geo->mdts_nbytes) {
+		XAL_DEBUG("FAILED: _pread(...) -- count(%zu) > mdts_nbytes(%" PRIu32 ")", count,
+			  geo->mdts_nbytes);
+		return -EINVAL;
+	}
+	if (count % geo->lba_nbytes) {
+		XAL_DEBUG("FAILED: _pread(...) -- unaligned count(%zu);", count);
+		return -EINVAL;
+	}
+	if (offset % geo->lba_nbytes) {
+		XAL_DEBUG("FAILED: _pread(...) -- unaligned offset(%zu);", offset);
+		return -EINVAL;
+	}
 
 	memset(buf, 0, count);
-	nbytes = pread(xal->handle.fd, buf, count, offset);
-	if ((nbytes == -1) || ((size_t)nbytes != count)) {
-		XAL_DEBUG("FAILED: pread(...);");
+
+	err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(xal->dev), offset / geo->lba_nbytes,
+			     count / geo->lba_nbytes, buf, NULL);
+	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+		XAL_DEBUG("FAILED: xnvme_nvm_read(...);");
 		return -EIO;
 	}
 
@@ -206,10 +224,10 @@ retrieve_and_decode_primary_superblock(void *buf, struct xal **xal)
 }
 
 int
-xal_open(const char *path, struct xal **xal)
+xal_open(struct xnvme_dev *dev, struct xal **xal)
 {
-	uint8_t buf[BUF_NBYTES];
 	struct xal *cand;
+	uint8_t *buf;
 	int err;
 
 	cand = calloc(1, sizeof(*cand));
@@ -218,12 +236,14 @@ xal_open(const char *path, struct xal **xal)
 		return -errno;
 	}
 
-	cand->handle.fd = open(path, O_RDONLY);
-	if (-1 == cand->handle.fd) {
-		XAL_DEBUG("FAILED: open(...)");
-		xal_close(cand);
+	buf = xnvme_buf_alloc(dev, BUF_NBYTES);
+	if (!buf) {
+		XAL_DEBUG("FAILED: xnvme_buf_alloc();");
+		free(cand);
 		return -errno;
 	}
+
+	cand->dev = dev;
 
 	err = retrieve_and_decode_primary_superblock(buf, &cand);
 	if (err) {
@@ -258,9 +278,12 @@ xal_open(const char *path, struct xal **xal)
 
 	*xal = cand; // All is good; promote the candidate
 
+	xnvme_buf_free(dev, buf);
+
 	return 0;
 
 failed:
+	xnvme_buf_free(dev, buf);
 	xal_close(cand);
 
 	return err;
@@ -472,7 +495,14 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 {
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
+	uint8_t *buf;
 	int err;
+
+	buf = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
+	if (!buf) {
+		XAL_DEBUG("FAILED: xnvme_buf_alloc(); errno(%d)", errno);
+		return -errno;
+	}
 
 	/**
 	 * For some reason then di_big_nextents is populated. As far as i understand that should
@@ -494,7 +524,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 	err = xal_pool_claim_inodes(&xal->inodes, 1, &self->content.dentries.inodes);
 	if (err) {
 		XAL_DEBUG("FAILED: !xal_pool_claim_inodes(); err(%d)", err)
-		return err;
+		goto exit;
 	}
 
 	for (uint64_t i = 0; i < nextents; ++i) {
@@ -511,13 +541,12 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 
 		for (size_t blk = 0; blk < extent.nblocks; ++blk) {
 			size_t ofz_disk = (extent.start_block + blk) * xal->sb.blocksize;
-			uint8_t buf[BUF_NBYTES];
 			struct xfs_odf_dir_blk_hdr *hdr = (void *)(buf);
 
 			err = _pread(xal, buf, xal->sb.blocksize, ofz_disk);
 			if (err) {
 				XAL_DEBUG("FAILED: !_pread(directory-extent)");
-				return -errno;
+				goto exit;
 			}
 			if ((be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) &&
 			    (be32toh(hdr->magic) != XAL_ODF_DIR3_BLOCK_MAGIC)) {
@@ -560,7 +589,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 				    &self->content.dentries.inodes[self->content.dentries.count]);
 				if (err) {
 					XAL_DEBUG("FAILED: process_ino(...)")
-					return err;
+					goto exit;
 				}
 
 				self->content.dentries.count += 1;
@@ -568,13 +597,16 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 				err = xal_pool_claim_inodes(&xal->inodes, 1, NULL);
 				if (err) {
 					XAL_DEBUG("FAILED: xal_pool_claim_inodes(...)");
-					return err;
+					goto exit;
 				}
 			}
 		}
 	}
 
-	return 0;
+exit:
+	xnvme_buf_free(xal->dev, buf);
+
+	return err;
 }
 
 /**
@@ -696,19 +728,34 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 int
 retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
 {
-	char buf[BUF_NBYTES] = {0};
-	struct xal_odf_btree_iab3_sfmt *iab3 = (void *)buf;
+	struct xal_odf_btree_iab3_sfmt *iab3;
 	off_t offset;
+	uint8_t *inodechunk;
+	char *buf;
 	int err;
+
+	buf = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
+	if (!buf) {
+		XAL_DEBUG("FAILED: xnvme_buf_alloc(); errno(%d)", errno);
+		return -errno;
+	}
+
+	inodechunk = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
+	if (!inodechunk) {
+		XAL_DEBUG("FAILED: xnvme_buf_alloc(); errno(%d)", errno);
+		err = -errno;
+		goto exit;
+	}
 
 	/** Compute the absolute offset for the block and retrieve it **/
 	offset = (xal->sb.agblocks * ag->seqno + blkno) * xal->sb.blocksize;
 	err = _pread(xal, buf, xal->sb.blocksize, offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()");
-		return err;
+		goto exit;
 	}
 
+	iab3 = (void *)buf;
 	iab3->magic.num = iab3->magic.num;
 	iab3->level = be16toh(iab3->level);
 	iab3->numrecs = be16toh(iab3->numrecs);
@@ -719,12 +766,12 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	assert(be32toh(iab3->magic.num) == XAL_ODF_IBT_CRC_MAGIC);
 
 	if (iab3->level) {
+		XAL_DEBUG("INFO: iab3->level(" PRIu16 ")?", iab3->level);
 		return 0;
 	}
 
 	for (uint16_t reci = 0; reci < iab3->numrecs; ++reci) {
 		struct xal_odf_inobt_rec *rec = (void *)(buf + sizeof(*iab3) + reci * sizeof(*rec));
-		uint8_t inodechunk[BUF_NBYTES];
 		uint32_t agbno, agbino;
 
 		rec->startino = be32toh(rec->startino);
@@ -787,7 +834,11 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 		retrieve_dinodes_via_iabt3(xal, ag, iab3->rightsib, index);
 	}
 
-	return 0;
+exit:
+	xnvme_buf_free(xal->dev, buf);
+	xnvme_buf_free(xal->dev, inodechunk);
+
+	return err;
 }
 
 int
