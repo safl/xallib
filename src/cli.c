@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <libxal.h>
+#include <libxnvme.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
