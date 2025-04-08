@@ -70,7 +70,7 @@ struct xal_odf_sb {
 
 	uint8_t _reserved_2[8];
 
-	xfs_ino_t rootino; ///< root inode number
+	uint64_t rootino; ///< root inode number
 
 	uint8_t _reserved_3[20];
 
