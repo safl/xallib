@@ -766,7 +766,7 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	assert(be32toh(iab3->magic.num) == XAL_ODF_IBT_CRC_MAGIC);
 
 	if (iab3->level) {
-		XAL_DEBUG("INFO: iab3->level(" PRIu16 ")?", iab3->level);
+		XAL_DEBUG("INFO: iab3->level(%" PRIu16 ")?", iab3->level);
 		return 0;
 	}
 
