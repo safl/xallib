@@ -830,7 +830,7 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	}
 
 	if (iab3->rightsib != 0xFFFFFFFF) {
-		XAL_DEBUG("FAILED: Going deeper on the right!");
+		XAL_DEBUG("INFO: Going deeper on the right!");
 		retrieve_dinodes_via_iabt3(xal, ag, iab3->rightsib, index);
 	}
 
@@ -896,7 +896,6 @@ _walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 		struct xal_inode *inodes = inode->content.dentries.inodes;
 
 		for (uint16_t i = 0; i < inode->content.dentries.count; ++i) {
-			XAL_DEBUG("FAILED: name: '%.*s'", XAL_INODE_NAME_MAXLEN, inodes[i].name);
 			_walk(&inodes[i], cb_func, cb_data, depth + 1);
 		}
 	} break;
