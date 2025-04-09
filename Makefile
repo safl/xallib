@@ -3,7 +3,9 @@ BUILD_TYPE ?= release
 
 .PHONY: all
 all: clean configure build install
+	@echo ""
 	@echo "To run tests; Have a look at the Makefile helpers"
+	@echo "================================================="
 
 .PHONY: clean
 clean:
