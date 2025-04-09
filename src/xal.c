@@ -121,7 +121,7 @@ _pread(struct xal *xal, void *buf, size_t count, off_t offset)
 	memset(buf, 0, count);
 
 	err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(xal->dev), offset / geo->lba_nbytes,
-			     count / geo->lba_nbytes, buf, NULL);
+			     (count / geo->lba_nbytes) - 1, buf, NULL);
 	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
 		XAL_DEBUG("FAILED: xnvme_nvm_read(...);");
 		return -EIO;
