@@ -292,6 +292,11 @@ failed:
 int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
+/**
+ * B+tree Directories decoding and inode population
+ *
+ * @see XFS Algorithms & Data Structures - 3rd Edition - 20.5 B+tree Directories" for details
+ */
 int
 process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 			       struct xal_inode *self)
@@ -301,6 +306,11 @@ process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 	return -ENOSYS;
 }
 
+/**
+ * B+tree Extent List decoding and inode population
+ *
+ * @see XFS Algorithms & Data Structures - 3rd Edition - 19.2 B+tree Extent List" for details
+ */
 int
 process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
@@ -309,6 +319,11 @@ process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct
 	return -ENOSYS;
 }
 
+/**
+ * Short Form Directories decoding and inode population
+ *
+ * @see XFS Algorithms & Data Structures - 3rd Edition - 20.1 Short Form Directories
+ */
 int
 process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode,
 					 struct xal_inode *self)
