@@ -26,3 +26,11 @@
 #define XAL_DEBUG(...)
 #define XAL_DEBUG_FCALL(x)
 #endif
+
+#ifdef static_assert
+#define XAL_STATIC_ASSERT(cond, msg) static_assert(cond, msg);
+#else
+#define XAL_STATIC_ASSERT(cond, msg)
+#endif
+
+#endif
