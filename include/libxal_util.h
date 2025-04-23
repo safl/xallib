@@ -33,4 +33,11 @@
 #define XAL_STATIC_ASSERT(cond, msg)
 #endif
 
+/**
+ * Macro to suppress warnings on unused arguments, thanks to stackoverflow.
+ */
+#ifdef __GNUC__
+#define XAL_UNUSED(x) UNUSED_##x __attribute__((__unused__))
+#else
+#define XAL_UNUSED(x) UNUSED_##x
 #endif
