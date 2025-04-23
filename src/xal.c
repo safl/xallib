@@ -298,10 +298,11 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
  * @see XFS Algorithms & Data Structures - 3rd Edition - 20.5 B+tree Directories" for details
  */
 int
-process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
-			       struct xal_inode *self)
+process_dinode_directory_btree(struct xal *XAL_UNUSED(xal), struct xal_odf_dinode *dinode,
+			       struct xal_inode *XAL_UNUSED(self))
 {
-	XAL_DEBUG("FAILED: directory in BTREE fmt -- not implemented.");
+	XAL_DEBUG("FAILED: directory in BTREE fmt -- not implemented. ino(0x%" PRIx64 ")",
+		  be64toh(dinode->ino));
 
 	return -ENOSYS;
 }
@@ -312,9 +313,11 @@ process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
  * @see XFS Algorithms & Data Structures - 3rd Edition - 19.2 B+tree Extent List" for details
  */
 int
-process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
+process_dinode_file_btree(struct xal *XAL_UNUSED(xal), struct xal_odf_dinode *dinode,
+			  struct xal_inode *XNVME_UNUSED(self))
 {
-	XAL_DEBUG("FAILED: file in BTREE fmt -- not implemented.");
+	XAL_DEBUG("FAILED: file in BTREE fmt -- not implemented. ino(0x%" PRIx64 ")",
+		  be64toh(dinode->ino));
 
 	return -ENOSYS;
 }
@@ -331,6 +334,8 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 	uint8_t *cursor = (void *)dinode;
 	uint8_t count, i8count;
 	int err;
+
+	XAL_DEBUG("INFO: Short Form Directories ino(0x%" PRIx64 ")", be64toh(dinode->ino));
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
@@ -406,6 +411,8 @@ process_dinode_inline_file_extents(struct xal *xal, struct xal_odf_dinode *dinod
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
 	int err;
+
+	XAL_DEBUG("INFO: Inline File Extents ino(0x%" PRIx64 ")", be64toh(dinode->ino));
 
 	/**
 	 * For some reason then di_big_nextents is populated. As far as i understand that should
@@ -512,6 +519,8 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 	uint64_t nextents;
 	uint8_t *buf;
 	int err;
+
+	XAL_DEBUG("INFO: Inline Directory Extents ino(0x%" PRIx64 ")", be64toh(dinode->ino));
 
 	buf = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
 	if (!buf) {
@@ -663,7 +672,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		case XAL_ODF_DIR3_FT_DIR:
 			err = process_dinode_directory_btree(xal, dinode, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_dinode_directory_btree()");
+				XAL_DEBUG("FAILED: process_dinode_directory_btree(); err(%d)", err);
 				return err;
 			}
 			break;
@@ -671,7 +680,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		case XAL_ODF_DIR3_FT_REG_FILE:
 			err = process_dinode_file_btree(xal, dinode, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_dinode_file_btree()");
+				XAL_DEBUG("FAILED: process_dinode_file_btree(); err(%d)", err);
 				return err;
 			}
 			break;
