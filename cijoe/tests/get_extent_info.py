@@ -7,12 +7,14 @@ import subprocess
 from pathlib import Path
 import re
 
+COLUMNS = ["startoffset", "endoffset", "startblock", "endblock"]
+
 
 def get_extents(path: Path):
     """The given path is expected to be absolute"""
 
     regex = (
-        r"^(?P<extent>\d+):\s+"
+        r"^(?P<ident>\d+):\s+"
         r"\[(?P<startoffset>\d+)\.\.(?P<endoffset>\d+)\]:\s+"
         r"(?P<startblock>\d+)\.\.(?P<endblock>\d+)$"
     )
@@ -23,15 +25,12 @@ def get_extents(path: Path):
         print("Failed running: %s" % " ".join(cmd))
         return proc.returncode
 
-    extents = {}
+    extents = []
     for line in proc.stdout.splitlines():
         match = re.match(regex, line.strip())
         if match:
-            data = match.groupdict()
-            id = data["extent"]
-            del data["extent"]
-
-            extents[id] = {key: int(val) for key, val in match.groupdict().items()}
+            extent = {key: int(val) for key, val in match.groupdict().items()}
+            extents.append([extent.get(col) for col in COLUMNS])
 
     return extents
 
@@ -43,12 +42,9 @@ def main(args):
         for name in files:
             path = Path(root) / name
 
-            result[str(path)] = {
-                "inode": os.stat(path).st_ino,
-                "extents": get_extents(path),
-            }
+            result[str(path)] = (os.stat(path).st_ino, get_extents(path))
 
-    args.output.write_text(json.dumps(result, indent=2))
+    args.output.write_text(json.dumps(result))
 
     return 0
 
