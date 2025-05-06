@@ -919,7 +919,7 @@ _walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 	case XAL_ODF_DIR3_FT_DIR: {
 		struct xal_inode *inodes = inode->content.dentries.inodes;
 
-		for (uint16_t i = 0; i < inode->content.dentries.count; ++i) {
+		for (uint32_t i = 0; i < inode->content.dentries.count; ++i) {
 			_walk(&inodes[i], cb_func, cb_data, depth + 1);
 		}
 	} break;
