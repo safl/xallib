@@ -18,6 +18,10 @@
 
 #define BUF_NBYTES 4096 * 32UL ///< Number of bytes in a buffer
 #define CHUNK_NINO 64	       ///< Number of inodes in a chunk
+#define BUF_BLOCKSIZE 4096     ///< Number of bytes in a block
+
+int
+decode_dentry(void *buf, struct xal_inode *dentry);
 
 /**
  * Find the dinode with inode number 'ino'
@@ -292,19 +296,250 @@ failed:
 int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
+/*************************************************************************************************
+ *  decode_xfs_extent_btree
+ *  bit[127]          bits[73 - 126]                  bits[21 - 72]              bits[0 - 20]
+ *  flag       logical file block offset          absolute block number         number of blocks
+ **************************************************************************************************/
+void
+decode_xfs_extent_btree(uint64_t l1, uint64_t l2, struct xal_extent *extent)
+{
+	extent->start_offset = l1;
+
+	// bits[73 - 126]
+	extent->start_block = l2 >> 21;
+
+	// bits[0 - 20]
+	extent->nblocks = l2 & 0x1FFFFF;
+}
+
+void
+decodeL1(unsigned char val, uint64_t *l2)
+{
+	uint64_t x = *l2;
+	int mask = val;
+	x = x | mask;
+	*l2 = x;
+	return;
+}
+
+uint64_t
+getPhysicalblockFromFs(struct xal *xal, uint64_t fsblock)
+{
+	int agnum = fsblock >> xal->sb.agblklog;
+	uint64_t blknum = fsblock & ((1 << xal->sb.agblklog) - 1);
+	uint64_t physicalblknum = agnum * xal->sb.agblocks + blknum;
+	return physicalblknum;
+}
+
+int
+readLeafData(struct xal *xal, struct xal_inode *self, uint64_t bmbtptrs,
+	     struct xal_btree_lblock *lfd)
+{
+	int err = 0;
+
+	uint64_t block_number = bmbtptrs;
+	uint64_t physicalblk = getPhysicalblockFromFs(xal, block_number);
+	uint64_t block_offset = (physicalblk * xal->sb.blocksize);
+
+	uint8_t *buf;
+	buf = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
+	if (!buf) {
+		XAL_DEBUG("FAILED: xnvme_buf_alloc(); errno(%d)", errno);
+		return -errno;
+	}
+
+	uint8_t *block_databuf;
+	block_databuf = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
+	if (!buf) {
+		XAL_DEBUG("FAILED: xnvme_buf_alloc(); errno(%d)", errno);
+		return -errno;
+	}
+
+	err = _pread(xal, block_databuf, xal->sb.blocksize, block_offset);
+	if (err) {
+		XAL_DEBUG("FAILED: _pread()");
+		goto exit;
+	}
+
+	uint64_t l1 = 0;
+	uint64_t l2 = 0;
+	int idx0 = 72;
+	int idx1 = 80;
+	int idx2 = 96;
+
+	for (int iter = 0; iter < be16toh(lfd->btree_numrecs); iter++) {
+		struct xal_extent extent = {0};
+		l1 = 0;
+		l2 = 0;
+
+		// l2
+		for (int i = 0; i < 8; i++) {
+
+			decodeL1(block_databuf[idx1 + i], &l2);
+			if (i < 7) {
+				l2 = l2 << 8;
+			}
+		}
+
+		// l1
+		for (int i = 0; i < 7; i++) {
+			decodeL1(block_databuf[idx0 + i], &l1);
+			if (i < 6) {
+				l1 = l1 << 8;
+			}
+		}
+
+		l1 = l1 >> 1;
+		idx1 = idx2;
+		idx2 += 16;
+		idx0 = idx1 - 8;
+		extent.flag = l2 >> 63;
+		decode_xfs_extent_btree(l1, l2, &extent);
+
+		for (size_t blk = 0; blk < extent.nblocks; ++blk) {
+			physicalblk = getPhysicalblockFromFs(xal, extent.start_block + blk);
+			size_t ofz_disk = (physicalblk)*xal->sb.blocksize;
+			struct xfs_odf_dir_blk_hdr *hdr = (void *)(buf);
+			
+			err = _pread(xal, buf, xal->sb.blocksize, ofz_disk);
+			if (err) {
+				XAL_DEBUG("FAILED: !_pread(directory-extent)");
+				goto exit;
+			}
+
+			if ((be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) &&
+			    (be32toh(hdr->magic) != XAL_ODF_DIR3_BLOCK_MAGIC)) {
+				continue;
+			}
+			for (uint64_t ofz = 64; ofz < xal->sb.blocksize;) {
+
+				uint8_t *dentry_cursor = buf + ofz;
+				struct xal_inode dentry = {0};
+				ofz += decode_dentry(dentry_cursor, &dentry);
+				/**
+				 * Seems like the only way to determine that there are no more
+				 * entries are if one start to decode uinvalid entries.
+				 * Such as a namelength of 0 or inode number 0.
+				 * Thus, checking for that here.
+				 **/
+				if ((!dentry.ino) || (!dentry.namelen)) {
+					continue;
+				}
+				/**
+				 * Skip processing the mandatory dentries: '.' and '..'
+				 */
+				if ((dentry.namelen == 1) && (dentry.name[0] == '.')) {
+					continue;
+				}
+				if ((dentry.namelen == 2) && (dentry.name[0] == '.') &&
+				    (dentry.name[1] == '.')) {
+					continue;
+				}
+
+				self->content.dentries.inodes[self->content.dentries.count] =
+				    dentry;
+				self->content.dentries.count += 1;
+			}
+		}
+	}
+
+exit:
+	xnvme_buf_free(xal->dev, buf);
+	xnvme_buf_free(xal->dev, block_databuf);
+
+	return err;
+}
+
+int
+readBlockData(struct xal *xal, void *buf, uint64_t block_number)
+{
+	int err;
+
+	// Calculate the Physical blcok from FS Block
+	uint64_t physicalblk = getPhysicalblockFromFs(xal, block_number);
+
+	// Calculate the block offset
+	off_t block_offset = physicalblk * xal->sb.blocksize;
+
+	err = _pread(xal, buf, xal->sb.blocksize, block_offset);
+	if (err) {
+		XAL_DEBUG("FAILED: _pread()\n");
+		return -errno;
+	}
+	return 0;
+}
+
 /**
  * B+tree Directories decoding and inode population
  *
  * @see XFS Algorithms & Data Structures - 3rd Edition - 20.5 B+tree Directories" for details
  */
 int
-process_dinode_directory_btree(struct xal *XAL_UNUSED(xal), struct xal_odf_dinode *dinode,
-			       struct xal_inode *XAL_UNUSED(self))
+process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
+			       struct xal_inode *self)
 {
-	XAL_DEBUG("FAILED: directory in BTREE fmt -- not implemented. ino(0x%" PRIx64 ")",
-		  be64toh(dinode->ino));
+	uint8_t *cursor = (void *)dinode;
+	uint16_t numrec; // Number of records in this block
+	uint64_t startoff[4];
+	uint64_t bmbtptrs[4];
 
-	return -ENOSYS;
+	int err;
+	uint8_t *leafbuf[4];
+
+	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
+
+	cursor += 2;
+	numrec = be16toh(*((uint16_t *)cursor));
+
+	cursor += 2;
+	for (int i = 0; i < 4; i++) {
+		startoff[i] = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+	}
+
+	cursor += (16 * 8);
+	for (int i = 0; i < 4; i++) {
+		bmbtptrs[i] = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+	}
+
+	// Allocate the buffer
+	for (int i = 0; i < numrec; i++) {
+		leafbuf[i] = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
+		if (!leafbuf[i]) {
+			XAL_DEBUG("FAILED: xnvme_buf_alloc(); errno(%d)", errno);
+			return -errno;
+		}
+	}
+
+	err = xal_pool_claim_inodes(&xal->inodes, 1, &self->content.dentries.inodes);
+	if (err) {
+		XAL_DEBUG("FAILED: !xal_pool_claim_inodes(); err(%d)", err)
+		goto exit;
+	}
+
+	for (int i = 0; i < numrec; i++) {
+		struct xal_btree_lblock *lfd = (struct xal_btree_lblock *)leafbuf[i];
+		readBlockData(xal, leafbuf[i], bmbtptrs[i]);
+
+		printf("\ndirectory_btree leaf: MagicNum = %08x\n", be32toh(lfd->btree_magicnum));
+		printf("directory_btree leaf: level = %hu\n", be16toh(lfd->btree_level));
+		printf("directory_btree leaf: numrec = %hu\n", be16toh(lfd->btree_numrecs));
+
+		readLeafData(xal, self, bmbtptrs[i], lfd);
+	}
+	return 0;
+
+exit:
+
+	for (int i = 0; i < numrec; i++) {
+		if (leafbuf[i]) {
+			xnvme_buf_free(xal->dev, leafbuf[i]);
+		}
+	}
+
+	return err;
 }
 
 /**
@@ -919,7 +1154,7 @@ _walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 	case XAL_ODF_DIR3_FT_DIR: {
 		struct xal_inode *inodes = inode->content.dentries.inodes;
 
-		for (uint16_t i = 0; i < inode->content.dentries.count; ++i) {
+		for (uint32_t i = 0; i < inode->content.dentries.count; ++i) {
 			_walk(&inodes[i], cb_func, cb_data, depth + 1);
 		}
 	} break;
@@ -940,3 +1175,4 @@ xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 {
 	return _walk(inode, cb_func, cb_data, 0);
 }
+
