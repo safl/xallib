@@ -80,9 +80,9 @@ xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino)
 	xal_ino_decode_absolute(xal, ino, &seqno, &agbno, &agbino);
 
 	// Absolute Inode offset in bytes
-	offset = (seqno * xal->sb.agblocks + agbno) * xal->sb.blocksize;
+	offset = (seqno * (uint64_t)xal->sb.agblocks + agbno) * xal->sb.blocksize;
 
-	return offset + (agbino * xal->sb.inodesize);
+	return offset + ((uint64_t)agbino * xal->sb.inodesize);
 }
 
 void
