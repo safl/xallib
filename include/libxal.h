@@ -229,3 +229,42 @@ xal_index(struct xal *xal);
  */
 int
 xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data);
+
+/**
+ * Decodes the given inode number in AG-Relative Inode number format
+ *
+ * For details on the format then see the description in section "13.3.1 Inode Numbers"
+ *
+ * @param xal Pointer to the xal-instance that the inode belongs to
+ * @param ino The absolute inode number to decode
+ * @param agbno Pointer to store the AG-relative block number
+ * @param agbino The inode relative to the AG-relative block
+ */
+void
+xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint32_t *agbno, uint32_t *agbino);
+
+/**
+ * Decodes the inode number in Absolute Inode number format
+ *
+ * For details on the format then see the description in section "13.3.1 Inode Numbers"
+ *
+ * @param xal Pointer to the xal-instance that the inode belongs to
+ * @param ino The absolute inode number to decode
+ * @param seqno Pointer to store the AG number
+ * @param agbno Pointer to store the AG-relative block number
+ * @param agbino The inode relative to the AG-relative block
+ */
+void
+xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint32_t *agbno,
+			uint32_t *agbino);
+
+/**
+ * Compute the byte-offset on disk of the given inode in absolute inode number format
+ *
+ * @param xal Pointer to the xal-instance that the inode belongs to
+ * @param ino The absolute inode number to decode
+ *
+ * @returns The byte-offset on success.
+ */
+uint64_t
+xal_get_inode_offset(struct xal *xal, uint64_t ino);
