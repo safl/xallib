@@ -362,3 +362,14 @@ struct xfs_odf_dir_blk_hdr {
 	uint64_t owner;
 	uint8_t _pad[16];
 };
+
+/**
+ * The XFS Long Format B+trees
+ */
+struct xal_btree_lblock {
+	uint32_t btree_magicnum; /// Specifies the magic number for the btree block.
+	uint16_t btree_level;   /// The level of the tree in which this block is found
+	uint16_t btree_numrecs; /// Number of records in this block.
+	uint64_t btree_leftsib;
+	uint64_t btree_rightsib;
+};
