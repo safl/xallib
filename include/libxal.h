@@ -267,4 +267,4 @@ xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint32_t
  * @returns The byte-offset on success.
  */
 uint64_t
-xal_get_inode_offset(struct xal *xal, uint64_t ino);
+xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino);

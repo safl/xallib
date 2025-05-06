@@ -72,7 +72,7 @@ xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint32_t
 }
 
 uint64_t
-xal_get_inode_offset(struct xal *xal, uint64_t ino)
+xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino)
 {
 	uint32_t seqno, agbno, agbino;
 	uint64_t offset;
