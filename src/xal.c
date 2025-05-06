@@ -313,11 +313,13 @@ process_dinode_directory_btree(struct xal *XAL_UNUSED(xal), struct xal_odf_dinod
  * @see XFS Algorithms & Data Structures - 3rd Edition - 19.2 B+tree Extent List" for details
  */
 int
-process_dinode_file_btree(struct xal *XAL_UNUSED(xal), struct xal_odf_dinode *dinode,
+process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 			  struct xal_inode *XNVME_UNUSED(self))
 {
-	XAL_DEBUG("FAILED: file in BTREE fmt -- not implemented. ino(0x%" PRIx64 ")",
-		  be64toh(dinode->ino));
+	uint64_t ino = be64toh(dinode->ino);
+
+	XAL_DEBUG("FAILED: file in BTREE fmt -- not impl. ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")",
+		  ino, xal_ino_decode_absolute_offset(xal, ino));
 
 	return -ENOSYS;
 }
