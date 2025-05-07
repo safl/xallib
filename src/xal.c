@@ -989,7 +989,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 int
 retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
 {
-	struct xal_odf_btree_iab3_sfmt *iab3;
+	struct xal_odf_btree_sfmt *iab3;
 	off_t offset;
 	uint8_t *inodechunk;
 	char *buf;

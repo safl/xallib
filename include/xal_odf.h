@@ -307,13 +307,13 @@ struct xal_odf_dir2_sf_hdr {
 	uint8_t parent[8]; /* Parent directory inode number */
 } __attribute__((packed));
 
-union xal_odf_btree_iab3_magic {
+union xal_odf_btree_magic {
 	uint32_t num;
 	char text[4];
 };
 
-struct xal_odf_btree_iab3_sfmt {
-	union xal_odf_btree_iab3_magic magic; // 'IAB3' for inode B+Tree
+struct xal_odf_btree_sfmt {
+	union xal_odf_btree_magic magic; // E.g. 'IAB3' for inode B+Tree
 	uint16_t level;			      // Tree level (0 = leaf, >0 = interior)
 	uint16_t numrecs;		      // Number of records in this node
 	uint32_t leftsib;		      // Left sibling block (AG-relative)
@@ -327,8 +327,8 @@ struct xal_odf_btree_iab3_sfmt {
 	uint32_t bb_crc; ///< In little-endian
 };
 
-struct xal_odf_btree_iab3_lfmt {
-	union xal_odf_btree_iab3_magic magic; // 'IAB3' for inode B+Tree
+struct xal_odf_btree_lfmt {
+	union xal_odf_btree_magic magic; // E.g. 'IAB3' for inode B+Tree or 'BMAP' for file-extents
 	uint16_t level;			      // Tree level (0 = leaf, >0 = interior)
 	uint16_t numrecs;		      // Number of records in this node
 	uint64_t leftsib;		      // Left sibling block (AG-relative)
@@ -339,6 +339,7 @@ struct xal_odf_btree_iab3_lfmt {
 	uuid_t bb_uuid;
 	uint64_t bb_owner;
 	uint32_t bb_crc; ///< In little-endian
+	uint32_t bb_pad;
 };
 
 struct xal_odf_inobt_rec {
