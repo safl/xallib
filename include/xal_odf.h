@@ -337,7 +337,7 @@ struct xal_odf_btree_iab3_lfmt {
 	uint64_t blkno; ///< blkno; seems like this is only filled when mkfs use-crc
 	uint64_t bb_lsn;
 	uuid_t bb_uuid;
-	uint32_t bb_owner;
+	uint64_t bb_owner;
 	uint32_t bb_crc; ///< In little-endian
 };
 
