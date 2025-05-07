@@ -17,7 +17,7 @@ int
 xal_odf_agfl_pp(void *buf);
 
 int
-xal_odf_btree_iab3_sfmt_pp(struct xal_odf_btree_iab3_sfmt *iab3);
+xal_odf_btree_iab3_sfmt_pp(struct xal_odf_btree_sfmt *iab3);
 
 int
 xal_odf_inobt_rec_pp(struct xal_odf_inobt_rec *rec);

@@ -223,7 +223,7 @@ xal_extent_pp(struct xal_extent *extent)
 }
 
 int
-xal_odf_btree_iab3_sfmt_pp(struct xal_odf_btree_iab3_sfmt *iab3)
+xal_odf_btree_iab3_sfmt_pp(struct xal_odf_btree_sfmt *iab3)
 {
 	int wrtn = 0;
 
