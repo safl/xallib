@@ -76,6 +76,25 @@ xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint32_t
 	xal_ino_decode_relative(xal, ino, agbno, agbino);
 }
 
+/**
+ * Calculate the on-disk offset of the given filesystem block number
+ *
+ * Format Assumption
+ * =================
+ * |       agno        |       bno        |
+ * | 64 - agblklog     |  agblklog        |
+ */
+uint64_t
+xal_absbno_offset(struct xal *xal, uint64_t absbno)
+{
+	uint64_t ag, bno;
+
+	ag = absbno >> xal->sb.agblklog;
+	bno = absbno & ((1 << xal->sb.agblklog) - 1);
+
+	return (ag * xal->sb.agblocks + bno) * xal->sb.blocksize;
+}
+
 uint64_t
 xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino)
 {
@@ -546,14 +565,18 @@ exit:
 int
 process_file_btree_leaf(struct xal *xal, uint64_t absbno, struct xal_inode *self)
 {
-	XAL_DEBUG("FAILED: absbno(%"PRIu64"); ino(%"PRIu64")", absbno, self->ino);
+
+	XAL_DEBUG("INFO: absbno(%" PRIu64 "), ofz(%" PRIu64 ")", absbno,
+		  xal_absbno_offset(xal, absbno));
+
+	XAL_DEBUG("FAILED: absbno(%" PRIu64 "); ino(%" PRIu64 ")", absbno, self->ino);
 	return -ENOSYS;
 }
 
 int
 process_file_btree_node(struct xal *xal, uint64_t absbno, struct xal_inode *self)
 {
-	XAL_DEBUG("FAILED: absbno(%"PRIu64"); ino(%"PRIu64")", absbno, self->ino);
+	XAL_DEBUG("FAILED: absbno(%" PRIu64 "); ino(%" PRIu64 ")", absbno, self->ino);
 	return -ENOSYS;
 }
 
@@ -588,22 +611,22 @@ process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct
 		return -EINVAL;
 	}
 
-	XAL_DEBUG("INFO: level(%"PRIu16"), numrecs(%"PRIu16")", level, numrecs);
+	XAL_DEBUG("INFO: level(%" PRIu16 "), numrecs(%" PRIu16 ")", level, numrecs);
 
 	/**
-	We do not use these keys; however, we parse them during development to compare with the output
-	of xfs_db for sanity checks. For some reason, there is an unexplained 64-byte gap on disk after
-	numrecs * 64 bytes of keys.
+	We do not use these keys; however, we parse them during development to compare with the
+	output of xfs_db for sanity checks. For some reason, there is an unexplained 64-byte gap on
+	disk after numrecs * 64 bytes of keys.
 	 */
 	for (uint16_t rec = 0; rec < numrecs; ++rec) {
 		uint64_t key = be64toh(*((uint64_t *)cursor));
 		cursor += sizeof(uint64_t);
 
-		XAL_DEBUG("INFO: key(%"PRIu64")", key);
+		XAL_DEBUG("INFO: key(%" PRIu64 ")", key);
 	}
 
 	cursor += 64; // TODO: Why this gap!?
-	
+
 	for (uint16_t rec = 0; rec < numrecs; ++rec) {
 		uint64_t pointer = be64toh(*((uint64_t *)cursor));
 		cursor += sizeof(uint64_t);
