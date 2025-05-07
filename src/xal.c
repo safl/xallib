@@ -1,3 +1,4 @@
+#include <asm-generic/errno.h>
 #include <libxnvme.h>
 #define _GNU_SOURCE
 #include <assert.h>
@@ -401,7 +402,7 @@ readLeafData(struct xal *xal, struct xal_inode *self, uint64_t bmbtptrs,
 			physicalblk = getPhysicalblockFromFs(xal, extent.start_block + blk);
 			size_t ofz_disk = (physicalblk)*xal->sb.blocksize;
 			struct xfs_odf_dir_blk_hdr *hdr = (void *)(buf);
-			
+
 			err = _pread(xal, buf, xal->sb.blocksize, ofz_disk);
 			if (err) {
 				XAL_DEBUG("FAILED: !_pread(directory-extent)");
@@ -542,21 +543,81 @@ exit:
 	return err;
 }
 
+int
+process_file_btree_leaf(struct xal *xal, uint64_t absbno, struct xal_inode *self)
+{
+	XAL_DEBUG("FAILED: absbno(%"PRIu64"); ino(%"PRIu64")", absbno, self->ino);
+	return -ENOSYS;
+}
+
+int
+process_file_btree_node(struct xal *xal, uint64_t absbno, struct xal_inode *self)
+{
+	XAL_DEBUG("FAILED: absbno(%"PRIu64"); ino(%"PRIu64")", absbno, self->ino);
+	return -ENOSYS;
+}
+
 /**
  * B+tree Extent List decoding and inode population
  *
  * @see XFS Algorithms & Data Structures - 3rd Edition - 19.2 B+tree Extent List" for details
+ *
+ * Assumptions
+ * ===========
+ *
+ * - Keys and pointers within the inode are 64 bits wide
  */
 int
-process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode,
-			  struct xal_inode *XNVME_UNUSED(self))
+process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
-	uint64_t ino = be64toh(dinode->ino);
+	uint8_t *cursor = (void *)dinode;
+	uint16_t level;	  // Level in the btree, expecting >= 1
+	uint16_t numrecs; // Number of records in the inode itself
+	int err;
 
-	XAL_DEBUG("FAILED: file in BTREE fmt -- not impl. ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")",
-		  ino, xal_ino_decode_absolute_offset(xal, ino));
+	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
-	return -ENOSYS;
+	level = be16toh(*((uint16_t *)cursor));
+	cursor += 2;
+
+	numrecs = be16toh(*((uint16_t *)cursor));
+	cursor += 2;
+
+	if (level < 1) {
+		XAL_DEBUG("FAILED: level(%" PRIu16 "); expected > 0", level);
+		return -EINVAL;
+	}
+
+	XAL_DEBUG("INFO: level(%"PRIu16"), numrecs(%"PRIu16")", level, numrecs);
+
+	/**
+	We do not use these keys; however, we parse them during development to compare with the output
+	of xfs_db for sanity checks. For some reason, there is an unexplained 64-byte gap on disk after
+	numrecs * 64 bytes of keys.
+	 */
+	for (uint16_t rec = 0; rec < numrecs; ++rec) {
+		uint64_t key = be64toh(*((uint64_t *)cursor));
+		cursor += sizeof(uint64_t);
+
+		XAL_DEBUG("INFO: key(%"PRIu64")", key);
+	}
+
+	cursor += 64; // TODO: Why this gap!?
+	
+	for (uint16_t rec = 0; rec < numrecs; ++rec) {
+		uint64_t pointer = be64toh(*((uint64_t *)cursor));
+		cursor += sizeof(uint64_t);
+
+		err = (level == 1) ? process_file_btree_leaf(xal, pointer, self)
+				   : process_file_btree_node(xal, pointer, self);
+		if (err) {
+			XAL_DEBUG("FAILED: file FMT_BTREE ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")",
+				  self->ino, xal_ino_decode_absolute_offset(xal, self->ino));
+			return err;
+		}
+	}
+
+	return 0;
 }
 
 /**
@@ -902,6 +963,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	}
 
 	self->size = be64toh(dinode->di_size);
+	self->ino = be64toh(dinode->ino);
 
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_BTREE:
@@ -1177,4 +1239,3 @@ xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 {
 	return _walk(inode, cb_func, cb_data, 0);
 }
-

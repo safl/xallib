@@ -314,10 +314,10 @@ union xal_odf_btree_magic {
 
 struct xal_odf_btree_sfmt {
 	union xal_odf_btree_magic magic; // E.g. 'IAB3' for inode B+Tree
-	uint16_t level;			      // Tree level (0 = leaf, >0 = interior)
-	uint16_t numrecs;		      // Number of records in this node
-	uint32_t leftsib;		      // Left sibling block (AG-relative)
-	uint32_t rightsib;		      // Right sibling block (AG-relative)
+	uint16_t level;			 // Tree level (0 = leaf, >0 = interior)
+	uint16_t numrecs;		 // Number of records in this node
+	uint32_t leftsib;		 // Left sibling block (AG-relative)
+	uint32_t rightsib;		 // Right sibling block (AG-relative)
 
 	uint64_t blkno; ///< blkno; seems like this is only filled when mkfs use-crc; also reported
 			///< in unit of SECTORS!
@@ -329,10 +329,10 @@ struct xal_odf_btree_sfmt {
 
 struct xal_odf_btree_lfmt {
 	union xal_odf_btree_magic magic; // E.g. 'IAB3' for inode B+Tree or 'BMAP' for file-extents
-	uint16_t level;			      // Tree level (0 = leaf, >0 = interior)
-	uint16_t numrecs;		      // Number of records in this node
-	uint64_t leftsib;		      // Left sibling block (AG-relative)
-	uint64_t rightsib;		      // Right sibling block (AG-relative)
+	uint16_t level;			 // Tree level (0 = leaf, >0 = interior)
+	uint16_t numrecs;		 // Number of records in this node
+	uint64_t leftsib;		 // Left sibling block (AG-relative)
+	uint64_t rightsib;		 // Right sibling block (AG-relative)
 
 	uint64_t blkno; ///< blkno; seems like this is only filled when mkfs use-crc
 	uint64_t bb_lsn;
@@ -369,8 +369,8 @@ struct xfs_odf_dir_blk_hdr {
  */
 struct xal_btree_lblock {
 	uint32_t btree_magicnum; /// Specifies the magic number for the btree block.
-	uint16_t btree_level;   /// The level of the tree in which this block is found
-	uint16_t btree_numrecs; /// Number of records in this block.
+	uint16_t btree_level;	 /// The level of the tree in which this block is found
+	uint16_t btree_numrecs;	 /// Number of records in this block.
 	uint64_t btree_leftsib;
 	uint64_t btree_rightsib;
 };
