@@ -229,6 +229,31 @@ disk block due to COW and reflinking. When data blocks are shared, extending
 or modifying a file creates a copy to preserve shared content, breaking the
 1:1 mapping.
 
+B-Trees
+=======
+
+The storage format of an inode can be one of inode which can be one of:
+``FMT_LOCAL``, ``FMT_EXTENT``, and ``FMT_BTREE``. The latter form is a B+Tree.
+This storage format is used for large directories and for fragmented files.
+
+Additionally, then within an allocation-group then inodes are stored in B+Trees,
+one for allocated inodes another for free inodes. There are probably other
+usages, but these are mentioned as they are uses which the library currently
+supports decoding. Specifically:
+
+* Inode B+Tree
+
+  - Magic number ``IAB3``
+  - Allocated inodes
+  
+* Directory B+tree
+
+  - Directory contents: tree of directory blocks
+
+* File B+tree
+
+  - File-contents: collection of extents / mapping file to disk-blocks
+
 Appendix
 ========
 
