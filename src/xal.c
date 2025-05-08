@@ -116,7 +116,9 @@ xal_close(struct xal *xal)
 		return;
 	}
 
+	xnvme_buf_free(xal->dev, xal->buf);
 	xal_pool_unmap(&xal->inodes);
+	xal_pool_unmap(&xal->extents);
 	free(xal->dinodes);
 	free(xal);
 }
@@ -301,12 +303,9 @@ xal_open(struct xnvme_dev *dev, struct xal **xal)
 
 	*xal = cand; // All is good; promote the candidate
 
-	xnvme_buf_free(dev, buf);
-
 	return 0;
 
 failed:
-	xnvme_buf_free(dev, buf);
 	xal_close(cand);
 
 	return err;
