@@ -122,10 +122,10 @@ xal_close(struct xal *xal)
 }
 
 int
-_pread(struct xal *xal, void *buf, size_t count, off_t offset)
+_pread(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
 {
-	struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(xal->dev);
-	const struct xnvme_geo *geo = xnvme_dev_get_geo(xal->dev);
+	struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+	const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
 	int err;
 
 	if (count > geo->mdts_nbytes) {
@@ -144,7 +144,7 @@ _pread(struct xal *xal, void *buf, size_t count, off_t offset)
 
 	memset(buf, 0, count);
 
-	err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(xal->dev), offset / geo->lba_nbytes,
+	err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), offset / geo->lba_nbytes,
 			     (count / geo->lba_nbytes) - 1, buf, NULL);
 	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
 		XAL_DEBUG("FAILED: xnvme_nvm_read(...);");
@@ -179,7 +179,7 @@ retrieve_and_decode_allocation_group(uint32_t seqno, void *buf, struct xal *xal)
 	struct xal_odf_agf *agf = (void *)(cursor + xal->sb.sectsize);
 	int err;
 
-	err = _pread(xal, buf, xal->sb.sectsize * 4, offset);
+	err = _pread(xal->dev, buf, xal->sb.sectsize * 4, offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()");
 		return err;
@@ -218,7 +218,7 @@ retrieve_and_decode_primary_superblock(void *buf, struct xal **xal)
 	struct xal *cand;
 	int err;
 
-	err = _pread(*xal, buf, 4096, 0);
+	err = _pread((*xal)->dev, buf, 4096, 0);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()\n");
 		return -errno;
@@ -376,7 +376,7 @@ readLeafData(struct xal *xal, struct xal_inode *self, uint64_t bmbtptrs,
 		return -errno;
 	}
 
-	err = _pread(xal, block_databuf, xal->sb.blocksize, block_offset);
+	err = _pread(xal->dev, block_databuf, xal->sb.blocksize, block_offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()");
 		goto exit;
@@ -422,7 +422,7 @@ readLeafData(struct xal *xal, struct xal_inode *self, uint64_t bmbtptrs,
 			size_t ofz_disk = (physicalblk)*xal->sb.blocksize;
 			struct xfs_odf_dir_blk_hdr *hdr = (void *)(buf);
 
-			err = _pread(xal, buf, xal->sb.blocksize, ofz_disk);
+			err = _pread(xal->dev, buf, xal->sb.blocksize, ofz_disk);
 			if (err) {
 				XAL_DEBUG("FAILED: !_pread(directory-extent)");
 				goto exit;
@@ -482,7 +482,7 @@ readBlockData(struct xal *xal, void *buf, uint64_t block_number)
 	// Calculate the block offset
 	off_t block_offset = physicalblk * xal->sb.blocksize;
 
-	err = _pread(xal, buf, xal->sb.blocksize, block_offset);
+	err = _pread(xal->dev, buf, xal->sb.blocksize, block_offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()\n");
 		return -errno;
@@ -888,7 +888,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 			size_t ofz_disk = (extent.start_block + blk) * xal->sb.blocksize;
 			struct xfs_odf_dir_blk_hdr *hdr = (void *)(buf);
 
-			err = _pread(xal, buf, xal->sb.blocksize, ofz_disk);
+			err = _pread(xal->dev, buf, xal->sb.blocksize, ofz_disk);
 			if (err) {
 				XAL_DEBUG("FAILED: !_pread(directory-extent)");
 				goto exit;
@@ -1095,7 +1095,7 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 
 	/** Compute the absolute offset for the block and retrieve it **/
 	offset = (xal->sb.agblocks * ag->seqno + blkno) * xal->sb.blocksize;
-	err = _pread(xal, buf, xal->sb.blocksize, offset);
+	err = _pread(xal->dev, buf, xal->sb.blocksize, offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()");
 		goto exit;
@@ -1150,7 +1150,7 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 
 			assert(chunk_nbytes < BUF_NBYTES);
 
-			err = _pread(xal, inodechunk, chunk_nbytes, chunk_offset);
+			err = _pread(xal->dev, inodechunk, chunk_nbytes, chunk_offset);
 			if (err) {
 				XAL_DEBUG("FAILED: _pread(chunk)");
 				return err;
