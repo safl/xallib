@@ -79,7 +79,7 @@ xal_pool_claim_inodes(struct xal_pool *pool, size_t count, struct xal_inode **in
 		return -EINVAL;
 	}
 
-	if (pool->allocated == pool->free) {
+	if ((pool->allocated + count) >= pool->free) {
 		err = xal_pool_grow(pool, pool->growby);
 		if (err) {
 			XAL_DEBUG("FAILED: xal_pool_grow(); err(%d)", err);
@@ -106,7 +106,7 @@ xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **
 		return -EINVAL;
 	}
 
-	if (pool->allocated == pool->free) {
+	if ((pool->allocated + count) >= pool->free) {
 		err = xal_pool_grow(pool, pool->growby);
 		if (err) {
 			XAL_DEBUG("xal_pool_grow(); err(%d)", err);
