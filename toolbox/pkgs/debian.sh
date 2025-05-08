@@ -23,3 +23,8 @@ apt-get -qy install \
 
 pipx install cijoe==v0.9.51 --force
 pipx ensurepath
+
+# Retrieve, build and install xNVMe from source
+git clone https://github.com/xnvme/xnvme.git
+cd xnvme
+make common install
