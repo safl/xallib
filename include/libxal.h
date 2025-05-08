@@ -167,6 +167,7 @@ struct xal_sb {
  */
 struct xal {
 	struct xnvme_dev *dev;
+	void *buf;		 ///< A single buffer for repetitive IO
 	uint8_t *dinodes;	 ///< Array of inodes in on-disk-format
 	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
 	struct xal_pool extents; ///< Pool of extents in host-native format
