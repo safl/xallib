@@ -162,7 +162,6 @@ _pread(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
  *
  * Assumes the following:
  *
- * - The handle (xal.handle) set setup
  * - The superblock (xal.sb) is initiatialized
  *
  * @param buf IO buffer, sufficiently large to hold a block of data
@@ -171,7 +170,8 @@ _pread(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
  * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
  */
 int
-retrieve_and_decode_allocation_group(uint32_t seqno, void *buf, struct xal *xal)
+retrieve_and_decode_allocation_group(struct xnvme_dev *dev, void *buf, uint32_t seqno,
+				     struct xal *xal)
 {
 	uint8_t *cursor = buf;
 	off_t offset = (off_t)seqno * (off_t)xal->sb.agblocks * (off_t)xal->sb.blocksize;
@@ -179,7 +179,7 @@ retrieve_and_decode_allocation_group(uint32_t seqno, void *buf, struct xal *xal)
 	struct xal_odf_agf *agf = (void *)(cursor + xal->sb.sectsize);
 	int err;
 
-	err = _pread(xal->dev, buf, xal->sb.sectsize * 4, offset);
+	err = _pread(dev, buf, xal->sb.sectsize * 4, offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()");
 		return err;
@@ -255,27 +255,27 @@ int
 xal_open(struct xnvme_dev *dev, struct xal **xal)
 {
 	struct xal *cand;
-	uint8_t *buf;
+	void *buf;
 	int err;
 
 	buf = xnvme_buf_alloc(dev, BUF_NBYTES);
 	if (!buf) {
-		XAL_DEBUG("FAILED: xnvme_buf_alloc();");
-		free(cand);
+		XAL_DEBUG("FAILED: xnvme_buf_alloc()");
 		return -errno;
 	}
 
 	err = retrieve_and_decode_primary_superblock(dev, buf, &cand);
 	if (err) {
 		XAL_DEBUG("FAILED: retrieve_and_decode_primary_superblock()");
-		goto failed;
+		xnvme_buf_free(dev, buf);
+		return -errno;
 	}
 
 	cand->dev = dev;
 	cand->buf = buf;
 
 	for (uint32_t seqno = 0; seqno < cand->sb.agcount; ++seqno) {
-		err = retrieve_and_decode_allocation_group(seqno, buf, cand);
+		err = retrieve_and_decode_allocation_group(dev, buf, seqno, cand);
 		if (err) {
 			XAL_DEBUG("FAILED: retrieve_and_decode_allocation_group(inodes); err(%d)",
 				  err);
