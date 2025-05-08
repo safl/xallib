@@ -267,7 +267,7 @@ xal_open(struct xnvme_dev *dev, struct xal **xal)
 
 	err = retrieve_and_decode_primary_superblock(dev, buf, &cand);
 	if (err) {
-		XAL_DEBUG("FAILED: _alloc_and_initialize_using_odf_buf();");
+		XAL_DEBUG("FAILED: retrieve_and_decode_primary_superblock()");
 		goto failed;
 	}
 
