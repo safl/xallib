@@ -115,20 +115,22 @@ def provoke_odf_file_fmt_btree(args: Namespace, cijoe: Cijoe) -> int:
     """
 
     prefix = args.mountpoint / "should-be-file-fmt_btree"
-    filepath = prefix / "fragmented"
 
-    commands = [
-        f"mkdir -p {prefix} && truncate -s 0 {filepath}",
-        (
-            f"for ((i=0; i<=600; i++)); do "
-            f"fallocate -o $((i * 8192)) -l 4096 {filepath}"
-            "; done"
-        ),
-    ]
-    for cmd in commands:
-        err, _ = cijoe.run(cmd)
-        if err:
-            return err
+    for nextents in [600, 6000]:
+        filepath = prefix / f"fragmented-nextents-{nextents}"
+
+        commands = [
+            f"mkdir -p {prefix} && truncate -s 0 {filepath}",
+            (
+                f"for ((i=0; i<={nextents}; i++)); do "
+                f"fallocate -o $((i * 8192)) -l 4096 {filepath}"
+                "; done"
+            ),
+        ]
+        for cmd in commands:
+            err, _ = cijoe.run(cmd)
+            if err:
+                return err
 
     return 0
 
@@ -142,7 +144,7 @@ def populate(args, cijoe) -> int:
     if err := provoke_odf_dir_fmt_extents(args, cijoe):
         return err
 
-    #if err := provoke_odf_dir_fmt_btree(args, cijoe):
+    # if err := provoke_odf_dir_fmt_btree(args, cijoe):
     #    return err
 
     if err := provoke_odf_file_fmt_local(args, cijoe):
