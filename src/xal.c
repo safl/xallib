@@ -85,12 +85,12 @@ xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint32_t
  * | 64 - agblklog     |  agblklog        |
  */
 uint64_t
-xal_absbno_offset(struct xal *xal, uint64_t absbno)
+xal_fsbno_offset(struct xal *xal, uint64_t fsbno)
 {
 	uint64_t ag, bno;
 
-	ag = absbno >> xal->sb.agblklog;
-	bno = absbno & ((1 << xal->sb.agblklog) - 1);
+	ag = fsbno >> xal->sb.agblklog;
+	bno = fsbno & ((1 << xal->sb.agblklog) - 1);
 
 	return (ag * xal->sb.agblocks + bno) * xal->sb.blocksize;
 }
@@ -563,20 +563,20 @@ exit:
 }
 
 int
-process_file_btree_leaf(struct xal *xal, uint64_t absbno, struct xal_inode *self)
+process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
 
-	XAL_DEBUG("INFO: absbno(%" PRIu64 "), ofz(%" PRIu64 ")", absbno,
-		  xal_absbno_offset(xal, absbno));
+	XAL_DEBUG("INFO: fsbno(%" PRIu64 "), ofz(%" PRIu64 ")", fsbno,
+		  xal_fsbno_offset(xal, fsbno));
 
-	XAL_DEBUG("FAILED: absbno(%" PRIu64 "); ino(%" PRIu64 ")", absbno, self->ino);
+	XAL_DEBUG("FAILED: fsbno(%" PRIu64 "); ino(%" PRIu64 ")", fsbno, self->ino);
 	return -ENOSYS;
 }
 
 int
-process_file_btree_node(struct xal *xal, uint64_t absbno, struct xal_inode *self)
+process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
-	XAL_DEBUG("FAILED: absbno(%" PRIu64 "); ino(%" PRIu64 ")", absbno, self->ino);
+	XAL_DEBUG("FAILED: fsbno(%" PRIu64 "); ino(%" PRIu64 ")", fsbno, self->ino);
 	return -ENOSYS;
 }
 
