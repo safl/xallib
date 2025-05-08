@@ -24,6 +24,21 @@
 int
 decode_dentry(void *buf, struct xal_inode *dentry);
 
+void
+decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
+{
+	// Extract start offset (l0:9-62)
+	extent->start_offset = (l0 << 1) >> 10;
+
+	// Extract start block (l0:0-8 and l1:21-63)
+	extent->start_block = ((l0 & 0x1FF) << 43) | (l1 >> 21);
+
+	// Extract block count (l1:0-20)
+	extent->nblocks = l1 & 0x1FFFFF;
+
+	extent->flag = l1 >> 63;
+}
+
 /**
  * Find the dinode with inode number 'ino'
  *
@@ -563,12 +578,66 @@ exit:
 int
 process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
+	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
+	struct xal_odf_btree_lfmt *leaf = xal->buf;
+	uint16_t level, numrecs;
+	uint64_t leftsib, rightsib;
+	int err;
 
-	XAL_DEBUG("INFO: fsbno(%" PRIu64 "), ofz(%" PRIu64 ")", fsbno,
-		  xal_fsbno_offset(xal, fsbno));
+	XAL_DEBUG("INFO: fsbno(0x%" PRIx64 "), ofz(%" PRIu64 ")", fsbno, ofz);
 
-	XAL_DEBUG("FAILED: fsbno(%" PRIu64 "); ino(%" PRIu64 ")", fsbno, self->ino);
-	return -ENOSYS;
+	err = _pread(xal->dev, xal->buf, xal->sb.blocksize, ofz);
+	if (err) {
+		XAL_DEBUG("FAILED: _pread(); err: %d", err);
+		return err;
+	}
+
+	XAL_DEBUG("INFO: magic(%.4s,0x%" PRIx32 ")", leaf->magic.text, leaf->magic.num);
+
+	level = be16toh(leaf->level);
+	if (level != 0) {
+		XAL_DEBUG("FAILED: expecting a leaf; got level(%" PRIu16 ")", level);
+		return -EINVAL;
+	}
+	numrecs = be16toh(leaf->numrecs);
+	leftsib = be64toh(leaf->leftsib);
+	rightsib = be64toh(leaf->rightsib);
+
+	XAL_DEBUG("INFO: level(%" PRIu16 "), numrecs(%" PRIu16 "), leftsib(0x%08" PRIx64
+		  ")@%" PRIu64 ", rightsib(0x%" PRIx64 ")@%" PRIu64 "",
+		  level, numrecs, leftsib, xal_fsbno_offset(xal, leftsib), rightsib,
+		  xal_fsbno_offset(xal, rightsib));
+
+	err = xal_pool_claim_extents(&xal->extents, numrecs, NULL);
+	if (err) {
+		XAL_DEBUG("FAILED: xal_pool_claim_extents(); err(%d)", err);
+		return err;
+	}
+	self->content.extents.count += numrecs;
+
+	for (uint16_t rec = 0; rec < numrecs; ++rec) {
+		size_t idx_ofz = self->content.extents.count - numrecs;
+		struct xal_extent *extent = &self->content.extents.extent[idx_ofz + rec];
+		uint8_t *cursor = xal->buf;
+		uint64_t l0, l1;
+
+		cursor += sizeof(*leaf) + 16ULL * rec;
+
+		l0 = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+
+		l1 = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+
+		decode_xfs_extent(l0, l1, extent);
+	}
+
+	// Process remaining leafs
+	if (rightsib != 0xFFFFFFFFFFFFFFFF) {
+		err = process_file_btree_leaf(xal, rightsib, self);
+	}
+
+	return err;
 }
 
 int
@@ -624,6 +693,19 @@ process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct
 	}
 
 	cursor += 64; // TODO: Why this gap!?
+
+	/**
+	We will need a lot more extents, however, we start by claiming one, such that the inode
+	gets its content initialized. Subsequent claims will be growing from that point on. This is
+	of course inherently non-thread-safe, so should the decoding at any point be re-implemented
+	in parallel, then this is one of the main things to handle.
+	*/
+	err = xal_pool_claim_extents(&xal->extents, 1, &self->content.extents.extent);
+	if (err) {
+		XAL_DEBUG("FAILED: xal_pool_claim_extents(); err(%d)", err);
+		return err;
+	}
+	self->content.extents.count = 1;
 
 	for (uint16_t rec = 0; rec < numrecs; ++rec) {
 		uint64_t pointer = be64toh(*((uint64_t *)cursor));
@@ -706,21 +788,6 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 	}
 
 	return 0;
-}
-
-void
-decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
-{
-	// Extract start offset (l0:9-62)
-	extent->start_offset = (l0 << 1) >> 10;
-
-	// Extract start block (l0:0-8 and l1:21-63)
-	extent->start_block = ((l0 & 0x1FF) << 43) | (l1 >> 21);
-
-	// Extract block count (l1:0-20)
-	extent->nblocks = l1 & 0x1FFFFF;
-
-	extent->flag = l1 >> 63;
 }
 
 int
