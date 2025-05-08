@@ -254,6 +254,21 @@ supports decoding. Specifically:
 
   - File-contents: collection of extents / mapping file to disk-blocks
 
+  - Return error if level == 0, the root-node should not be a leaf, since it
+    would not need to be in FMT_BTREE.
+  
+  - Decode records encoded in the "dinode" as filesystem block numbers
+  
+    - Call leaf-decoder on rightsub if level == 1, that means all the children
+      are leafs, the leaf-decoder run recursively for siblings
+      
+    - Call node-decoder if level > 1, the node-decode will run recursively for
+      siblings
+
+  - Follow the filesystem block pointers, now assuming magic-number BMA3
+
+  - Read the block; and call the appriate decoder
+
 Appendix
 ========
 
