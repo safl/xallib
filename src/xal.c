@@ -202,29 +202,33 @@ retrieve_and_decode_allocation_group(uint32_t seqno, void *buf, struct xal *xal)
 }
 
 /**
- * Retrieve the superblock from disk and decode the on-disk-format
+ * Retrieve the superblock from disk and decode the on-disk-format and allocate 'xal' instance
  *
- * This will grow the memory backing 'xal' as it will make room for allocation-groups.
+ * This will allocate the memory backing 'xal'
  *
+ * @param dev Pointer to device instance
  * @param buf IO buffer, sufficiently large to hold a block of data
  * @param xal Double-pointer to the xal
  *
  * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
  */
 int
-retrieve_and_decode_primary_superblock(void *buf, struct xal **xal)
+retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct xal **xal)
 {
 	const struct xal_odf_sb *psb = buf;
 	struct xal *cand;
+	uint32_t agcount;
 	int err;
 
-	err = _pread((*xal)->dev, buf, 4096, 0);
+	err = _pread(dev, buf, 4096, 0);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()\n");
 		return -errno;
 	}
 
-	cand = realloc(*xal, sizeof(*cand) + sizeof(*(cand->ags)) * be32toh(psb->agcount));
+	agcount = be32toh(psb->agcount);
+
+	cand = calloc(1, sizeof(*cand) + sizeof(*(cand->ags)) * agcount);
 	if (!cand) {
 		XAL_DEBUG("FAILED: realloc()\n");
 		return -errno;
@@ -240,7 +244,7 @@ retrieve_and_decode_primary_superblock(void *buf, struct xal **xal)
 	cand->sb.rootino = be64toh(psb->rootino);
 	cand->sb.agblocks = be32toh(psb->agblocks);
 	cand->sb.agblklog = psb->agblklog;
-	cand->sb.agcount = be32toh(psb->agcount);
+	cand->sb.agcount = agcount;
 
 	*xal = cand;
 
@@ -254,12 +258,6 @@ xal_open(struct xnvme_dev *dev, struct xal **xal)
 	uint8_t *buf;
 	int err;
 
-	cand = calloc(1, sizeof(*cand));
-	if (!cand) {
-		XAL_DEBUG("FAILED: calloc();");
-		return -errno;
-	}
-
 	buf = xnvme_buf_alloc(dev, BUF_NBYTES);
 	if (!buf) {
 		XAL_DEBUG("FAILED: xnvme_buf_alloc();");
@@ -267,13 +265,13 @@ xal_open(struct xnvme_dev *dev, struct xal **xal)
 		return -errno;
 	}
 
-	cand->dev = dev;
-
-	err = retrieve_and_decode_primary_superblock(buf, &cand);
+	err = retrieve_and_decode_primary_superblock(dev, buf, &cand);
 	if (err) {
 		XAL_DEBUG("FAILED: _alloc_and_initialize_using_odf_buf();");
 		goto failed;
 	}
+
+	cand->dev = dev;
 
 	for (uint32_t seqno = 0; seqno < cand->sb.agcount; ++seqno) {
 		err = retrieve_and_decode_allocation_group(seqno, buf, cand);
