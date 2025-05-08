@@ -272,6 +272,7 @@ xal_open(struct xnvme_dev *dev, struct xal **xal)
 	}
 
 	cand->dev = dev;
+	cand->buf = buf;
 
 	for (uint32_t seqno = 0; seqno < cand->sb.agcount; ++seqno) {
 		err = retrieve_and_decode_allocation_group(seqno, buf, cand);
