@@ -17,12 +17,30 @@
 #include <xal_pool.h>
 #include <xal_pp.h>
 
-#define BUF_NBYTES 4096 * 32UL ///< Number of bytes in a buffer
-#define CHUNK_NINO 64	       ///< Number of inodes in a chunk
-#define BUF_BLOCKSIZE 4096     ///< Number of bytes in a block
+#define BUF_NBYTES 4096 * 32UL	     ///< Number of bytes in a buffer
+#define CHUNK_NINO 64		     ///< Number of inodes in a chunk
+#define BUF_BLOCKSIZE 4096	     ///< Number of bytes in a block
+#define BLOCK_MAX_NBYTES 16UL * 1024 ///< This is utilized for stack-variables; max 16K blocksizes
 
 int
 decode_dentry(void *buf, struct xal_inode *dentry);
+
+static void
+btree_block_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
+{
+	size_t hdr_nbytes = sizeof(struct xal_odf_btree_lfmt);
+	size_t mrecs = (xal->sb.blocksize - hdr_nbytes) / 16;
+
+	if (maxrecs) {
+		*maxrecs = mrecs;
+	}
+	if (keys) {
+		*keys = hdr_nbytes;
+	}
+	if (pointers) {
+		*pointers = hdr_nbytes + mrecs * 8;
+	}
+}
 
 void
 decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
@@ -578,19 +596,196 @@ exit:
 int
 process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
+	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
+	struct xal_odf_btree_lfmt leaf = {0};
+	uint16_t level, numrecs;
+	uint64_t leftsib, rightsib;
+	int err;
 
-	XAL_DEBUG("INFO: fsbno(%" PRIu64 "), ofz(%" PRIu64 ")", fsbno,
-		  xal_fsbno_offset(xal, fsbno));
+	XAL_DEBUG("ENTER:   fsbno(0x%" PRIx64 " @ %" PRIu64 ") in ino(0x%" PRIx64 ")", fsbno, ofz,
+		  self->ino);
 
-	XAL_DEBUG("FAILED: fsbno(%" PRIu64 "); ino(%" PRIu64 ")", fsbno, self->ino);
-	return -ENOSYS;
+	err = _pread(xal->dev, xal->buf, xal->sb.blocksize, ofz);
+	if (err) {
+		XAL_DEBUG("FAILED: _pread(); err: %d", err);
+		return err;
+	}
+	memcpy(&leaf, xal->buf, sizeof(leaf));
+
+	if (XAL_ODF_BMAP_CRC_MAGIC != be32toh(leaf.magic.num)) {
+		XAL_DEBUG("FAILED: expected magic(BMA3) got magic('%.4s', 0x%" PRIx32 "); ",
+			  leaf.magic.text, leaf.magic.num);
+		return -EINVAL;
+	}
+
+	level = be16toh(leaf.level);
+	if (level != 0) {
+		XAL_DEBUG("FAILED: expecting a leaf; got level(%" PRIu16 ")", level);
+		return -EINVAL;
+	}
+	numrecs = be16toh(leaf.numrecs);
+	leftsib = be64toh(leaf.leftsib);
+	rightsib = be64toh(leaf.rightsib);
+
+	XAL_DEBUG("INFO:    magic(%.4s, 0x%" PRIx32 ")", leaf.magic.text, leaf.magic.num);
+	XAL_DEBUG("INFO:    level(%" PRIu16 ")", level);
+	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", numrecs);
+	XAL_DEBUG("INFO:  leftsib(0x%016" PRIx64 " @ %" PRIu64 ")", leftsib,
+		  xal_fsbno_offset(xal, leftsib));
+	XAL_DEBUG("INFO:    fsbno(0x%016" PRIx64 " @ %" PRIu64 ")", fsbno, ofz);
+	XAL_DEBUG("INFO: rightsib(0x%016" PRIx64 " @ %" PRIu64 ")", rightsib,
+		  xal_fsbno_offset(xal, rightsib));
+
+	err = xal_pool_claim_extents(&xal->extents, numrecs, NULL);
+	if (err) {
+		XAL_DEBUG("FAILED: xal_pool_claim_extents(); err(%d)", err);
+		return err;
+	}
+	self->content.extents.count += numrecs;
+
+	for (uint16_t rec = 0; rec < numrecs; ++rec) {
+		size_t idx_ofz = self->content.extents.count - numrecs;
+		struct xal_extent *extent = &self->content.extents.extent[idx_ofz + rec];
+		uint8_t *cursor = xal->buf;
+		uint64_t l0, l1;
+
+		cursor += sizeof(leaf) + 16ULL * rec;
+
+		l0 = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+
+		l1 = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+
+		decode_xfs_extent(l0, l1, extent);
+	}
+
+	XAL_DEBUG("EXIT");
+
+	/**
+	It seems like this is not needed. It looks like the parent node has all the siblings in the
+	array of pointers, these left/right pointers **should** then point to each other, but they
+	do not have to, and if both the parent invokes the leaf-decoder for each record, and the
+	leaf-decoder then calls recursively, then each leaf is processed (n (n+1))/2 times, which is
+	less than ideal :)
+	It is left as a comment here, and removed entirely in the node-decoder.
+
+	if (rightsib != 0xFFFFFFFFFFFFFFFF) {
+		err = process_file_btree_leaf(xal, rightsib, self);
+	}
+	*/
+
+	return err;
 }
 
 int
 process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
-	XAL_DEBUG("FAILED: fsbno(%" PRIu64 "); ino(%" PRIu64 ")", fsbno, self->ino);
-	return -ENOSYS;
+	uint64_t pointers[BLOCK_MAX_NBYTES / 8] = {0};
+
+	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
+
+	struct xal_odf_btree_lfmt node = {0};
+	size_t pointers_ofz;
+	uint16_t level, numrecs;
+	uint64_t leftsib, rightsib;
+	size_t maxrecs;
+	int err;
+
+	XAL_DEBUG("ENTER:   fsbno(0x%" PRIx64 " @ %" PRIu64 ") in ino(0x%" PRIx64 ")", fsbno, ofz,
+		  self->ino);
+
+	if (xal->sb.blocksize > BLOCK_MAX_NBYTES) {
+		XAL_DEBUG("FAILED: blocksize(%" PRIu32 ") > BLOCK_MAX_NBYTES(%" PRIu64 ")",
+			  xal->sb.blocksize, BLOCK_MAX_NBYTES);
+		return -EINVAL;
+	}
+
+	btree_block_meta(xal, &maxrecs, NULL, &pointers_ofz);
+
+	XAL_DEBUG("INFO: maxrecs(%zu)", maxrecs);
+	XAL_DEBUG("INFO: pointers_ofz(%zu)", pointers_ofz);
+
+	err = _pread(xal->dev, xal->buf, xal->sb.blocksize, ofz);
+	if (err) {
+		XAL_DEBUG("FAILED: _pread(); err: %d", err);
+		return err;
+	}
+	memcpy(&node, xal->buf, sizeof(node));
+	memcpy(&pointers, xal->buf + pointers_ofz, xal->sb.blocksize - pointers_ofz);
+
+	if (XAL_ODF_BMAP_CRC_MAGIC != be32toh(node.magic.num)) {
+		XAL_DEBUG("FAILED: expected magic(BMA3) got magic('%.4s', 0x%" PRIx32 "); ",
+			  node.magic.text, node.magic.num);
+		return -EINVAL;
+	}
+
+	level = be16toh(node.level);
+	if (!level) {
+		XAL_DEBUG("FAILED: expecting a node; got level(%" PRIu16 ")", level);
+		return -EINVAL;
+	}
+	numrecs = be16toh(node.numrecs);
+	leftsib = be64toh(node.leftsib);
+	rightsib = be64toh(node.rightsib);
+
+	XAL_DEBUG("INFO:    magic(%.4s, 0x%" PRIx32 ")", node.magic.text, node.magic.num);
+	XAL_DEBUG("INFO:    level(%" PRIu16 ")", level);
+	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", numrecs);
+	XAL_DEBUG("INFO:  leftsib(0x%016" PRIx64 " @ %" PRIu64 ")", leftsib,
+		  xal_fsbno_offset(xal, leftsib));
+	XAL_DEBUG("INFO:    fsbno(0x%016" PRIx64 " @ %" PRIu64 ")", fsbno, ofz);
+	XAL_DEBUG("INFO: rightsib(0x%016" PRIx64 " @ %" PRIu64 ")", rightsib,
+		  xal_fsbno_offset(xal, rightsib));
+
+	XAL_DEBUG("#### Processing Pointers ###");
+	for (uint16_t rec = 0; rec < numrecs; ++rec) {
+		uint64_t pointer = be64toh(pointers[rec]);
+
+		XAL_DEBUG("INFO:      ptr[%" PRIu16 "] = 0x%" PRIx64, rec, pointer);
+
+		err = (level == 1) ? process_file_btree_leaf(xal, pointer, self)
+				   : process_file_btree_node(xal, pointer, self);
+		if (err) {
+			XAL_DEBUG("FAILED: file FMT_BTREE ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")",
+				  self->ino, xal_ino_decode_absolute_offset(xal, self->ino));
+			return err;
+		}
+	}
+
+	XAL_DEBUG("INFO: ---===={[ EXIT: process_file_btree_node() ====---");
+
+	return err;
+}
+
+/**
+ * Derive the values needed to decode the records of a btree-root-node embedded in a dinode
+ *
+ * @param xal The xal instance
+ * @param dinode The dinode in question
+ * @param maxrecs Optional Maximum number of records in the dinode
+ * @param keys Optional pointer to store dinode-offset to keys
+ * @param pointers Optional pointer to store dinode-offset to pointers
+ */
+static void
+btree_dinode_meta(struct xal *xal, struct xal_odf_dinode *dinode, size_t *maxrecs, size_t *keys,
+		  size_t *pointers)
+{
+	size_t core_nbytes = sizeof(*dinode);
+	size_t attr_ofz = core_nbytes + dinode->di_forkoff * 8UL;
+	size_t attr_nbytes = xal->sb.inodesize - attr_ofz;
+	size_t data_nbytes = xal->sb.inodesize - core_nbytes - attr_nbytes;
+	size_t mrecs = (data_nbytes - 4) / 16;
+
+	if (maxrecs) {
+		*maxrecs = mrecs;
+	}
+	if (keys) {
+		*keys = core_nbytes + 2 + 2;
+	}
+	if (pointers) {
+		*pointers = core_nbytes + 2 + 2 + mrecs * 8;
+	}
 }
 
 /**
@@ -604,12 +799,16 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
  * - Keys and pointers within the inode are 64 bits wide
  */
 int
-process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
+process_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint16_t level;	  // Level in the btree, expecting >= 1
 	uint16_t numrecs; // Number of records in the inode itself
+	size_t ofz_ptr;	  // Offset from start of dinode to start of embedded pointers
 	int err;
+
+	XAL_DEBUG("ENTER: ino(0x%" PRIx64 " @ %" PRIu64 ")", self->ino,
+		  xal_ino_decode_absolute_offset(xal, self->ino));
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
@@ -624,34 +823,97 @@ process_dinode_file_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct
 		return -EINVAL;
 	}
 
-	XAL_DEBUG("INFO: level(%" PRIu16 "), numrecs(%" PRIu16 ")", level, numrecs);
+	XAL_DEBUG("INFO:    level(%" PRIu16 ")", level);
+	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", numrecs);
 
 	/**
-	We do not use these keys; however, we parse them during development to compare with the
-	output of xfs_db for sanity checks. For some reason, there is an unexplained 64-byte gap on
-	disk after numrecs * 64 bytes of keys.
+	The keys are great if we were seeking to a given position within the file, however, since
+	we just want all the extent info, then we have no use for the keys except for debugging /
+	sanity checking during developement.
+	For example, comparing the decoded keys against the keys parsed by 'xfs_db' and when
+	inspecting the disk via hexdump, then one can look for the key-values in the data-dump.
 	 */
 	for (uint16_t rec = 0; rec < numrecs; ++rec) {
 		uint64_t key = be64toh(*((uint64_t *)cursor));
 		cursor += sizeof(uint64_t);
 
-		XAL_DEBUG("INFO: key(%" PRIu64 ")", key);
+		XAL_DEBUG("INFO:      key[%" PRIu16 "] = %" PRIu64, rec, key);
 	}
 
-	cursor += 64; // TODO: Why this gap!?
+	/**
+	For some reason, there is an unexplained 64-byte gap between the last key and the start of
+	the pointers. This was observed in a dinode with level 1. At level 2, different offsets were
+	observed.
+	When inspecting the data on disk then there is a bunch of zeroes... after fiddling
+	then it looks like some kind of padding is happening... the amount of zeroes depended on
+	numrec, the more records, the less zeroes.
 
+	Looking at a disk with hexdump, then looking at a start-sequence starting 'level', then 192
+	bytes later then the file-attributes start. This kinda looks like there is allocated 3 x 64
+	bytes to: level, numrecs, keys, ptrs.
+
+	Thus, although the XFS-documentation visualizes it as 'pointers' start right after 'keys',
+	then it looks more like some padded and aligned struct:
+
+	struct foo {
+		uint16_t level;
+		uint16_t numrecs;
+		uint64_t keys[?];
+		uint64_t pointers[?];
+	}
+
+	Another observation is that the first pointer seem to start af 96 bytes. This is exactly
+	half of the 3x64. Since there has to be room for level and numrecs, then it would seem like
+	a maxrecs would be something like: floor(((3 * 64 / 2) - 4) / 8) = 11.
+
+	So, will attempt to use it as offset from the last the key to the first pointer.
+	Specifically: "cursor += (maxrecs - numrecs) * 8;"... no nothing adds up here...
+
+	Ohhh! There is a 'di_forkoff' in the dinode! Just RTFM Chapter 18 On-disk Inode.
+
+	core_offset: 176 bytes
+	attr_offset: di_forkoff (8bit value that needs to be multiplied)
+	Then the amount of bytes for records become:
+
+	nbytes = be8toh(di_forkoff) * 8 - core_offset?
+	*/
+
+	btree_dinode_meta(xal, dinode, NULL, NULL, &ofz_ptr);
+
+	// Let's try resetting the cursor...
+	cursor = (uint8_t *)dinode + ofz_ptr;
+
+	/**
+	We will need a lot more extents, however, we start by claiming one, such that the inode
+	gets its content initialized. Subsequent claims will be growing from that point on. This is
+	of course inherently non-thread-safe, so should the decoding at any point be re-implemented
+	in parallel, then this is one of the main things to handle.
+	*/
+	err = xal_pool_claim_extents(&xal->extents, 1, &self->content.extents.extent);
+	if (err) {
+		XAL_DEBUG("FAILED: xal_pool_claim_extents(); err(%d)", err);
+		return err;
+	}
+	self->content.extents.count = 1;
+
+	XAL_DEBUG("#### Processing Pointers ###");
 	for (uint16_t rec = 0; rec < numrecs; ++rec) {
 		uint64_t pointer = be64toh(*((uint64_t *)cursor));
-		cursor += sizeof(uint64_t);
+
+		cursor += sizeof(pointer);
+
+		XAL_DEBUG("INFO:      ptr[%" PRIu16 "] = 0x%" PRIx64, rec, pointer);
 
 		err = (level == 1) ? process_file_btree_leaf(xal, pointer, self)
 				   : process_file_btree_node(xal, pointer, self);
 		if (err) {
-			XAL_DEBUG("FAILED: file FMT_BTREE ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")",
+			XAL_DEBUG("FAILED: file FMT_BTREE ino(0x%" PRIx64 " @ %" PRIu64 ")",
 				  self->ino, xal_ino_decode_absolute_offset(xal, self->ino));
 			return err;
 		}
 	}
+
+	XAL_DEBUG("EXIT")
 
 	return 0;
 }
@@ -998,7 +1260,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 			break;
 
 		case XAL_ODF_DIR3_FT_REG_FILE:
-			err = process_dinode_file_btree(xal, dinode, self);
+			err = process_file_btree_root(xal, dinode, self);
 			if (err) {
 				XAL_DEBUG("FAILED: process_dinode_file_btree(); err(%d)", err);
 				return err;
