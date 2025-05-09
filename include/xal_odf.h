@@ -57,6 +57,8 @@ typedef struct {
 #define XAL_ODF_DIR3_BLOCK_MAGIC 0x58444233 /* XDB3: single block dirs */
 #define XAL_ODF_DIR3_DATA_MAGIC 0x58444433  /* XDD3: multiblock dirs */
 
+#define XAL_ODF_BMAP_CRC_MAGIC 0x424d4133 /* B+Tree Extent List, v5 only */
+
 /**
  * The XFS Superblock on-disk representation in v5 format
  */
