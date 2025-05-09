@@ -250,7 +250,7 @@ supports decoding. Specifically:
 
   - Directory contents: tree of directory blocks
 
-* File B+tree
+* File B+tree ``BMA3``
 
   - File-contents: collection of extents / mapping file to disk-blocks
 
@@ -268,6 +268,43 @@ supports decoding. Specifically:
   - Follow the filesystem block pointers, now assuming magic-number BMA3
 
   - Read the block; and call the appriate decoder
+
+Observations
+============
+
+These are notes on the on-disk-format that I did not find described in the XFS
+spec.
+
+B+Tree File Extent Lists
+------------------------
+
+Although the root-node is an internal node similar to other nodes in the B+Tree,
+then it differs from other internal nodes on at least two essential areas.
+
+1) The root-node does **not** have fields: magic, leftsib, rightsib, that you
+otherwise find in a B+Tree internal node and even in leafs. Instead of the
+magic-value then the dinode.format combined with the ftype determine the content
+of the data-fork.
+Leftsib and rightsib are not there which is logically sound, since the root
+would not be a root node if it had siblings.
+
+2) There is less space as the node is embedded within the inode, inodes are
+usually 256 or 512 bytes, whereas an internal node is blocksize amount of bytes
+which usually is at least 512 bytes and commonly 4096. Consequently, then an
+internal node can contain significantly more records than a root node. This is
+good to be aware of, since the offsets to keys and pointers begin at variable
+offsets.
+
+In addition, then, starting with the root node, then children of the root in the
+three are pointed to by **records**. However, internal-node and leafs also have
+leftsib and rightsib pointers. However, to traverse the three starting at the
+root-node, then you only need to use the pointers within the records as these
+point to all immediate children of the root node.
+
+Thus, given any child, then one kan move left/right until reaching 0xFFF...F
+which indicates that there are no more sibling in the given direction.
+However, using the sibling pointers it superflous when starting at the root and
+processing filesystem block numbers from the records.
 
 Appendix
 ========
