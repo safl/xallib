@@ -1459,8 +1459,15 @@ xal_dinodes_retrieve(struct xal *xal)
 
 	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
 		struct xal_ag *ag = &xal->ags[seqno];
+		int err;
 
-		retrieve_dinodes_via_iabt3(xal, ag, ag->agi_root, &index);
+		err = retrieve_dinodes_via_iabt3(xal, ag, ag->agi_root, &index);
+		if (err) {
+			XAL_DEBUG("FAILED: retrieve_dinodes_via_iabt3(); err(%d)", err);
+			free(xal->dinodes);
+			xal->dinodes = NULL;
+			return err;
+		}
 	}
 
 	return 0;
