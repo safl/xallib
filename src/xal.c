@@ -1357,20 +1357,20 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	memcpy(&iab3, xal->buf, sizeof(iab3));
 
 	// iab3.magic.num = iab3.magic.num;
-	iab3.level = be16toh(iab3.level);
-	iab3.numrecs = be16toh(iab3.numrecs);
-	iab3.leftsib = be32toh(iab3.leftsib);
-	iab3.rightsib = be32toh(iab3.rightsib);
+	iab3.pos.level = be16toh(iab3.pos.level);
+	iab3.pos.numrecs = be16toh(iab3.pos.numrecs);
+	iab3.siblings.left = be32toh(iab3.siblings.left);
+	iab3.siblings.right = be32toh(iab3.siblings.right);
 	iab3.blkno = be64toh(iab3.blkno);
 
 	assert(be32toh(iab3.magic.num) == XAL_ODF_IBT_CRC_MAGIC);
 
-	if (iab3.level) {
-		XAL_DEBUG("INFO: iab3->level(%" PRIu16 ")?", iab3.level);
+	if (iab3.pos.level) {
+		XAL_DEBUG("INFO: iab3->level(%" PRIu16 ")?", iab3.pos.level);
 		return 0;
 	}
 
-	for (uint16_t reci = 0; reci < iab3.numrecs; ++reci) {
+	for (uint16_t reci = 0; reci < iab3.pos.numrecs; ++reci) {
 		struct xal_odf_inobt_rec *rec =
 		    (void *)(xal->buf + sizeof(iab3) + reci * sizeof(*rec));
 		uint32_t agbno, agbino;
@@ -1430,9 +1430,9 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 		}
 	}
 
-	if (iab3.rightsib != 0xFFFFFFFF) {
+	if (iab3.siblings.right != 0xFFFFFFFF) {
 		XAL_DEBUG("INFO: Going deeper on the right!");
-		retrieve_dinodes_via_iabt3(xal, ag, iab3.rightsib, index);
+		retrieve_dinodes_via_iabt3(xal, ag, iab3.siblings.right, index);
 	}
 
 exit:

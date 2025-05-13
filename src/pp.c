@@ -234,10 +234,10 @@ xal_odf_btree_iab3_sfmt_pp(struct xal_odf_btree_sfmt *iab3)
 
 	wrtn += printf("xal_ofd_btree_iab3:\n");
 	wrtn += printf("  magic: 0x%08" PRIX32 " / '%.4s'\n", iab3->magic.num, iab3->magic.text);
-	wrtn += printf("  level: %" PRIu16 "\n", iab3->level);
-	wrtn += printf("  numrecs: %" PRIu16 "\n", iab3->numrecs);
-	wrtn += printf("  leftsib: 0x%08" PRIX32 "\n", iab3->leftsib);
-	wrtn += printf("  rightsib: 0x%08" PRIX32 "\n", iab3->rightsib);
+	wrtn += printf("  level: %" PRIu16 "\n", iab3->pos.level);
+	wrtn += printf("  numrecs: %" PRIu16 "\n", iab3->pos.numrecs);
+	wrtn += printf("  leftsib: 0x%08" PRIX32 "\n", iab3->siblings.left);
+	wrtn += printf("  rightsib: 0x%08" PRIX32 "\n", iab3->siblings.right);
 
 	wrtn += printf("  blkno: %" PRIu64 "\n", iab3->blkno / 8);
 

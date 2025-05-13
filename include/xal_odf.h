@@ -314,12 +314,20 @@ union xal_odf_btree_magic {
 	char text[4];
 };
 
+struct xal_odf_btree_pos {
+	uint16_t level;	  ///< Tree level (0 = leaf, >0 = interior)
+	uint16_t numrecs; ///< Number of records in this node
+};
+
+struct xal_odf_btree_siblings_short {
+	uint32_t left;	///< Left sibling block (AG-relative)
+	uint32_t right; ///< Right sibling block (AG-relative)
+};
+
 struct xal_odf_btree_sfmt {
 	union xal_odf_btree_magic magic; // E.g. 'IAB3' for inode B+Tree
-	uint16_t level;			 // Tree level (0 = leaf, >0 = interior)
-	uint16_t numrecs;		 // Number of records in this node
-	uint32_t leftsib;		 // Left sibling block (AG-relative)
-	uint32_t rightsib;		 // Right sibling block (AG-relative)
+	struct xal_odf_btree_pos pos;
+	struct xal_odf_btree_siblings_short siblings;
 
 	uint64_t blkno; ///< blkno; seems like this is only filled when mkfs use-crc; also reported
 			///< in unit of SECTORS!
