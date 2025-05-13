@@ -598,8 +598,6 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
 	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
 	struct xal_odf_btree_lfmt leaf = {0};
-	uint16_t level, numrecs;
-	uint64_t leftsib, rightsib;
 	int err;
 
 	XAL_DEBUG("ENTER:   fsbno(0x%" PRIx64 " @ %" PRIu64 ") in ino(0x%" PRIx64 ")", fsbno, ofz,
@@ -618,33 +616,33 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 		return -EINVAL;
 	}
 
-	level = be16toh(leaf.level);
-	if (level != 0) {
-		XAL_DEBUG("FAILED: expecting a leaf; got level(%" PRIu16 ")", level);
+	leaf.level = be16toh(leaf.level);
+	if (leaf.level != 0) {
+		XAL_DEBUG("FAILED: expecting a leaf; got level(%" PRIu16 ")", leaf.level);
 		return -EINVAL;
 	}
-	numrecs = be16toh(leaf.numrecs);
-	leftsib = be64toh(leaf.leftsib);
-	rightsib = be64toh(leaf.rightsib);
+	leaf.numrecs = be16toh(leaf.numrecs);
+	leaf.leftsib = be64toh(leaf.leftsib);
+	leaf.rightsib = be64toh(leaf.rightsib);
 
 	XAL_DEBUG("INFO:    magic(%.4s, 0x%" PRIx32 ")", leaf.magic.text, leaf.magic.num);
-	XAL_DEBUG("INFO:    level(%" PRIu16 ")", level);
-	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", numrecs);
-	XAL_DEBUG("INFO:  leftsib(0x%016" PRIx64 " @ %" PRIu64 ")", leftsib,
-		  xal_fsbno_offset(xal, leftsib));
+	XAL_DEBUG("INFO:    level(%" PRIu16 ")", leaf.level);
+	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", leaf.numrecs);
+	XAL_DEBUG("INFO:  leftsib(0x%016" PRIx64 " @ %" PRIu64 ")", leaf.leftsib,
+		  xal_fsbno_offset(xal, leaf.leftsib));
 	XAL_DEBUG("INFO:    fsbno(0x%016" PRIx64 " @ %" PRIu64 ")", fsbno, ofz);
-	XAL_DEBUG("INFO: rightsib(0x%016" PRIx64 " @ %" PRIu64 ")", rightsib,
-		  xal_fsbno_offset(xal, rightsib));
+	XAL_DEBUG("INFO: rightsib(0x%016" PRIx64 " @ %" PRIu64 ")", leaf.rightsib,
+		  xal_fsbno_offset(xal, leaf.rightsib));
 
-	err = xal_pool_claim_extents(&xal->extents, numrecs, NULL);
+	err = xal_pool_claim_extents(&xal->extents, leaf.numrecs, NULL);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim_extents(); err(%d)", err);
 		return err;
 	}
-	self->content.extents.count += numrecs;
+	self->content.extents.count += leaf.numrecs;
 
-	for (uint16_t rec = 0; rec < numrecs; ++rec) {
-		size_t idx_ofz = self->content.extents.count - numrecs;
+	for (uint16_t rec = 0; rec < leaf.numrecs; ++rec) {
+		size_t idx_ofz = self->content.extents.count - leaf.numrecs;
 		struct xal_extent *extent = &self->content.extents.extent[idx_ofz + rec];
 		uint8_t *cursor = xal->buf;
 		uint64_t l0, l1;
@@ -682,13 +680,9 @@ int
 process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
 	uint64_t pointers[BLOCK_MAX_NBYTES / 8] = {0};
-
 	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
-
 	struct xal_odf_btree_lfmt node = {0};
 	size_t pointers_ofz;
-	uint16_t level, numrecs;
-	uint64_t leftsib, rightsib;
 	size_t maxrecs;
 	int err;
 
@@ -720,32 +714,32 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 		return -EINVAL;
 	}
 
-	level = be16toh(node.level);
-	if (!level) {
-		XAL_DEBUG("FAILED: expecting a node; got level(%" PRIu16 ")", level);
+	node.level = be16toh(node.level);
+	if (!node.level) {
+		XAL_DEBUG("FAILED: expecting a node; got level(%" PRIu16 ")", node.level);
 		return -EINVAL;
 	}
-	numrecs = be16toh(node.numrecs);
-	leftsib = be64toh(node.leftsib);
-	rightsib = be64toh(node.rightsib);
+	node.numrecs = be16toh(node.numrecs);
+	node.leftsib = be64toh(node.leftsib);
+	node.rightsib = be64toh(node.rightsib);
 
 	XAL_DEBUG("INFO:    magic(%.4s, 0x%" PRIx32 ")", node.magic.text, node.magic.num);
-	XAL_DEBUG("INFO:    level(%" PRIu16 ")", level);
-	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", numrecs);
-	XAL_DEBUG("INFO:  leftsib(0x%016" PRIx64 " @ %" PRIu64 ")", leftsib,
-		  xal_fsbno_offset(xal, leftsib));
+	XAL_DEBUG("INFO:    level(%" PRIu16 ")", node.level);
+	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", node.numrecs);
+	XAL_DEBUG("INFO:  leftsib(0x%016" PRIx64 " @ %" PRIu64 ")", node.leftsib,
+		  xal_fsbno_offset(xal, node.leftsib));
 	XAL_DEBUG("INFO:    fsbno(0x%016" PRIx64 " @ %" PRIu64 ")", fsbno, ofz);
-	XAL_DEBUG("INFO: rightsib(0x%016" PRIx64 " @ %" PRIu64 ")", rightsib,
-		  xal_fsbno_offset(xal, rightsib));
+	XAL_DEBUG("INFO: rightsib(0x%016" PRIx64 " @ %" PRIu64 ")", node.rightsib,
+		  xal_fsbno_offset(xal, node.rightsib));
 
 	XAL_DEBUG("#### Processing Pointers ###");
-	for (uint16_t rec = 0; rec < numrecs; ++rec) {
+	for (uint16_t rec = 0; rec < node.numrecs; ++rec) {
 		uint64_t pointer = be64toh(pointers[rec]);
 
 		XAL_DEBUG("INFO:      ptr[%" PRIu16 "] = 0x%" PRIx64, rec, pointer);
 
-		err = (level == 1) ? process_file_btree_leaf(xal, pointer, self)
-				   : process_file_btree_node(xal, pointer, self);
+		err = (node.level == 1) ? process_file_btree_leaf(xal, pointer, self)
+					: process_file_btree_node(xal, pointer, self);
 		if (err) {
 			XAL_DEBUG("FAILED: file FMT_BTREE ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")",
 				  self->ino, xal_ino_decode_absolute_offset(xal, self->ino));
