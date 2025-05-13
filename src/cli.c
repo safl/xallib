@@ -58,7 +58,7 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 }
 
 void
-node_inspector(struct xal_inode *inode, void *cb_args, int level)
+node_inspector(struct xal *xal, struct xal_inode *inode, void *cb_args, int level)
 {
 	struct xal_nodeinspector_stats *stats = cb_args;
 
@@ -71,6 +71,15 @@ node_inspector(struct xal_inode *inode, void *cb_args, int level)
 	case XAL_ODF_DIR3_FT_REG_FILE:
 		stats->nfiles += 1;
 		printf("%*s%.*s [file]\n", level * 2, "", inode->namelen, inode->name);
+		for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
+			struct xal_extent *extent = &inode->content.extents.extent[i];
+
+			printf("[%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]\n",
+			       (extent->start_offset * xal->sb.blocksize) / 512,
+			       (extent->nblocks * xal->sb.blocksize) / 512 - 1,
+			       xal_fsbno_offset(xal, extent->start_block) / 512,
+			       (extent->nblocks * xal->sb.blocksize) / 512);
+		}
 		break;
 	default:
 		printf("# UNKNOWN\n");
@@ -123,7 +132,7 @@ main(int argc, char *argv[])
 		goto exit;
 	}
 
-	err = xal_walk(xal->root, args.verbose ? node_inspector : NULL,
+	err = xal_walk(xal, xal->root, args.verbose ? node_inspector : NULL,
 		       args.verbose ? &cb_args : NULL);
 	if (err) {
 		printf("xal_walk(...); err(%d)\n", err);

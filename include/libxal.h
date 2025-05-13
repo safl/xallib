@@ -73,8 +73,6 @@ struct xal_inode {
 int
 xal_inode_pp(struct xal_inode *inode);
 
-typedef void (*xal_walk_cb)(struct xal_inode *inode, void *cb_args, int level);
-
 /**
  * A pool of mmap backed memory for fixed-size elements.
  *
@@ -176,6 +174,8 @@ struct xal {
 	struct xal_ag ags[]; ///< Array of 'agcount' number of allocation-groups
 };
 
+typedef void (*xal_walk_cb)(struct xal *xal, struct xal_inode *inode, void *cb_args, int level);
+
 int
 xal_pp(struct xal *xal);
 
@@ -229,7 +229,7 @@ xal_index(struct xal *xal);
  * Returns 0 on success. On error, negative errno is returned to indicate the error.
  */
 int
-xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data);
+xal_walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data);
 
 /**
  * Decodes the given inode number in AG-Relative Inode number format
