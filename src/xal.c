@@ -347,33 +347,6 @@ failed:
 int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
-/*************************************************************************************************
- *  decode_xfs_extent_btree
- *  bit[127]          bits[73 - 126]                  bits[21 - 72]              bits[0 - 20]
- *  flag       logical file block offset          absolute block number         number of blocks
- **************************************************************************************************/
-void
-decode_xfs_extent_btree(uint64_t l1, uint64_t l2, struct xal_extent *extent)
-{
-	extent->start_offset = l1;
-
-	// bits[73 - 126]
-	extent->start_block = l2 >> 21;
-
-	// bits[0 - 20]
-	extent->nblocks = l2 & 0x1FFFFF;
-}
-
-void
-decodeL1(unsigned char val, uint64_t *l2)
-{
-	uint64_t x = *l2;
-	int mask = val;
-	x = x | mask;
-	*l2 = x;
-	return;
-}
-
 uint64_t
 getPhysicalblockFromFs(struct xal *xal, uint64_t fsblock)
 {
@@ -413,40 +386,19 @@ readLeafData(struct xal *xal, struct xal_inode *self, uint64_t bmbtptrs,
 		goto exit;
 	}
 
-	uint64_t l1 = 0;
-	uint64_t l2 = 0;
-	int idx0 = 72;
-	int idx1 = 80;
-	int idx2 = 96;
+	uint8_t *cursor = (void *)block_databuf;
+	cursor += sizeof(struct xal_btree_lblock); ///< Advance past lblock
+	struct xal_extent extent = {0};
+	uint64_t l0, l1;
 
 	for (int iter = 0; iter < be16toh(lfd->btree_numrecs); iter++) {
-		struct xal_extent extent = {0};
-		l1 = 0;
-		l2 = 0;
+		l0 = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
 
-		// l2
-		for (int i = 0; i < 8; i++) {
+		l1 = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
 
-			decodeL1(block_databuf[idx1 + i], &l2);
-			if (i < 7) {
-				l2 = l2 << 8;
-			}
-		}
-
-		// l1
-		for (int i = 0; i < 7; i++) {
-			decodeL1(block_databuf[idx0 + i], &l1);
-			if (i < 6) {
-				l1 = l1 << 8;
-			}
-		}
-
-		l1 = l1 >> 1;
-		idx1 = idx2;
-		idx2 += 16;
-		idx0 = idx1 - 8;
-		extent.flag = l2 >> 63;
-		decode_xfs_extent_btree(l1, l2, &extent);
+		decode_xfs_extent(l0, l1, &extent);
 
 		for (size_t blk = 0; blk < extent.nblocks; ++blk) {
 			physicalblk = getPhysicalblockFromFs(xal, extent.start_block + blk);
@@ -573,11 +525,6 @@ process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 	for (int i = 0; i < numrec; i++) {
 		struct xal_btree_lblock *lfd = (struct xal_btree_lblock *)leafbuf[i];
 		readBlockData(xal, leafbuf[i], bmbtptrs[i]);
-
-		printf("\ndirectory_btree leaf: MagicNum = %08x\n", be32toh(lfd->btree_magicnum));
-		printf("directory_btree leaf: level = %hu\n", be16toh(lfd->btree_level));
-		printf("directory_btree leaf: numrec = %hu\n", be16toh(lfd->btree_numrecs));
-
 		readLeafData(xal, self, bmbtptrs[i], lfd);
 	}
 	return 0;
@@ -1037,6 +984,16 @@ decode_dentry(void *buf, struct xal_inode *dentry)
 	uint8_t *cursor = buf;
 	uint16_t nbytes = 8 + 1 + 1 + 2;
 
+	// xfs dir unused entries case with freetag value as 0xffff
+	uint16_t freetag = be16toh(*(uint16_t *)cursor);
+	if (freetag == 0xffff) {
+		cursor += 2; // Advance length of uint16_t freetag
+		uint16_t length = be16toh(*(uint16_t *)cursor);
+		nbytes = length;
+		return nbytes;
+	}
+
+	// xfs dir data entry case
 	dentry->ino = be64toh(*(uint64_t *)cursor);
 	cursor += 8;
 
@@ -1522,3 +1479,4 @@ xal_walk(struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data)
 {
 	return _walk(inode, cb_func, cb_data, 0);
 }
+
