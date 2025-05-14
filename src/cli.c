@@ -17,16 +17,18 @@
 
 #define BUF_NBYTES 4096
 
-struct xal_nodeinspector_stats {
-	uint64_t ndirs;
-	uint64_t nfiles;
-};
-
 struct xal_cli_args {
-	bool meta;
 	bool bmap;
 	bool find;
+	bool meta;
+	bool stats;
 	char *mountpoint;
+};
+
+struct xal_nodeinspector_args {
+	uint64_t ndirs;
+	uint64_t nfiles;
+	struct xal_cli_args *cli_args;
 };
 
 int
@@ -44,6 +46,8 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 			args->find = 1;
 		} else if (strcmp(argv[i], "--meta") == 0) {
 			args->meta = 1;
+		} else if (strcmp(argv[i], "--stats") == 0) {
+			args->stats = 1;
 		} else if (args->mountpoint == NULL) {
 			args->mountpoint = argv[i];
 		} else {
@@ -60,83 +64,88 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 	return 0;
 }
 
+/**
+ * Produces output on stdout similar to the output produced by running "find /mount/point"
+ */
 void
 node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *cb_args,
 		    int XAL_UNUSED(level))
 {
-	struct xal_nodeinspector_stats *stats = cb_args;
+	struct xal_nodeinspector_args *args = cb_args;
 
 	switch (inode->ftype) {
 	case XAL_ODF_DIR3_FT_DIR:
-		stats->ndirs += 1;
-
-		for (struct xal_inode *parent = inode->parent; parent; parent = parent->parent) {
-			printf("/%.*s", inode->namelen, inode->name);
-		}
-		printf("\n");
-
+		args->ndirs += 1;
 		break;
 
 	case XAL_ODF_DIR3_FT_REG_FILE:
-		for (struct xal_inode *parent = inode->parent; parent; parent = parent->parent) {
-			printf("/%.*s", inode->namelen, inode->name);
-		}
-		printf("/%.*s\n", inode->namelen, inode->name);
-
-		stats->nfiles += 1;
+		args->nfiles += 1;
 		break;
 	default:
-		printf("# UNKNOWN\n");
+		printf("# UNKNOWN(%.*s)", inode->namelen, inode->name);
 		return;
 	}
+
+	printf("%s", args->cli_args->mountpoint);
+	if ((inode->parent) &&
+	    (args->cli_args->mountpoint[strlen(args->cli_args->mountpoint) - 1] == '/')) {
+		printf("/");
+	}
+	xal_inode_path_pp(inode);
+	printf("\n");
 }
 
 void
 node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int XAL_UNUSED(level))
 {
-	struct xal_nodeinspector_stats *stats = cb_args;
+	struct xal_nodeinspector_args *args = cb_args;
 
 	switch (inode->ftype) {
 	case XAL_ODF_DIR3_FT_DIR:
-		stats->ndirs += 1;
-
-		for (struct xal_inode *parent = inode->parent; parent; parent = parent->parent) {
-			printf("/%.*s", inode->namelen, inode->name);
-		}
-		printf("\n");
-
+		args->ndirs += 1;
 		break;
 
 	case XAL_ODF_DIR3_FT_REG_FILE:
-		for (struct xal_inode *parent = inode->parent; parent; parent = parent->parent) {
-			printf("/%.*s", inode->namelen, inode->name);
-		}
-
-		printf("/%.*s:\n", inode->namelen, inode->name);
-
-		stats->nfiles += 1;
-		for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
-			struct xal_extent *extent = &inode->content.extents.extent[i];
-
-			printf("- [%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]\n",
-			       (extent->start_offset * xal->sb.blocksize) / 512,
-			       (extent->nblocks * xal->sb.blocksize) / 512 - 1,
-			       xal_fsbno_offset(xal, extent->start_block) / 512,
-			       (extent->nblocks * xal->sb.blocksize) / 512);
-		}
+		args->nfiles += 1;
 		break;
 	default:
-		printf("# UNKNOWN\n");
+		printf("# UNKNOWN(%.*s)", inode->namelen, inode->name);
 		return;
+	}
+
+	printf("'%s", args->cli_args->mountpoint);
+	if ((inode->parent) &&
+	    (args->cli_args->mountpoint[strlen(args->cli_args->mountpoint) - 1] == '/')) {
+		printf("/");
+	}
+	xal_inode_path_pp(inode);
+	printf("':");
+	if (!inode->content.extents.count) {
+		printf(" ~\n");
+		return;
+	}
+	printf("\n");
+
+	for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
+		struct xal_extent *extent = &inode->content.extents.extent[i];
+		size_t fofz_begin, fofz_end, bofz_begin, bofz_end;
+
+		fofz_begin = (extent->start_offset * xal->sb.blocksize) / 512;
+		fofz_end = fofz_begin + (extent->nblocks * xal->sb.blocksize) / 512 - 1;
+		bofz_begin = xal_fsbno_offset(xal, extent->start_block) / 512;
+		bofz_end = bofz_begin + (extent->nblocks * xal->sb.blocksize) / 512 - 1;
+
+		printf("- [%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]\n", fofz_begin,
+		       fofz_end, bofz_begin, bofz_end);
 	}
 }
 
 int
 main(int argc, char *argv[])
 {
-	struct xal_nodeinspector_stats cb_args = {0};
 	struct xal_cli_args args = {0};
 	struct xnvme_opts opts = {0};
+	struct xal_nodeinspector_args cb_args;
 	struct xnvme_dev *dev;
 	struct xal *xal;
 	int err;
@@ -178,23 +187,27 @@ main(int argc, char *argv[])
 
 	if (args.bmap) {
 		memset(&cb_args, 0, sizeof(cb_args));
+		cb_args.cli_args = &args;
+
 		err = xal_walk(xal, xal->root, node_inspector_bmap, &cb_args);
 		if (err) {
 			printf("xal_walk(.. node_visistor_bmap ..); err(%d)\n", err);
 			goto exit;
 		}
-
-		printf("ndirs(%" PRIu64 "); nfiles(%" PRIu64 ")\n", cb_args.ndirs, cb_args.nfiles);
 	}
 
 	if (args.find) {
 		memset(&cb_args, 0, sizeof(cb_args));
+		cb_args.cli_args = &args;
+
 		err = xal_walk(xal, xal->root, node_inspector_find, &cb_args);
 		if (err) {
 			printf("xal_walk(.. node_visistor_find ..); err(%d)\n", err);
 			goto exit;
 		}
+	}
 
+	if (args.stats) {
 		printf("ndirs(%" PRIu64 "); nfiles(%" PRIu64 ")\n", cb_args.ndirs, cb_args.nfiles);
 	}
 
