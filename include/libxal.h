@@ -274,3 +274,6 @@ xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino);
 uint64_t
 xal_fsbno_offset(struct xal *xal, uint64_t fsbno);
 
+int
+xal_inode_path_pp(struct xal_inode *inode);
+

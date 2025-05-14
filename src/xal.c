@@ -1477,3 +1477,21 @@ xal_walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb
 {
 	return _walk(xal, inode, cb_func, cb_data, 0);
 }
+
+int
+xal_inode_path_pp(struct xal_inode *inode)
+{
+	int wrtn = 0;
+
+	if (!inode) {
+		return wrtn;
+	}
+	if (!inode->parent) {
+		return wrtn;
+	}
+
+	wrtn += xal_inode_path_pp(inode->parent);
+	wrtn += printf("/%.*s", inode->namelen, inode->name);
+
+	return wrtn;
+}
