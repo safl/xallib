@@ -969,6 +969,8 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 
 	for (int i = 0; i < count; ++i) {
 		struct xal_inode *dentry = &self->content.dentries.inodes[i];
+
+		dentry->parent = self;
 		err = process_ino(xal, dentry->ino, dentry);
 		if (err) {
 			XAL_DEBUG("FAILED: process_ino()");
@@ -1179,6 +1181,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 					continue;
 				}
 
+				dentry.parent = self;
 				self->content.dentries.inodes[self->content.dentries.count] =
 				    dentry;
 
