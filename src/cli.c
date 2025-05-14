@@ -23,34 +23,37 @@ struct xal_nodeinspector_stats {
 };
 
 struct xal_cli_args {
-	int verbose;
-	char *filename;
+	bool meta;
+	bool bmap;
+	bool find;
+	char *mountpoint;
 };
 
 int
 parse_args(int argc, char *argv[], struct xal_cli_args *args)
 {
-	args->verbose = 0;
-	args->filename = NULL;
-
 	if (argc < 2) {
-		fprintf(stderr, "Usage: %s [-v | --verbose] <filename>\n", argv[0]);
+		fprintf(stderr, "Usage: %s [-b | --verbose] <mountpoint>\n", argv[0]);
 		return -EINVAL;
 	}
 
 	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
-			args->verbose = 1;
-		} else if (args->filename == NULL) {
-			args->filename = argv[i];
+		if (strcmp(argv[i], "--bmap") == 0) {
+			args->bmap = 1;
+		} else if (strcmp(argv[i], "--find") == 0) {
+			args->find = 1;
+		} else if (strcmp(argv[i], "--meta") == 0) {
+			args->meta = 1;
+		} else if (args->mountpoint == NULL) {
+			args->mountpoint = argv[i];
 		} else {
 			fprintf(stderr, "Unexpected argument: %s\n", argv[i]);
 			return -EINVAL;
 		}
 	}
 
-	if (args->filename == NULL) {
-		fprintf(stderr, "Error: Filename is required\n");
+	if (args->mountpoint == NULL) {
+		fprintf(stderr, "Error: Mountpoint is required\n");
 		return -EINVAL;
 	}
 
@@ -58,23 +61,64 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 }
 
 void
-node_inspector(struct xal *xal, struct xal_inode *inode, void *cb_args, int level)
+node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *cb_args,
+		    int XAL_UNUSED(level))
 {
 	struct xal_nodeinspector_stats *stats = cb_args;
 
 	switch (inode->ftype) {
 	case XAL_ODF_DIR3_FT_DIR:
 		stats->ndirs += 1;
-		printf("%*s%.*s [dir]\n", level * 2, "", inode->namelen, inode->name);
+
+		for (struct xal_inode *parent = inode->parent; parent; parent = parent->parent) {
+			printf("/%.*s", inode->namelen, inode->name);
+		}
+		printf("\n");
+
 		break;
 
 	case XAL_ODF_DIR3_FT_REG_FILE:
+		for (struct xal_inode *parent = inode->parent; parent; parent = parent->parent) {
+			printf("/%.*s", inode->namelen, inode->name);
+		}
+		printf("/%.*s\n", inode->namelen, inode->name);
+
 		stats->nfiles += 1;
-		printf("%*s%.*s [file]\n", level * 2, "", inode->namelen, inode->name);
+		break;
+	default:
+		printf("# UNKNOWN\n");
+		return;
+	}
+}
+
+void
+node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int XAL_UNUSED(level))
+{
+	struct xal_nodeinspector_stats *stats = cb_args;
+
+	switch (inode->ftype) {
+	case XAL_ODF_DIR3_FT_DIR:
+		stats->ndirs += 1;
+
+		for (struct xal_inode *parent = inode->parent; parent; parent = parent->parent) {
+			printf("/%.*s", inode->namelen, inode->name);
+		}
+		printf("\n");
+
+		break;
+
+	case XAL_ODF_DIR3_FT_REG_FILE:
+		for (struct xal_inode *parent = inode->parent; parent; parent = parent->parent) {
+			printf("/%.*s", inode->namelen, inode->name);
+		}
+
+		printf("/%.*s:\n", inode->namelen, inode->name);
+
+		stats->nfiles += 1;
 		for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
 			struct xal_extent *extent = &inode->content.extents.extent[i];
 
-			printf("[%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]\n",
+			printf("- [%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]\n",
 			       (extent->start_offset * xal->sb.blocksize) / 512,
 			       (extent->nblocks * xal->sb.blocksize) / 512 - 1,
 			       xal_fsbno_offset(xal, extent->start_block) / 512,
@@ -90,8 +134,8 @@ node_inspector(struct xal *xal, struct xal_inode *inode, void *cb_args, int leve
 int
 main(int argc, char *argv[])
 {
-	struct xal_cli_args args = {0};
 	struct xal_nodeinspector_stats cb_args = {0};
+	struct xal_cli_args args = {0};
 	struct xnvme_opts opts = {0};
 	struct xnvme_dev *dev;
 	struct xal *xal;
@@ -116,7 +160,7 @@ main(int argc, char *argv[])
 		return -err;
 	}
 
-	if (args.verbose) {
+	if (args.meta) {
 		xal_pp(xal);
 	}
 
@@ -132,14 +176,25 @@ main(int argc, char *argv[])
 		goto exit;
 	}
 
-	err = xal_walk(xal, xal->root, args.verbose ? node_inspector : NULL,
-		       args.verbose ? &cb_args : NULL);
-	if (err) {
-		printf("xal_walk(...); err(%d)\n", err);
-		goto exit;
+	if (args.bmap) {
+		memset(&cb_args, 0, sizeof(cb_args));
+		err = xal_walk(xal, xal->root, node_inspector_bmap, &cb_args);
+		if (err) {
+			printf("xal_walk(.. node_visistor_bmap ..); err(%d)\n", err);
+			goto exit;
+		}
+
+		printf("ndirs(%" PRIu64 "); nfiles(%" PRIu64 ")\n", cb_args.ndirs, cb_args.nfiles);
 	}
 
-	if (args.verbose) {
+	if (args.find) {
+		memset(&cb_args, 0, sizeof(cb_args));
+		err = xal_walk(xal, xal->root, node_inspector_find, &cb_args);
+		if (err) {
+			printf("xal_walk(.. node_visistor_find ..); err(%d)\n", err);
+			goto exit;
+		}
+
 		printf("ndirs(%" PRIu64 "); nfiles(%" PRIu64 ")\n", cb_args.ndirs, cb_args.nfiles);
 	}
 
