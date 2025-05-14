@@ -980,6 +980,16 @@ decode_dentry(void *buf, struct xal_inode *dentry)
 	uint8_t *cursor = buf;
 	uint16_t nbytes = 8 + 1 + 1 + 2;
 
+	// xfs dir unused entries case with freetag value as 0xffff
+	uint16_t freetag = be16toh(*(uint16_t *)cursor);
+	if (freetag == 0xffff) {
+		cursor += 2; // Advance length of uint16_t freetag
+		uint16_t length = be16toh(*(uint16_t *)cursor);
+		nbytes = length;
+		return nbytes;
+	}
+
+	// xfs dir data entry case
 	dentry->ino = be64toh(*(uint64_t *)cursor);
 	cursor += 8;
 
