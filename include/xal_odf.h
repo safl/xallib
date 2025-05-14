@@ -383,4 +383,13 @@ struct xal_btree_lblock {
 	uint16_t btree_numrecs;	 /// Number of records in this block.
 	uint64_t btree_leftsib;
 	uint64_t btree_rightsib;
+
+	/* version 5 filesystem fields start here */
+	uint64_t btree_blkno;
+	uint64_t btree_lsn;
+	uuid_t btree_uuid;
+	uint64_t btree_owner;
+	uint32_t btree_crc;
+	uint32_t btree_pad;
 };
+
