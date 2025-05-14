@@ -126,6 +126,11 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 	}
 	printf("\n");
 
+	if (args->cli_args->meta) {
+		printf("- {'ino': 0x%" PRIx64 ", 'ofz': %" PRIu64 "}\n", inode->ino,
+		       xal_ino_decode_absolute_offset(xal, inode->ino));
+	}
+
 	for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
 		struct xal_extent *extent = &inode->content.extents.extent[i];
 		size_t fofz_begin, fofz_end, bofz_begin, bofz_end;
