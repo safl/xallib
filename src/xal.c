@@ -1315,9 +1315,19 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	iab3.pos.numrecs = be16toh(iab3.pos.numrecs);
 	iab3.siblings.left = be32toh(iab3.siblings.left);
 	iab3.siblings.right = be32toh(iab3.siblings.right);
-	iab3.blkno = be64toh(iab3.blkno);
+	// iab3.blkno = be64toh(iab3.blkno);
 
-	assert(be32toh(iab3.magic.num) == XAL_ODF_IBT_CRC_MAGIC);
+	XAL_DEBUG("INFO:    magic(%.4s, 0x%" PRIx32 ")", iab3.magic.text, iab3.magic.num);
+	XAL_DEBUG("INFO:    level(%" PRIu16 ")", iab3.pos.level);
+	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", iab3.pos.numrecs);
+	XAL_DEBUG("INFO:  leftsib(0x%016" PRIx32 " @ %" PRIu64 ")", iab3.siblings.left,
+		  xal_agbno_absolute_offset(xal, ag->seqno, iab3.siblings.left));
+	
+	XAL_DEBUG("INFO:      bno(0x%016" PRIx64 " @ %" PRIu64 ")", blkno,
+		  xal_agbno_absolute_offset(xal, ag->seqno, blkno));
+
+	XAL_DEBUG("INFO: rightsib(0x%016" PRIx32 " @ %" PRIu64 ")", iab3.siblings.right,
+		  xal_agbno_absolute_offset(xal, ag->seqno, iab3.siblings.right));
 
 	if (iab3.pos.level) {
 		XAL_DEBUG("INFO: iab3->level(%" PRIu16 ")?", iab3.pos.level);

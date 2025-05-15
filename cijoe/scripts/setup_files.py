@@ -47,7 +47,7 @@ def provoke_odf_dir_fmt_local(args: Namespace, cijoe: Cijoe) -> int:
     """
 
     return create_directory_with_urandom_content(
-        args, cijoe, args.mountpoint / "should-be-dir-fmt_local", 10, "4K"
+        args, cijoe, args.mountpoint / "should-be-dir-fmt_local", 5, "4K"
     )
 
 
