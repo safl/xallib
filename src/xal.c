@@ -1307,6 +1307,28 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	return 0;
 }
 
+static int
+read_iab3_block(struct xal *xal, struct xal_ag *ag, uint64_t blkno, void *buf)
+{
+	struct xal_odf_btree_sfmt *block = (void *)buf;
+	int err;
+
+	err = _pread_into(xal->dev, xal->buf, xal->sb.blocksize,
+			  xal_agbno_absolute_offset(xal, ag->seqno, blkno), buf);
+	if (err) {
+		XAL_DEBUG("FAILED: _pread_into(); err(%d)", err);
+		return err;
+	}
+
+	if (XAL_ODF_IBT_CRC_MAGIC != be32toh(block->magic.num)) {
+		XAL_DEBUG("FAILED: expected magic(IAB3) got magic('%.4s', 0x%" PRIx32 "); ",
+			  block->magic.text, block->magic.num);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /**
  * Retrieve all the allocated inodes stored within the given allocation group
  *
@@ -1315,54 +1337,45 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 int
 retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
 {
-	struct xal_odf_inobt_rec records[xal->sb.blocksize / sizeof(struct xal_odf_inobt_rec)];
-	struct xal_odf_btree_sfmt iab3;
-	off_t offset;
+	uint8_t block[BLOCK_MAX_NBYTES] = {0};
+	struct xal_odf_btree_sfmt *iab3 = (void *)block;
 	int err;
 
-	/** Compute the absolute offset for the block and retrieve it **/
-	offset = (xal->sb.agblocks * ag->seqno + blkno) * xal->sb.blocksize;
-	err = _pread(xal->dev, xal->buf, xal->sb.blocksize, offset);
+	err = read_iab3_block(xal, ag, blkno, block);
 	if (err) {
-		XAL_DEBUG("FAILED: _pread(); err(%d)", err);
+		XAL_DEBUG("FAILED: read_iab3_block(); err(%d)", err);
 		return err;
 	}
 
-	memcpy(&iab3, xal->buf, sizeof(iab3));
-	if (XAL_ODF_IBT_CRC_MAGIC != be32toh(iab3.magic.num)) {
-		XAL_DEBUG("FAILED: expected magic(IAB3) got magic('%.4s', 0x%" PRIx32 "); ",
-			  iab3.magic.text, iab3.magic.num);
-		return -EINVAL;
-	}
-
-	memset(records, 0, sizeof(records));
-	memcpy(&records, ((uint8_t *)xal->buf) + sizeof(iab3), sizeof(records));
-
-	iab3.pos.level = be16toh(iab3.pos.level);
-	iab3.pos.numrecs = be16toh(iab3.pos.numrecs);
-	iab3.siblings.left = be32toh(iab3.siblings.left);
-	iab3.siblings.right = be32toh(iab3.siblings.right);
-	// iab3.blkno = be64toh(iab3.blkno);
+	iab3->pos.level = be16toh(iab3->pos.level);
+	iab3->pos.numrecs = be16toh(iab3->pos.numrecs);
+	iab3->siblings.left = be32toh(iab3->siblings.left);
+	iab3->siblings.right = be32toh(iab3->siblings.right);
+	iab3->blkno = be64toh(iab3->blkno);
 
 	XAL_DEBUG("INFO:    seqno(%" PRIu32 ")", ag->seqno);
-	XAL_DEBUG("INFO:    magic(%.4s, 0x%" PRIx32 ")", iab3.magic.text, iab3.magic.num);
-	XAL_DEBUG("INFO:    level(%" PRIu16 ")", iab3.pos.level);
-	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", iab3.pos.numrecs);
-	XAL_DEBUG("INFO:  leftsib(0x%08" PRIx32 " @ %" PRIu64 ")", iab3.siblings.left,
-		  xal_agbno_absolute_offset(xal, ag->seqno, iab3.siblings.left));
+	XAL_DEBUG("INFO:    magic(%.4s, 0x%" PRIx32 ")", iab3->magic.text, iab3->magic.num);
+	XAL_DEBUG("INFO:    level(%" PRIu16 ")", iab3->pos.level);
+	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", iab3->pos.numrecs);
+	XAL_DEBUG("INFO:  leftsib(0x%08" PRIx32 " @ %" PRIu64 ")", iab3->siblings.left,
+		  xal_agbno_absolute_offset(xal, ag->seqno, iab3->siblings.left));
 
 	XAL_DEBUG("INFO:      bno(0x%08" PRIx64 " @ %" PRIu64 ")", blkno,
 		  xal_agbno_absolute_offset(xal, ag->seqno, blkno));
 
-	XAL_DEBUG("INFO: rightsib(0x%08" PRIx32 " @ %" PRIu64 ")", iab3.siblings.right,
-		  xal_agbno_absolute_offset(xal, ag->seqno, iab3.siblings.right));
+	XAL_DEBUG("INFO: rightsib(0x%08" PRIx32 " @ %" PRIu64 ")", iab3->siblings.right,
+		  xal_agbno_absolute_offset(xal, ag->seqno, iab3->siblings.right));
 
-	if (iab3.pos.level) {
-		XAL_DEBUG("FAILED: iab3->level(%" PRIu16 ")?", iab3.pos.level);
+	if (iab3->pos.level) {
+		XAL_DEBUG("FAILED: iab3->level(%" PRIu16 ")?", iab3->pos.level);
 		return -EINVAL;
 	}
 
-	for (uint16_t reci = 0; reci < iab3.pos.numrecs; ++reci) {
+	struct xal_odf_inobt_rec records[xal->sb.blocksize / sizeof(struct xal_odf_inobt_rec)];
+	memset(records, 0, sizeof(records));
+	memcpy(&records, ((uint8_t *)xal->buf) + sizeof(*iab3), sizeof(records));
+
+	for (uint16_t reci = 0; reci < iab3->pos.numrecs; ++reci) {
 		uint8_t inodechunk[BUF_NBYTES] = {0};
 		struct xal_odf_inobt_rec *rec = &records[reci];
 		uint32_t agbno, agbino;
