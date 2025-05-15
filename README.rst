@@ -318,3 +318,32 @@ want to be GPL-v2 infected.
 * https://www.usenix.org/system/files/login/articles/140-hellwig.pdf
 
 * https://www.kernel.org/pub/linux/utils/fs/xfs/docs/xfs_filesystem_structure.pdf
+
+Testing
+=======
+
+In addition to the synthetic generated files and folders generated with
+``setup_files.py``, then this::
+
+  oi_download_images \
+    --base_dir ./openimages \
+    --labels Airplane Horse Fish Pizza Television
+    --limit 50000
+
+Was attempted as a potential dataset, however, it fetches files individually
+which is very slow. Thus, currently exploring the use of
+``Places365-Standard Dataset`` by downloading via::
+
+  wget http://data.csail.mit.edu/places/places365/places365standard_easyformat.tar
+
+To reproduce things, then using this seems simpler, as it would simple to
+checksum the archive.
+
+Missing: Inode Allocation B+Tree
+--------------------------------
+
+The inode-allocation B+Tree is currently only tested in a scenario where
+the root-node is level 0, e.g. a leaf-node. This must be expanded to include
+``level=1`` and ``level=2``. To ensure that the decoding is capable of
+processing root-node, internal-node with leaf children, internal-node with other
+internal nodes as children.
