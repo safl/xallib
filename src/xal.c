@@ -205,7 +205,7 @@ _pread_into(struct xnvme_dev *dev, void *iobuf, size_t count, off_t offset, void
 {
 	int err;
 
-	err = _pread(dev, buf, count, offset);
+	err = _pread(dev, iobuf, count, offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread(); err(%d)", err);
 		return err;
