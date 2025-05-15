@@ -1345,8 +1345,8 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 		  xal_agbno_absolute_offset(xal, ag->seqno, iab3.siblings.right));
 
 	if (iab3.pos.level) {
-		XAL_DEBUG("INFO: iab3->level(%" PRIu16 ")?", iab3.pos.level);
-		return 0;
+		XAL_DEBUG("FAILED: iab3->level(%" PRIu16 ")?", iab3.pos.level);
+		return -EINVAL;
 	}
 
 	for (uint16_t reci = 0; reci < iab3.pos.numrecs; ++reci) {
