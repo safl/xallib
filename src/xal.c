@@ -1298,33 +1298,28 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 int
 retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
 {
-	struct xal_odf_btree_sfmt iab3 = {0};
+	struct xal_odf_inobt_rec records[xal->sb.blocksize / sizeof(struct xal_odf_inobt_rec)];
+	struct xal_odf_btree_sfmt iab3;
 	off_t offset;
-	uint8_t *inodechunk;
 	int err;
-
-	inodechunk = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
-	if (!inodechunk) {
-		XAL_DEBUG("FAILED: xnvme_buf_alloc(); errno(%d)", errno);
-		err = -errno;
-		goto exit;
-	}
 
 	/** Compute the absolute offset for the block and retrieve it **/
 	offset = (xal->sb.agblocks * ag->seqno + blkno) * xal->sb.blocksize;
 	err = _pread(xal->dev, xal->buf, xal->sb.blocksize, offset);
 	if (err) {
-		XAL_DEBUG("FAILED: _pread()");
-		goto exit;
+		XAL_DEBUG("FAILED: _pread(); err(%d)", err);
+		return err;
 	}
 
 	memcpy(&iab3, xal->buf, sizeof(iab3));
-
 	if (XAL_ODF_IBT_CRC_MAGIC != be32toh(iab3.magic.num)) {
 		XAL_DEBUG("FAILED: expected magic(IAB3) got magic('%.4s', 0x%" PRIx32 "); ",
 			  iab3.magic.text, iab3.magic.num);
 		return -EINVAL;
 	}
+
+	memset(records, 0, sizeof(records));
+	memcpy(&records, ((uint8_t *)xal->buf) + sizeof(iab3), sizeof(records));
 
 	iab3.pos.level = be16toh(iab3.pos.level);
 	iab3.pos.numrecs = be16toh(iab3.pos.numrecs);
@@ -1338,7 +1333,7 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", iab3.pos.numrecs);
 	XAL_DEBUG("INFO:  leftsib(0x%08" PRIx32 " @ %" PRIu64 ")", iab3.siblings.left,
 		  xal_agbno_absolute_offset(xal, ag->seqno, iab3.siblings.left));
-	
+
 	XAL_DEBUG("INFO:      bno(0x%08" PRIx64 " @ %" PRIu64 ")", blkno,
 		  xal_agbno_absolute_offset(xal, ag->seqno, blkno));
 
@@ -1351,8 +1346,8 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	}
 
 	for (uint16_t reci = 0; reci < iab3.pos.numrecs; ++reci) {
-		struct xal_odf_inobt_rec *rec =
-		    (void *)(xal->buf + sizeof(iab3) + reci * sizeof(*rec));
+		uint8_t inodechunk[BUF_NBYTES] = {0};
+		struct xal_odf_inobt_rec *rec = &records[reci];
 		uint32_t agbno, agbino;
 
 		rec->startino = be32toh(rec->startino);
@@ -1385,11 +1380,17 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 
 			assert(chunk_nbytes < BUF_NBYTES);
 
-			err = _pread(xal->dev, inodechunk, chunk_nbytes, chunk_offset);
+			memset(xal->buf, 0, chunk_nbytes);
+
+			err = _pread(xal->dev, xal->buf, chunk_nbytes, chunk_offset);
 			if (err) {
 				XAL_DEBUG("FAILED: _pread(chunk)");
 				return err;
 			}
+			memcpy(inodechunk, xal->buf, chunk_nbytes);
+
+			printf("chunk_nbytes(%" PRIu64 "), BUF_NBYTES(%" PRIu64 ")\n", chunk_nbytes,
+			       BUF_NBYTES);
 		}
 
 		/**
@@ -1409,9 +1410,6 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 			*index += 1;
 		}
 	}
-
-exit:
-	xnvme_buf_free(xal->dev, inodechunk);
 
 	return err;
 }
