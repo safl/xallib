@@ -128,6 +128,16 @@ xal_fsbno_offset(struct xal *xal, uint64_t fsbno)
 	return (ag * xal->sb.agblocks + bno) * xal->sb.blocksize;
 }
 
+/**
+ * Compute the absolute disk offset of the given agbno reltive to the ag with 'seqno'
+ */
+uint64_t
+xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint32_t agbno)
+{
+	// Absolute Inode offset in bytes
+	return (seqno * (uint64_t)xal->sb.agblocks + agbno) * xal->sb.blocksize;
+}
+
 uint64_t
 xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino)
 {

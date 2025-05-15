@@ -277,3 +277,14 @@ xal_fsbno_offset(struct xal *xal, uint64_t fsbno);
 int
 xal_inode_path_pp(struct xal_inode *inode);
 
+/**
+ * Compute the absolute disk offset of the given 'agbno' relative to the ag with the given 'seqno'
+ *
+ * Relative block numbers are utilized in e.g. B+Tree sibilings and pointers when they only ever
+ * refer to blocks within a given allocation group, for example the B+Tree tracking all allocated
+ * inodes, the inode-allocation-btree.
+ * Generally, then they are used in the btree-short-form, whereas the btree-long-form has the seqno
+ * encoded in the block number.
+ */
+uint64_t
+xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint32_t agbno);
