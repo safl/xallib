@@ -24,7 +24,7 @@ def create_directory_with_urandom_content(
         f"mkdir -p {dir}",
         (
             f"for ((i=0; i<={count}; i++)); do "
-            f"dd if=/dev/urandom of={dir}/file-rand-{size}-$i-{count}.bin "
+            f"dd if=/dev/urandom of={dir}/file-rand-{size}-$i-{count}.bin status=none "
             f"bs={size} count=1"
             "; done"
         ),
