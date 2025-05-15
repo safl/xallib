@@ -78,7 +78,7 @@ def provoke_odf_file_fmt_local(args: Namespace, cijoe: Cijoe) -> int:
 
     prefix = args.mountpoint / "should-be-file-fmt_local"
 
-    total = 10
+    total = 5
     for cur in range(1, total + 1):
         filepath = prefix / f"empty-{cur}-{total}.file"
         for cmd in [f"mkdir -p {prefix}", f"touch {filepath}"]:
