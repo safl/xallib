@@ -167,7 +167,7 @@ xal_close(struct xal *xal)
 	free(xal);
 }
 
-int
+static int
 _pread(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
 {
 	struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
@@ -196,6 +196,22 @@ _pread(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
 		XAL_DEBUG("FAILED: xnvme_nvm_read(...);");
 		return -EIO;
 	}
+
+	return 0;
+}
+
+static int
+_pread_into(struct xnvme_dev *dev, void *iobuf, size_t count, off_t offset, void *buf)
+{
+	int err;
+
+	err = _pread(dev, buf, count, offset);
+	if (err) {
+		XAL_DEBUG("FAILED: _pread(); err(%d)", err);
+		return err;
+	}
+
+	memcpy(buf, iobuf, count);
 
 	return 0;
 }
