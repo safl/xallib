@@ -1410,11 +1410,6 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 		}
 	}
 
-	if (iab3.siblings.right != 0xFFFFFFFF) {
-		XAL_DEBUG("INFO: Going deeper on the right!");
-		retrieve_dinodes_via_iabt3(xal, ag, iab3.siblings.right, index);
-	}
-
 exit:
 	xnvme_buf_free(xal->dev, inodechunk);
 
