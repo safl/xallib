@@ -38,9 +38,9 @@ def main(args: Namespace, cijoe: Cijoe):
 
     size_bytes = int(args.size_in_gb << 30)
 
-    cijoe.run(f"sudo swapoff {args.dev_path}")
-    cijoe.run(f"sudo zramctl --reset {args.dev_path}")
-    cijoe.run(f"sudo modprobe -r zram")
+    cijoe.run(f'sudo swapoff {args.dev_path} || echo "Above error is OK."')
+    cijoe.run(f'sudo zramctl --reset {args.dev_path} || echo "Above is OK."')
+    cijoe.run(f'sudo modprobe -r zram || echo "Above is OK."')
 
     err, state = cijoe.run(f"sudo modprobe zram num_devices=1")
     if err:
