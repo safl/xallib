@@ -1307,6 +1307,9 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	return 0;
 }
 
+/**
+ * Retrieve the IAB3 block 'blkno' in 'ag' via 'xal->buf' into 'buf' and convert endianess
+ */
 static int
 read_iab3_block(struct xal *xal, struct xal_ag *ag, uint64_t blkno, void *buf)
 {
@@ -1326,60 +1329,37 @@ read_iab3_block(struct xal *xal, struct xal_ag *ag, uint64_t blkno, void *buf)
 		return -EINVAL;
 	}
 
+	block->pos.level = be16toh(block->pos.level);
+	block->pos.numrecs = be16toh(block->pos.numrecs);
+	block->siblings.left = be32toh(block->siblings.left);
+	block->siblings.right = be32toh(block->siblings.right);
+	block->blkno = be64toh(block->blkno);
+
+	XAL_DEBUG("INFO:    seqno(%" PRIu32 ")", ag->seqno);
+	XAL_DEBUG("INFO:    magic(%.4s, 0x%" PRIx32 ")", block->magic.text, block->magic.num);
+	XAL_DEBUG("INFO:    level(%" PRIu16 ")", block->pos.level);
+	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", block->pos.numrecs);
+	XAL_DEBUG("INFO:  leftsib(0x%08" PRIx32 " @ %" PRIu64 ")", block->siblings.left,
+		  xal_agbno_absolute_offset(xal, ag->seqno, block->siblings.left));
+	XAL_DEBUG("INFO:      bno(0x%08" PRIx64 " @ %" PRIu64 ")", blkno,
+		  xal_agbno_absolute_offset(xal, ag->seqno, blkno));
+	XAL_DEBUG("INFO: rightsib(0x%08" PRIx32 " @ %" PRIu64 ")", block->siblings.right,
+		  xal_agbno_absolute_offset(xal, ag->seqno, block->siblings.right));
+
 	return 0;
 }
 
-/**
- * Retrieve all the allocated inodes stored within the given allocation group
- *
- * It is assumed that the inode-allocation-b+tree is rooted at the given 'blkno'
- */
-int
-retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
-{
-	uint8_t block[BLOCK_MAX_NBYTES] = {0};
-	struct xal_odf_btree_sfmt *iab3 = (void *)block;
+static int
+decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t *index) {
+	struct xal_odf_btree_sfmt *root = (void *)buf;
 	int err;
-
-	err = read_iab3_block(xal, ag, blkno, block);
-	if (err) {
-		XAL_DEBUG("FAILED: read_iab3_block(); err(%d)", err);
-		return err;
-	}
-
-	iab3->pos.level = be16toh(iab3->pos.level);
-	iab3->pos.numrecs = be16toh(iab3->pos.numrecs);
-	iab3->siblings.left = be32toh(iab3->siblings.left);
-	iab3->siblings.right = be32toh(iab3->siblings.right);
-	iab3->blkno = be64toh(iab3->blkno);
-
-	XAL_DEBUG("INFO:    seqno(%" PRIu32 ")", ag->seqno);
-	XAL_DEBUG("INFO:    magic(%.4s, 0x%" PRIx32 ")", iab3->magic.text, iab3->magic.num);
-	XAL_DEBUG("INFO:    level(%" PRIu16 ")", iab3->pos.level);
-	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", iab3->pos.numrecs);
-	XAL_DEBUG("INFO:  leftsib(0x%08" PRIx32 " @ %" PRIu64 ")", iab3->siblings.left,
-		  xal_agbno_absolute_offset(xal, ag->seqno, iab3->siblings.left));
-
-	XAL_DEBUG("INFO:      bno(0x%08" PRIx64 " @ %" PRIu64 ")", blkno,
-		  xal_agbno_absolute_offset(xal, ag->seqno, blkno));
-
-	XAL_DEBUG("INFO: rightsib(0x%08" PRIx32 " @ %" PRIu64 ")", iab3->siblings.right,
-		  xal_agbno_absolute_offset(xal, ag->seqno, iab3->siblings.right));
-
-	if (iab3->pos.level) {
-		XAL_DEBUG("FAILED: iab3->level(%" PRIu16 ")?", iab3->pos.level);
-		return -EINVAL;
-	}
-
-	struct xal_odf_inobt_rec records[xal->sb.blocksize / sizeof(struct xal_odf_inobt_rec)];
-	memset(records, 0, sizeof(records));
-	memcpy(&records, ((uint8_t *)xal->buf) + sizeof(*iab3), sizeof(records));
-
-	for (uint16_t reci = 0; reci < iab3->pos.numrecs; ++reci) {
+	
+	for (uint16_t reci = 0; reci < root->pos.numrecs; ++reci) {
 		uint8_t inodechunk[BUF_NBYTES] = {0};
-		struct xal_odf_inobt_rec *rec = &records[reci];
+		struct xal_odf_inobt_rec *rec;
 		uint32_t agbno, agbino;
-
+		
+		rec = (void*)(((uint8_t*)buf) + sizeof(*root) + reci * sizeof(*rec));
 		rec->startino = be32toh(rec->startino);
 		rec->holemask = be16toh(rec->holemask);
 		rec->count = rec->count;
@@ -1442,6 +1422,45 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 	}
 
 	return err;
+}
+
+/**
+ * Retrieve all the allocated inodes stored within the given allocation group
+ *
+ * It is assumed that the inode-allocation-b+tree is rooted at the given 'blkno'
+ */
+int
+retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
+{
+	uint8_t block[BLOCK_MAX_NBYTES] = {0};
+	struct xal_odf_btree_sfmt *root = (void *)block;
+	int err;
+
+	err = read_iab3_block(xal, ag, blkno, block);
+	if (err) {
+		XAL_DEBUG("FAILED: read_iab3_block(); err(%d)", err);
+		return err;
+	}
+
+	switch(root->pos.level) {
+	case 1:
+		XAL_DEBUG("FAILED: iab3->level(%" PRIu16 ")?", root->pos.level);
+		return -EINVAL;
+
+	case 0:
+		err = decode_iab3_leaf_records(xal, ag, block, index);
+		if (err) {
+			XAL_DEBUG("FAILED: decode_iab3_leaf(); err(%d)", err);
+			return err;
+		}
+		break;
+
+	default:
+		XAL_DEBUG("FAILED: iab3->level(%" PRIu16 ")?", root->pos.level);
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 int
