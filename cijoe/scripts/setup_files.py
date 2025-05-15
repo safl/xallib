@@ -146,10 +146,25 @@ def provoke_odf_iabt_lvl0(args: Namespace, cijoe: Cijoe) -> int:
     )
 
 
+def provoke_odf_iabt_lvl1(args: Namespace, cijoe: Cijoe) -> int:
+    """
+    This is the base to use when trying to provoke different layout for the
+    inode-allocation-btree (IAB3). With this, the root node is level 1 and records be
+    node pointers.
+    """
+
+    return create_directory_with_urandom_content(
+        args, cijoe, args.mountpoint / "intent_iab3_lvl1", 20000, "4K"
+    )
+
+
 def populate(args, cijoe) -> int:
     """Explicitly create different files and folders to provoke all ODF cases"""
 
     if err := provoke_odf_iabt_lvl0(args, cijoe):
+        return err
+
+    if err := provoke_odf_iabt_lvl1(args, cijoe):
         return err
 
     if err := provoke_odf_dir_fmt_local(args, cijoe):
