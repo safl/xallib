@@ -1194,7 +1194,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 
 	err = dinodes_get(xal, ino, (void **)&dinode);
 	if (err) {
-		XAL_DEBUG("FAILED: dinodes_get();");
+		XAL_DEBUG("FAILED: dinodes_get(); err(%d)", err);
 		return err;
 	}
 
