@@ -80,6 +80,7 @@ dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
 		return 0;
 	}
 
+	XAL_DEBUG("FAILED: no match for ino(0x%" PRIx64 ")", ino);
 	return -EINVAL;
 }
 
