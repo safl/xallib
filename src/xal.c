@@ -1320,7 +1320,12 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 
 	memcpy(&iab3, xal->buf, sizeof(iab3));
 
-	// iab3.magic.num = iab3.magic.num;
+	if (XAL_ODF_IBT_CRC_MAGIC != be32toh(iab3.magic.num)) {
+		XAL_DEBUG("FAILED: expected magic(IAB3) got magic('%.4s', 0x%" PRIx32 "); ",
+			  iab3.magic.text, iab3.magic.num);
+		return -EINVAL;
+	}
+
 	iab3.pos.level = be16toh(iab3.pos.level);
 	iab3.pos.numrecs = be16toh(iab3.pos.numrecs);
 	iab3.siblings.left = be32toh(iab3.siblings.left);
