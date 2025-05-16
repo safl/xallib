@@ -168,7 +168,7 @@ xal_close(struct xal *xal)
 }
 
 static int
-_pread(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
+dev_read(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
 {
 	struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
 	const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
@@ -201,11 +201,11 @@ _pread(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
 }
 
 static int
-_pread_into(struct xnvme_dev *dev, void *iobuf, size_t count, off_t offset, void *buf)
+dev_read_into(struct xnvme_dev *dev, void *iobuf, size_t count, off_t offset, void *buf)
 {
 	int err;
 
-	err = _pread(dev, iobuf, count, offset);
+	err = dev_read(dev, iobuf, count, offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread(); err(%d)", err);
 		return err;
@@ -241,7 +241,7 @@ retrieve_and_decode_allocation_group(struct xnvme_dev *dev, void *buf, uint32_t 
 	struct xal_odf_agf *agf = (void *)(cursor + xal->sb.sectsize);
 	int err;
 
-	err = _pread(dev, buf, xal->sb.sectsize * 4, offset);
+	err = dev_read(dev, buf, xal->sb.sectsize * 4, offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()");
 		return err;
@@ -282,7 +282,7 @@ retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct 
 	uint32_t agcount;
 	int err;
 
-	err = _pread(dev, buf, 4096, 0);
+	err = dev_read(dev, buf, 4096, 0);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()\n");
 		return -errno;
@@ -407,7 +407,7 @@ readLeafData(struct xal *xal, struct xal_inode *self, uint64_t bmbtptrs,
 		return -errno;
 	}
 
-	err = _pread(xal->dev, block_databuf, xal->sb.blocksize, block_offset);
+	err = dev_read(xal->dev, block_databuf, xal->sb.blocksize, block_offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()");
 		goto exit;
@@ -432,7 +432,7 @@ readLeafData(struct xal *xal, struct xal_inode *self, uint64_t bmbtptrs,
 			size_t ofz_disk = (physicalblk)*xal->sb.blocksize;
 			struct xfs_odf_dir_blk_hdr *hdr = (void *)(buf);
 
-			err = _pread(xal->dev, buf, xal->sb.blocksize, ofz_disk);
+			err = dev_read(xal->dev, buf, xal->sb.blocksize, ofz_disk);
 			if (err) {
 				XAL_DEBUG("FAILED: !_pread(directory-extent)");
 				goto exit;
@@ -492,7 +492,7 @@ readBlockData(struct xal *xal, void *buf, uint64_t block_number)
 	// Calculate the block offset
 	off_t block_offset = physicalblk * xal->sb.blocksize;
 
-	err = _pread(xal->dev, buf, xal->sb.blocksize, block_offset);
+	err = dev_read(xal->dev, buf, xal->sb.blocksize, block_offset);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread()\n");
 		return -errno;
@@ -577,7 +577,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	XAL_DEBUG("ENTER:   fsbno(0x%" PRIx64 " @ %" PRIu64 ") in ino(0x%" PRIx64 ")", fsbno, ofz,
 		  self->ino);
 
-	err = _pread(xal->dev, xal->buf, xal->sb.blocksize, ofz);
+	err = dev_read(xal->dev, xal->buf, xal->sb.blocksize, ofz);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread(); err: %d", err);
 		return err;
@@ -674,7 +674,7 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	XAL_DEBUG("INFO: maxrecs(%zu)", maxrecs);
 	XAL_DEBUG("INFO: pointers_ofz(%zu)", pointers_ofz);
 
-	err = _pread(xal->dev, xal->buf, xal->sb.blocksize, ofz);
+	err = dev_read(xal->dev, xal->buf, xal->sb.blocksize, ofz);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread(); err: %d", err);
 		return err;
@@ -1128,7 +1128,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 			size_t ofz_disk = (extent.start_block + blk) * xal->sb.blocksize;
 			struct xfs_odf_dir_blk_hdr *hdr = (void *)(buf);
 
-			err = _pread(xal->dev, buf, xal->sb.blocksize, ofz_disk);
+			err = dev_read(xal->dev, buf, xal->sb.blocksize, ofz_disk);
 			if (err) {
 				XAL_DEBUG("FAILED: !_pread(directory-extent)");
 				goto exit;
@@ -1316,8 +1316,8 @@ read_iab3_block(struct xal *xal, struct xal_ag *ag, uint64_t blkno, void *buf)
 	struct xal_odf_btree_sfmt *block = (void *)buf;
 	int err;
 
-	err = _pread_into(xal->dev, xal->buf, xal->sb.blocksize,
-			  xal_agbno_absolute_offset(xal, ag->seqno, blkno), buf);
+	err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize,
+			    xal_agbno_absolute_offset(xal, ag->seqno, blkno), buf);
 	if (err) {
 		XAL_DEBUG("FAILED: _pread_into(); err(%d)", err);
 		return err;
@@ -1350,16 +1350,17 @@ read_iab3_block(struct xal *xal, struct xal_ag *ag, uint64_t blkno, void *buf)
 }
 
 static int
-decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t *index) {
+decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t *index)
+{
 	struct xal_odf_btree_sfmt *root = (void *)buf;
 	int err;
-	
+
 	for (uint16_t reci = 0; reci < root->pos.numrecs; ++reci) {
 		uint8_t inodechunk[BUF_NBYTES] = {0};
 		struct xal_odf_inobt_rec *rec;
 		uint32_t agbno, agbino;
-		
-		rec = (void*)(((uint8_t*)buf) + sizeof(*root) + reci * sizeof(*rec));
+
+		rec = (void *)(((uint8_t *)buf) + sizeof(*root) + reci * sizeof(*rec));
 		rec->startino = be32toh(rec->startino);
 		rec->holemask = be16toh(rec->holemask);
 		rec->count = rec->count;
@@ -1392,7 +1393,7 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 
 			memset(xal->buf, 0, chunk_nbytes);
 
-			err = _pread(xal->dev, xal->buf, chunk_nbytes, chunk_offset);
+			err = dev_read(xal->dev, xal->buf, chunk_nbytes, chunk_offset);
 			if (err) {
 				XAL_DEBUG("FAILED: _pread(chunk)");
 				return err;
@@ -1442,7 +1443,7 @@ retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, u
 		return err;
 	}
 
-	switch(root->pos.level) {
+	switch (root->pos.level) {
 	case 1:
 		XAL_DEBUG("FAILED: iab3->level(%" PRIu16 ")?", root->pos.level);
 		return -EINVAL;
