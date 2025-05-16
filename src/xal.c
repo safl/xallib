@@ -21,6 +21,7 @@
 #define CHUNK_NINO 64		     ///< Number of inodes in a chunk
 #define BUF_BLOCKSIZE 4096	     ///< Number of bytes in a block
 #define BLOCK_MAX_NBYTES 64UL * 1024 ///< This is utilized for stack-variables; max 16K blocksizes
+#define ODF_INODE_MAX_NBYTES 2048    ///< Maximum size of an inode;
 
 int
 decode_dentry(void *buf, struct xal_inode *dentry);
