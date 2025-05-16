@@ -1045,15 +1045,18 @@ decode_dentry(void *buf, struct xal_inode *dentry)
 	return nbytes;
 }
 
+/**
+ * Read a directory-block from disk and process the directory-entries within.
+ */
 int
-process_dinode_dir_extents_block(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
+process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
-	uint8_t block[ODF_BLOCK_FS_BYTES_MAX] = {0};
-	struct xfs_odf_dir_blk_hdr *hdr = (void *)(block);
+	uint8_t dblock[ODF_BLOCK_FS_BYTES_MAX] = {0};
+	struct xfs_odf_dir_blk_hdr *hdr = (void *)(dblock);
 	size_t ofz_disk = xal_fsbno_offset(xal, fsbno);
 	int err;
 
-	err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize, ofz_disk, block);
+	err = dev_read_into(xal->dev, xal->buf, xal->sb.dirblocksize, ofz_disk, dblock);
 	if (err) {
 		XAL_DEBUG("FAILED: !dev_read(directory-extent)");
 		return err;
@@ -1064,8 +1067,8 @@ process_dinode_dir_extents_block(struct xal *xal, uint64_t fsbno, struct xal_ino
 		return err;
 	}
 
-	for (uint64_t ofz = 64; ofz < xal->sb.blocksize;) {
-		uint8_t *dentry_cursor = block + ofz;
+	for (uint64_t ofz = 64; ofz < xal->sb.dirblocksize;) {
+		uint8_t *dentry_cursor = dblock + ofz;
 		struct xal_inode dentry = {0};
 
 		ofz += decode_dentry(dentry_cursor, &dentry);
@@ -1151,6 +1154,7 @@ int
 process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	struct pair_u64 *extents = (void *)(((uint8_t *)dinode) + sizeof(struct xal_odf_dinode));
+	const uint32_t fsblk_per_dblk = xal->sb.dirblocksize / xal->sb.blocksize;
 	uint64_t nextents = be32toh(dinode->di_nextents);
 	int err;
 
@@ -1162,8 +1166,8 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	if (!nextents) {
 		nextents = be64toh(dinode->di_big_nextents);
 	}
-
-	XAL_DEBUG("!!!!!!!!!! nextents(%" PRIu64 ")", nextents);
+	XAL_DEBUG("INFO: nextents(%" PRIu64 ")", nextents);
+	XAL_DEBUG("INFO: fsblk_per_dblk(%" PRIu32 ")", fsblk_per_dblk);
 
 	/**
 	 * A single inode is claimed, this is to get the pointer to the start of the array,
@@ -1185,10 +1189,10 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 
 		decode_xfs_extent(be64toh(extents[i].l0), be64toh(extents[i].l1), &extent);
 
-		for (size_t blk = 0; blk < extent.nblocks; ++blk) {
-			uint64_t fsbno = extent.start_block + blk;
+		for (size_t fsblk = 0; fsblk < extent.nblocks; fsblk += fsblk_per_dblk) {
+			uint64_t fsbno = extent.start_block + fsblk;
 
-			err = process_dinode_dir_extents_block(xal, fsbno, self);
+			err = process_dinode_dir_extents_dblock(xal, fsbno, self);
 			if (err) {
 				XAL_DEBUG("FAILED: process_dinode_dir_extents_block():err(%d)",
 					  err);
