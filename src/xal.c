@@ -175,16 +175,16 @@ dev_read(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
 	int err;
 
 	if (count > geo->mdts_nbytes) {
-		XAL_DEBUG("FAILED: _pread(...) -- count(%zu) > mdts_nbytes(%" PRIu32 ")", count,
+		XAL_DEBUG("FAILED: dev_read(...) -- count(%zu) > mdts_nbytes(%" PRIu32 ")", count,
 			  geo->mdts_nbytes);
 		return -EINVAL;
 	}
 	if (count % geo->lba_nbytes) {
-		XAL_DEBUG("FAILED: _pread(...) -- unaligned count(%zu);", count);
+		XAL_DEBUG("FAILED: dev_read(...) -- unaligned count(%zu);", count);
 		return -EINVAL;
 	}
 	if (offset % geo->lba_nbytes) {
-		XAL_DEBUG("FAILED: _pread(...) -- unaligned offset(%zu);", offset);
+		XAL_DEBUG("FAILED: dev_read(...) -- unaligned offset(%zu);", offset);
 		return -EINVAL;
 	}
 
@@ -207,7 +207,7 @@ dev_read_into(struct xnvme_dev *dev, void *iobuf, size_t count, off_t offset, vo
 
 	err = dev_read(dev, iobuf, count, offset);
 	if (err) {
-		XAL_DEBUG("FAILED: _pread(); err(%d)", err);
+		XAL_DEBUG("FAILED: dev_read_into(); err(%d)", err);
 		return err;
 	}
 
@@ -243,7 +243,7 @@ retrieve_and_decode_allocation_group(struct xnvme_dev *dev, void *buf, uint32_t 
 
 	err = dev_read(dev, buf, xal->sb.sectsize * 4, offset);
 	if (err) {
-		XAL_DEBUG("FAILED: _pread()");
+		XAL_DEBUG("FAILED: dev_read()");
 		return err;
 	}
 
@@ -284,7 +284,7 @@ retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct 
 
 	err = dev_read(dev, buf, 4096, 0);
 	if (err) {
-		XAL_DEBUG("FAILED: _pread()\n");
+		XAL_DEBUG("FAILED: dev_read()\n");
 		return -errno;
 	}
 
@@ -409,7 +409,7 @@ readLeafData(struct xal *xal, struct xal_inode *self, uint64_t bmbtptrs,
 
 	err = dev_read(xal->dev, block_databuf, xal->sb.blocksize, block_offset);
 	if (err) {
-		XAL_DEBUG("FAILED: _pread()");
+		XAL_DEBUG("FAILED: dev_read()");
 		goto exit;
 	}
 
@@ -434,7 +434,7 @@ readLeafData(struct xal *xal, struct xal_inode *self, uint64_t bmbtptrs,
 
 			err = dev_read(xal->dev, buf, xal->sb.blocksize, ofz_disk);
 			if (err) {
-				XAL_DEBUG("FAILED: !_pread(directory-extent)");
+				XAL_DEBUG("FAILED: !dev_read(directory-extent)");
 				goto exit;
 			}
 
@@ -494,7 +494,7 @@ readBlockData(struct xal *xal, void *buf, uint64_t block_number)
 
 	err = dev_read(xal->dev, buf, xal->sb.blocksize, block_offset);
 	if (err) {
-		XAL_DEBUG("FAILED: _pread()\n");
+		XAL_DEBUG("FAILED: dev_read()\n");
 		return -errno;
 	}
 	return 0;
@@ -583,7 +583,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 
 	err = dev_read(xal->dev, xal->buf, xal->sb.blocksize, ofz);
 	if (err) {
-		XAL_DEBUG("FAILED: _pread(); err: %d", err);
+		XAL_DEBUG("FAILED: dev_read(); err: %d", err);
 		return err;
 	}
 	memcpy(&leaf, xal->buf, sizeof(leaf));
@@ -680,7 +680,7 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 
 	err = dev_read(xal->dev, xal->buf, xal->sb.blocksize, ofz);
 	if (err) {
-		XAL_DEBUG("FAILED: _pread(); err: %d", err);
+		XAL_DEBUG("FAILED: dev_read(); err: %d", err);
 		return err;
 	}
 	memcpy(&node, xal->buf, sizeof(node));
@@ -1140,7 +1140,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 
 			err = dev_read(xal->dev, buf, xal->sb.blocksize, ofz_disk);
 			if (err) {
-				XAL_DEBUG("FAILED: !_pread(directory-extent)");
+				XAL_DEBUG("FAILED: !dev_read(directory-extent)");
 				goto exit;
 			}
 			if ((be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) &&
@@ -1329,7 +1329,7 @@ read_iab3_block(struct xal *xal, struct xal_ag *ag, uint64_t blkno, void *buf)
 	err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize,
 			    xal_agbno_absolute_offset(xal, ag->seqno, blkno), buf);
 	if (err) {
-		XAL_DEBUG("FAILED: _pread_into(); err(%d)", err);
+		XAL_DEBUG("FAILED: dev_read_into(); err(%d)", err);
 		return err;
 	}
 
@@ -1405,7 +1405,7 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 
 			err = dev_read(xal->dev, xal->buf, chunk_nbytes, chunk_offset);
 			if (err) {
-				XAL_DEBUG("FAILED: _pread(chunk)");
+				XAL_DEBUG("FAILED: dev_read(chunk)");
 				return err;
 			}
 			memcpy(inodechunk, xal->buf, chunk_nbytes);
