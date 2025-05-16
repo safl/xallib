@@ -392,4 +392,3 @@ struct xal_btree_lblock {
 	uint32_t btree_crc;
 	uint32_t btree_pad;
 };
-

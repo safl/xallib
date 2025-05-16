@@ -23,6 +23,11 @@
 #define ODF_BLOCK_MAX_NBYTES 64UL * 1024 ///< Maximum size of a block
 #define ODF_INODE_MAX_NBYTES 2048	 ///< Maximum size of an inode
 
+struct pair_u64 {
+	uint64_t l0;
+	uint64_t l1;
+};
+
 int
 decode_dentry(void *buf, struct xal_inode *dentry);
 
@@ -1143,8 +1148,8 @@ process_dinode_dir_extents_block(struct xal *xal, uint64_t fsbno, struct xal_ino
 int
 process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
-	uint8_t *cursor = (void *)dinode;
-	uint64_t nextents;
+	struct pair_u64 *extents = (void *)(((uint8_t *)dinode) + sizeof(struct xal_odf_dinode));
+	uint64_t nextents = be32toh(dinode->di_nextents);
 	int err;
 
 	/**
@@ -1152,10 +1157,9 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	 * not happen for format=0x2 "extents" as this should have all extent-records inline in the
 	 * inode. Thus this abomination... just grabbing whatever has a value...
 	 */
-	nextents =
-	    (dinode->di_nextents) ? be32toh(dinode->di_nextents) : be64toh(dinode->di_big_nextents);
-
-	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
+	if (!nextents) {
+		nextents = be64toh(dinode->di_big_nextents);
+	}
 
 	/**
 	 * A single inode is claimed, this is to get the pointer to the start of the array,
@@ -1163,24 +1167,19 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	 * the first call provides a pointer, since the start of the array, that consists of all
 	 * the children is only rooted once.
 	 */
-
 	err = xal_pool_claim_inodes(&xal->inodes, 1, &self->content.dentries.inodes);
 	if (err) {
 		XAL_DEBUG("FAILED: !xal_pool_claim_inodes(); err(%d)", err)
 		return err;
 	}
 
+	/**
+	 * Decode the extents and process each block
+	 */
 	for (uint64_t i = 0; i < nextents; ++i) {
 		struct xal_extent extent = {0};
-		uint64_t l0, l1;
 
-		l0 = be64toh(*((uint64_t *)cursor));
-		cursor += 8;
-
-		l1 = be64toh(*((uint64_t *)cursor));
-		cursor += 8;
-
-		decode_xfs_extent(l0, l1, &extent);
+		decode_xfs_extent(be64toh(extents[i].l0), be64toh(extents[i].l1), &extent);
 
 		for (size_t blk = 0; blk < extent.nblocks; ++blk) {
 			uint64_t fsbno = extent.start_block + blk;
