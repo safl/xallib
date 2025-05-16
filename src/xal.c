@@ -507,8 +507,7 @@ readBlockData(struct xal *xal, void *buf, uint64_t block_number)
  * @see XFS Algorithms & Data Structures - 3rd Edition - 20.5 B+tree Directories" for details
  */
 int
-process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
-			       struct xal_inode *self)
+process_dinode_dir_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint16_t numrec; // Number of records in this block
@@ -767,7 +766,8 @@ btree_dinode_meta(struct xal *xal, struct xal_odf_dinode *dinode, size_t *maxrec
  * - Keys and pointers within the inode are 64 bits wide
  */
 int
-process_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
+process_dinode_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
+			       struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint16_t level;	  // Level in the btree, expecting >= 1
@@ -891,8 +891,7 @@ process_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode, struct x
  * @see XFS Algorithms & Data Structures - 3rd Edition - 20.1 Short Form Directories
  */
 int
-process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode,
-					 struct xal_inode *self)
+process_dinode_dir_local(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint8_t count, i8count;
@@ -957,8 +956,7 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 }
 
 int
-process_dinode_inline_file_extents(struct xal *xal, struct xal_odf_dinode *dinode,
-				   struct xal_inode *self)
+process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
@@ -1075,8 +1073,7 @@ decode_dentry(void *buf, struct xal_inode *dentry)
  * of these have a 'count' of blocks. This 200bits worth of blocks... thats an awful lot of blocks.
  */
 int
-process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *dinode,
-					struct xal_inode *self)
+process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
@@ -1231,17 +1228,17 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_BTREE:
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			err = process_dinode_directory_btree(xal, dinode, self);
+			err = process_dinode_dir_btree(xal, dinode, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_dinode_directory_btree(); err(%d)", err);
+				XAL_DEBUG("FAILED: process_dinode_dir_btree():err(%d)", err);
 				return err;
 			}
 			break;
 
 		case XAL_ODF_DIR3_FT_REG_FILE:
-			err = process_file_btree_root(xal, dinode, self);
+			err = process_dinode_file_btree_root(xal, dinode, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_dinode_file_btree(); err(%d)", err);
+				XAL_DEBUG("FAILED: process_dinode_file_btree_root():err(%d)", err);
 				return err;
 			}
 			break;
@@ -1255,17 +1252,17 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_EXTENTS:
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			err = process_dinode_inline_directory_extents(xal, dinode, self);
+			err = process_dinode_dir_extents(xal, dinode, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_dinode_inline_directory_extent()");
+				XAL_DEBUG("FAILED: process_dinode_dir_extents()");
 				return err;
 			}
 			break;
 
 		case XAL_ODF_DIR3_FT_REG_FILE:
-			err = process_dinode_inline_file_extents(xal, dinode, self);
+			err = process_dinode_file_extents(xal, dinode, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_dinode_inline_file_extents()");
+				XAL_DEBUG("FAILED: process_dinode_file_extents()");
 				return err;
 			}
 			break;
@@ -1279,9 +1276,9 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_LOCAL: ///< Decode directory listing in inode
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			err = process_dinode_inline_shortform_dentries(xal, dinode, self);
+			err = process_dinode_dir_local(xal, dinode, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_dinode_inline_shortform_dentries()");
+				XAL_DEBUG("FAILED: process_dinode_dir_local()");
 				return err;
 			}
 			break;
