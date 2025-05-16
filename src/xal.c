@@ -1174,7 +1174,7 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	if (!nextents) {
 		nextents = be64toh(dinode->di_big_nextents);
 	}
-	XAL_DEBUG("INFO: nextents(%" PRIu64 ")", nextents);
+	XAL_DEBUG("INFO:       nextents(%" PRIu64 ")", nextents);
 	XAL_DEBUG("INFO: fsblk_per_dblk(%" PRIu32 ")", fsblk_per_dblk);
 
 	/**
@@ -1195,10 +1195,18 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	for (uint64_t i = 0; i < nextents; ++i) {
 		struct xal_extent extent = {0};
 
+		XAL_DEBUG("INFO: extent(%" PRIu64 "/%" PRIu64 ")", i + 1, nextents);
+
 		decode_xfs_extent(be64toh(extents[i].l0), be64toh(extents[i].l1), &extent);
 
 		for (size_t fsblk = 0; fsblk < extent.nblocks; fsblk += fsblk_per_dblk) {
 			uint64_t fsbno = extent.start_block + fsblk;
+
+			XAL_DEBUG("INFO:  fsbno(0x%" PRIu64 ") @ ofz(%" PRIu64 ")", fsbno,
+				  xal_fsbno_offset(xal, fsbno));
+			XAL_DEBUG("INFO:  fsblk(%zu : %zu/%zu)", fsblk, fsblk + 1, extent.nblocks);
+			XAL_DEBUG("INFO:   dblk(%zu/%zu)", (fsblk / fsblk_per_dblk) + 1,
+				  extent.nblocks / fsblk_per_dblk);
 
 			err = process_dinode_dir_extents_dblock(xal, fsbno, self);
 			if (err) {
