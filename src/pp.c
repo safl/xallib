@@ -50,6 +50,7 @@ xal_pp(struct xal *xal)
 	wrtn += printf("  sb.agblocks: %" PRIu32 "\n", xal->sb.agblocks);
 	wrtn += printf("  sb.agblklog: %" PRIu8 "\n", xal->sb.agblklog);
 	wrtn += printf("  sb.agcount: %" PRIu32 "\n", xal->sb.agcount);
+	wrtn += printf("  sb.dirblocksize: %" PRIu32 "\n", xal->sb.dirblocksize);
 
 	for (uint32_t i = 0; i < xal->sb.agcount; ++i) {
 		wrtn += xal_ag_pp(&xal->ags[i]);
@@ -64,7 +65,7 @@ xal_odf_sb_pp(void *buf)
 	struct xal_odf_sb *sb = buf;
 	int wrtn = 0;
 
-	wrtn += printf("xal_sb:\n");
+	wrtn += printf("xal_odf_sb:\n");
 	wrtn += printf("  magicnum: 0x%" PRIx32 "\n", be32toh(sb->magicnum));
 	wrtn += printf("  blocksize: 0x%" PRIx32 "x\n", be32toh(sb->blocksize));
 	wrtn += printf("  rootino: %" PRIx64 "zu\n", be64toh(sb->rootino));
@@ -73,6 +74,7 @@ xal_odf_sb_pp(void *buf)
 	wrtn += printf("  sectsize: %" PRIx16 "u\n", be16toh(sb->sectsize));
 	wrtn += printf("  inodesize: %" PRIx16 "u\n", be16toh(sb->inodesize));
 	wrtn += printf("  fname: '%.*s'\n", XAL_ODF_LABEL_MAX, sb->fname);
+	wrtn += printf("  dirblklog: 0x%" PRIu8 "x\n", sb->dirblklog);
 
 	return wrtn;
 }

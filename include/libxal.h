@@ -156,6 +156,7 @@ struct xal_sb {
 	uint32_t agblocks;   ///< Size of an allocation group, in blocks
 	uint8_t agblklog;    ///< log2 of 'agblocks' (rounded up)
 	uint32_t agcount;    ///< Number of allocation groups
+	uint32_t dirblocksize; ///< Size of a directory block, in bytes
 };
 
 /**

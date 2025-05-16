@@ -97,7 +97,11 @@ struct xal_odf_sb {
 
 	uint64_t icount; ///< allocated inodes
 
-	uint8_t _reserved_7[112];
+	uint8_t _reserved_7[56];
+	
+	uint8_t dirblklog;
+
+	uint8_t _reserved_8[56];
 
 	uuid_t meta_uuid; ///< metadata file system unique id
 };

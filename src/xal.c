@@ -313,6 +313,7 @@ retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct 
 	cand->sb.agblocks = be32toh(psb->agblocks);
 	cand->sb.agblklog = psb->agblklog;
 	cand->sb.agcount = agcount;
+	cand->sb.dirblocksize = cand->sb.blocksize << psb->dirblklog;
 
 	*xal = cand;
 
