@@ -518,7 +518,7 @@ process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 	int err;
 	uint8_t *leafbuf[4];
 
-	XAL_DEBUG("INFO: Directory B+Tree ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
+	XAL_DEBUG("ENTER: Directory B+Tree ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
 		  xal_ino_decode_absolute_offset(xal, ino));
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
@@ -558,6 +558,8 @@ process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 		readBlockData(xal, leafbuf[i], bmbtptrs[i]);
 		readLeafData(xal, self, bmbtptrs[i], lfd);
 	}
+
+	XAL_DEBUG("EXIT");
 	return 0;
 
 exit:
@@ -899,12 +901,12 @@ int
 process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode,
 					 struct xal_inode *self)
 {
+	uint64_t ino = be64toh(dinode->ino);
 	uint8_t *cursor = (void *)dinode;
 	uint8_t count, i8count;
-	uint64_t ino = be64toh(dinode->ino);
 	int err;
 
-	XAL_DEBUG("INFO: Short Form Directories ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
+	XAL_DEBUG("ENTER: Short Form Directories ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
 		  xal_ino_decode_absolute_offset(xal, ino));
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
@@ -921,6 +923,7 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 
 	err = xal_pool_claim_inodes(&xal->inodes, count, &self->content.dentries.inodes);
 	if (err) {
+		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); err(%d)", err);
 		return err;
 	}
 
@@ -958,6 +961,7 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 		}
 	}
 
+	XAL_DEBUG("EXIT");
 	return 0;
 }
 
@@ -970,7 +974,7 @@ process_dinode_inline_file_extents(struct xal *xal, struct xal_odf_dinode *dinod
 	uint64_t nextents;
 	int err;
 
-	XAL_DEBUG("INFO: Inline File Extents ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
+	XAL_DEBUG("ENTER: Inline File Extents ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
 		  xal_ino_decode_absolute_offset(xal, ino));
 
 	/**
@@ -1001,6 +1005,7 @@ process_dinode_inline_file_extents(struct xal *xal, struct xal_odf_dinode *dinod
 		decode_xfs_extent(l0, l1, &self->content.extents.extent[i]);
 	}
 
+	XAL_DEBUG("EXIT");
 	return 0;
 }
 
@@ -1090,7 +1095,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 	uint8_t *buf;
 	int err;
 
-	XAL_DEBUG("INFO: Inline Directory Extents ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
+	XAL_DEBUG("ENTER: Inline Directory Extents ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
 		  xal_ino_decode_absolute_offset(xal, ino));
 
 	buf = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
