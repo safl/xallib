@@ -24,6 +24,16 @@ The library's minimal requirements include:
 The focus is solely on an efficient data-access library, with no interest in
 forensics, recovery, or repair.
 
+Limits
+======
+
+Unlike ``xfs_bmap``, **xal** stores only file extents, not directory extents.
+This is intentional, as **xal** provides a data structure containing the parsed
+contents of directory extents via ``xal_index()``.
+
+Instead of reading directory blocks from disk, one can use the, in-memory,
+decoded file system tree rooted at ``xal->root``.
+
 Tooling
 =======
 
