@@ -164,8 +164,8 @@ def populate(args, cijoe) -> int:
     if err := provoke_odf_iabt_lvl0(args, cijoe):
         return err
 
-    if err := provoke_odf_iabt_lvl1(args, cijoe):
-        return err
+    #    if err := provoke_odf_iabt_lvl1(args, cijoe):
+    #        return err
 
     if err := provoke_odf_dir_fmt_local(args, cijoe):
         return err
@@ -173,8 +173,8 @@ def populate(args, cijoe) -> int:
     if err := provoke_odf_dir_fmt_extents(args, cijoe):
         return err
 
-    # if err := provoke_odf_dir_fmt_btree(args, cijoe):
-    #    return err
+    if err := provoke_odf_dir_fmt_btree(args, cijoe):
+        return err
 
     if err := provoke_odf_file_fmt_local(args, cijoe):
         return err
