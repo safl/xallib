@@ -1093,17 +1093,10 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 	uint64_t ino = be64toh(dinode->ino);
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
-	uint8_t *buf;
 	int err;
 
 	XAL_DEBUG("ENTER: Inline Directory Extents ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
 		  xal_ino_decode_absolute_offset(xal, ino));
-
-	buf = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
-	if (!buf) {
-		XAL_DEBUG("FAILED: xnvme_buf_alloc(); errno(%d)", errno);
-		return -errno;
-	}
 
 	/**
 	 * For some reason then di_big_nextents is populated. As far as i understand that should
@@ -1125,7 +1118,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 	err = xal_pool_claim_inodes(&xal->inodes, 1, &self->content.dentries.inodes);
 	if (err) {
 		XAL_DEBUG("FAILED: !xal_pool_claim_inodes(); err(%d)", err)
-		goto exit;
+		return err;
 	}
 
 	for (uint64_t i = 0; i < nextents; ++i) {
@@ -1141,13 +1134,14 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 		decode_xfs_extent(l0, l1, &extent);
 
 		for (size_t blk = 0; blk < extent.nblocks; ++blk) {
+			uint8_t block[BLOCK_MAX_NBYTES] = {0};
 			size_t ofz_disk = (extent.start_block + blk) * xal->sb.blocksize;
-			struct xfs_odf_dir_blk_hdr *hdr = (void *)(buf);
+			struct xfs_odf_dir_blk_hdr *hdr = (void *)(block);
 
-			err = dev_read(xal->dev, buf, xal->sb.blocksize, ofz_disk);
+			err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize, ofz_disk, block);
 			if (err) {
 				XAL_DEBUG("FAILED: !dev_read(directory-extent)");
-				goto exit;
+				return err;
 			}
 			if ((be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) &&
 			    (be32toh(hdr->magic) != XAL_ODF_DIR3_BLOCK_MAGIC)) {
@@ -1155,7 +1149,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 			}
 
 			for (uint64_t ofz = 64; ofz < xal->sb.blocksize;) {
-				uint8_t *dentry_cursor = buf + ofz;
+				uint8_t *dentry_cursor = block + ofz;
 				struct xal_inode dentry = {0};
 
 				ofz += decode_dentry(dentry_cursor, &dentry);
@@ -1191,7 +1185,7 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 				    &self->content.dentries.inodes[self->content.dentries.count]);
 				if (err) {
 					XAL_DEBUG("FAILED: process_ino(...)")
-					goto exit;
+					return err;
 				}
 
 				self->content.dentries.count += 1;
@@ -1199,14 +1193,11 @@ process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *
 				err = xal_pool_claim_inodes(&xal->inodes, 1, NULL);
 				if (err) {
 					XAL_DEBUG("FAILED: xal_pool_claim_inodes(...)");
-					goto exit;
+					return err;
 				}
 			}
 		}
 	}
-
-exit:
-	xnvme_buf_free(xal->dev, buf);
 
 	return err;
 }
