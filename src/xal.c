@@ -510,7 +510,6 @@ int
 process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 			       struct xal_inode *self)
 {
-	uint64_t ino = be64toh(dinode->ino);
 	uint8_t *cursor = (void *)dinode;
 	uint16_t numrec; // Number of records in this block
 	uint64_t startoff[4];
@@ -518,9 +517,6 @@ process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 
 	int err;
 	uint8_t *leafbuf[4];
-
-	XAL_DEBUG("ENTER: Directory B+Tree ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
-		  xal_ino_decode_absolute_offset(xal, ino));
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
@@ -560,7 +556,6 @@ process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 		readLeafData(xal, self, bmbtptrs[i], lfd);
 	}
 
-	XAL_DEBUG("EXIT");
 	return 0;
 
 exit:
@@ -581,8 +576,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	struct xal_odf_btree_lfmt leaf = {0};
 	int err;
 
-	XAL_DEBUG("ENTER:   fsbno(0x%" PRIx64 " @ %" PRIu64 ") in ino(0x%" PRIx64 ")", fsbno, ofz,
-		  self->ino);
+	XAL_DEBUG("ENTER: File Extents -- B+Tree -- Leaf Node");
 
 	err = dev_read(xal->dev, xal->buf, xal->sb.blocksize, ofz);
 	if (err) {
@@ -667,8 +661,7 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	size_t maxrecs;
 	int err;
 
-	XAL_DEBUG("ENTER:   fsbno(0x%" PRIx64 " @ %" PRIu64 ") in ino(0x%" PRIx64 ")", fsbno, ofz,
-		  self->ino);
+	XAL_DEBUG("ENTER: File Extents -- B+Tree -- Internal Node");
 
 	if (xal->sb.blocksize > ODF_BLOCK_MAX_NBYTES) {
 		XAL_DEBUG("FAILED: blocksize(%" PRIu32 ") > ODF_BLOCK_MAX_NBYTES(%" PRIu64 ")",
@@ -728,7 +721,7 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 		}
 	}
 
-	XAL_DEBUG("INFO: ---===={[ EXIT: process_file_btree_node() ====---");
+	XAL_DEBUG("EXIT");
 
 	return err;
 }
@@ -782,8 +775,7 @@ process_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode, struct x
 	size_t ofz_ptr;	  // Offset from start of dinode to start of embedded pointers
 	int err;
 
-	XAL_DEBUG("ENTER: ino(0x%" PRIx64 " @ %" PRIu64 ")", self->ino,
-		  xal_ino_decode_absolute_offset(xal, self->ino));
+	XAL_DEBUG("ENTER: File Extents -- B+Tree -- Root Node");
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
@@ -902,13 +894,11 @@ int
 process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode *dinode,
 					 struct xal_inode *self)
 {
-	uint64_t ino = be64toh(dinode->ino);
 	uint8_t *cursor = (void *)dinode;
 	uint8_t count, i8count;
 	int err;
 
-	XAL_DEBUG("ENTER: Short Form Directories ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
-		  xal_ino_decode_absolute_offset(xal, ino));
+	XAL_DEBUG("ENTER: Directory Entries -- Dinode Inline Shortform");
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
@@ -970,13 +960,11 @@ int
 process_dinode_inline_file_extents(struct xal *xal, struct xal_odf_dinode *dinode,
 				   struct xal_inode *self)
 {
-	uint64_t ino = be64toh(dinode->ino);
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
 	int err;
 
-	XAL_DEBUG("ENTER: Inline File Extents ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
-		  xal_ino_decode_absolute_offset(xal, ino));
+	XAL_DEBUG("ENTER: File Extents -- Dinode Inline");
 
 	/**
 	 * For some reason then di_big_nextents is populated. As far as i understand that should
@@ -1090,13 +1078,9 @@ int
 process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *dinode,
 					struct xal_inode *self)
 {
-	uint64_t ino = be64toh(dinode->ino);
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
 	int err;
-
-	XAL_DEBUG("ENTER: Inline Directory Extents ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
-		  xal_ino_decode_absolute_offset(xal, ino));
 
 	/**
 	 * For some reason then di_big_nextents is populated. As far as i understand that should
@@ -1215,6 +1199,8 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	struct xal_odf_dinode *dinode;
 	int err;
 
+	XAL_DEBUG("ENTER");
+
 	err = dinodes_get(xal, ino, (void **)&dinode);
 	if (err) {
 		XAL_DEBUG("FAILED: dinodes_get(); err(%d)", err);
@@ -1229,12 +1215,17 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		} else if (S_ISREG(mode)) {
 			self->ftype = XAL_ODF_DIR3_FT_REG_FILE;
 		} else {
+			XAL_DEBUG("FAILED: unsupported ftype");
 			return -EINVAL;
 		}
 	}
 
 	self->size = be64toh(dinode->di_size);
 	self->ino = be64toh(dinode->ino);
+
+	XAL_DEBUG("INFO: ino(0x%" PRIx64 ") @ ofz(%" PRIu64 "), name(%.*s)[%" PRIu8 "]", ino,
+		  xal_ino_decode_absolute_offset(xal, ino), self->namelen, self->name,
+		  self->namelen);
 
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_BTREE:
@@ -1310,6 +1301,8 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		XAL_DEBUG("FAILED: Unsupported FMT_DEV or FMT_UUID");
 		return -ENOSYS;
 	}
+
+	XAL_DEBUG("EXIT");
 
 	return 0;
 }
