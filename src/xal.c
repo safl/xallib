@@ -1038,6 +1038,74 @@ decode_dentry(void *buf, struct xal_inode *dentry)
 	return nbytes;
 }
 
+int
+process_dinode_dir_extents_block(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
+{
+	uint8_t block[ODF_BLOCK_MAX_NBYTES] = {0};
+	struct xfs_odf_dir_blk_hdr *hdr = (void *)(block);
+	size_t ofz_disk = xal_fsbno_offset(xal, fsbno);
+	int err;
+
+	err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize, ofz_disk, block);
+	if (err) {
+		XAL_DEBUG("FAILED: !dev_read(directory-extent)");
+		return err;
+	}
+	if ((be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) &&
+	    (be32toh(hdr->magic) != XAL_ODF_DIR3_BLOCK_MAGIC)) {
+		XAL_DEBUG("FAILED: unexpected magic(0x%" PRIx32 ")", be32toh(hdr->magic));
+		return err;
+	}
+
+	for (uint64_t ofz = 64; ofz < xal->sb.blocksize;) {
+		uint8_t *dentry_cursor = block + ofz;
+		struct xal_inode dentry = {0};
+
+		ofz += decode_dentry(dentry_cursor, &dentry);
+
+		/**
+		 * Seems like the only way to determine that there are no more
+		 * entries are if one start to decode uinvalid entries.
+		 * Such as a namelength of 0 or inode number 0.
+		 * Thus, checking for that here.
+		 */
+		if ((!dentry.ino) || (!dentry.namelen)) {
+			break;
+		}
+
+		/**
+		 * Skip processing the mandatory dentries: '.' and '..'
+		 */
+		if ((dentry.namelen == 1) && (dentry.name[0] == '.')) {
+			continue;
+		}
+		if ((dentry.namelen == 2) && (dentry.name[0] == '.') && (dentry.name[1] == '.')) {
+			continue;
+		}
+
+		dentry.parent = self;
+		self->content.dentries.inodes[self->content.dentries.count] = dentry;
+
+		err = process_ino(xal,
+				  self->content.dentries.inodes[self->content.dentries.count].ino,
+				  &self->content.dentries.inodes[self->content.dentries.count]);
+		if (err) {
+			XAL_DEBUG("FAILED: process_ino(...)")
+			return err;
+		}
+
+		self->content.dentries.count += 1;
+
+		err = xal_pool_claim_inodes(&xal->inodes, 1, NULL);
+		if (err) {
+			XAL_DEBUG("FAILED: xal_pool_claim_inodes(...)");
+			return err;
+		}
+	}
+
+	return 0;
+}
+
 /**
  * Processing a multi-block directory with extents in inline format
  * ================================================================
@@ -1115,67 +1183,13 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 		decode_xfs_extent(l0, l1, &extent);
 
 		for (size_t blk = 0; blk < extent.nblocks; ++blk) {
-			uint8_t block[ODF_BLOCK_MAX_NBYTES] = {0};
-			size_t ofz_disk = (extent.start_block + blk) * xal->sb.blocksize;
-			struct xfs_odf_dir_blk_hdr *hdr = (void *)(block);
+			uint64_t fsbno = extent.start_block + blk;
 
-			err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize, ofz_disk, block);
+			err = process_dinode_dir_extents_block(xal, fsbno, self);
 			if (err) {
-				XAL_DEBUG("FAILED: !dev_read(directory-extent)");
+				XAL_DEBUG("FAILED: process_dinode_dir_extents_block():err(%d)",
+					  err);
 				return err;
-			}
-			if ((be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) &&
-			    (be32toh(hdr->magic) != XAL_ODF_DIR3_BLOCK_MAGIC)) {
-				continue;
-			}
-
-			for (uint64_t ofz = 64; ofz < xal->sb.blocksize;) {
-				uint8_t *dentry_cursor = block + ofz;
-				struct xal_inode dentry = {0};
-
-				ofz += decode_dentry(dentry_cursor, &dentry);
-
-				/**
-				 * Seems like the only way to determine that there are no more
-				 * entries are if one start to decode uinvalid entries.
-				 * Such as a namelength of 0 or inode number 0.
-				 * Thus, checking for that here.
-				 */
-				if ((!dentry.ino) || (!dentry.namelen)) {
-					break;
-				}
-
-				/**
-				 * Skip processing the mandatory dentries: '.' and '..'
-				 */
-				if ((dentry.namelen == 1) && (dentry.name[0] == '.')) {
-					continue;
-				}
-				if ((dentry.namelen == 2) && (dentry.name[0] == '.') &&
-				    (dentry.name[1] == '.')) {
-					continue;
-				}
-
-				dentry.parent = self;
-				self->content.dentries.inodes[self->content.dentries.count] =
-				    dentry;
-
-				err = process_ino(
-				    xal,
-				    self->content.dentries.inodes[self->content.dentries.count].ino,
-				    &self->content.dentries.inodes[self->content.dentries.count]);
-				if (err) {
-					XAL_DEBUG("FAILED: process_ino(...)")
-					return err;
-				}
-
-				self->content.dentries.count += 1;
-
-				err = xal_pool_claim_inodes(&xal->inodes, 1, NULL);
-				if (err) {
-					XAL_DEBUG("FAILED: xal_pool_claim_inodes(...)");
-					return err;
-				}
 			}
 		}
 	}
