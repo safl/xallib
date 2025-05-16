@@ -509,6 +509,7 @@ int
 process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 			       struct xal_inode *self)
 {
+	uint64_t ino = be64toh(dinode->ino);
 	uint8_t *cursor = (void *)dinode;
 	uint16_t numrec; // Number of records in this block
 	uint64_t startoff[4];
@@ -516,6 +517,9 @@ process_dinode_directory_btree(struct xal *xal, struct xal_odf_dinode *dinode,
 
 	int err;
 	uint8_t *leafbuf[4];
+
+	XAL_DEBUG("INFO: Directory B+Tree ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
+		  xal_ino_decode_absolute_offset(xal, ino));
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
@@ -897,9 +901,11 @@ process_dinode_inline_shortform_dentries(struct xal *xal, struct xal_odf_dinode 
 {
 	uint8_t *cursor = (void *)dinode;
 	uint8_t count, i8count;
+	uint64_t ino = be64toh(dinode->ino);
 	int err;
 
-	XAL_DEBUG("INFO: Short Form Directories ino(0x%" PRIx64 ")", be64toh(dinode->ino));
+	XAL_DEBUG("INFO: Short Form Directories ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
+		  xal_ino_decode_absolute_offset(xal, ino));
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
@@ -959,11 +965,13 @@ int
 process_dinode_inline_file_extents(struct xal *xal, struct xal_odf_dinode *dinode,
 				   struct xal_inode *self)
 {
+	uint64_t ino = be64toh(dinode->ino);
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
 	int err;
 
-	XAL_DEBUG("INFO: Inline File Extents ino(0x%" PRIx64 ")", be64toh(dinode->ino));
+	XAL_DEBUG("INFO: Inline File Extents ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
+		  xal_ino_decode_absolute_offset(xal, ino));
 
 	/**
 	 * For some reason then di_big_nextents is populated. As far as i understand that should
@@ -1076,12 +1084,14 @@ int
 process_dinode_inline_directory_extents(struct xal *xal, struct xal_odf_dinode *dinode,
 					struct xal_inode *self)
 {
+	uint64_t ino = be64toh(dinode->ino);
 	uint8_t *cursor = (void *)dinode;
 	uint64_t nextents;
 	uint8_t *buf;
 	int err;
 
-	XAL_DEBUG("INFO: Inline Directory Extents ino(0x%" PRIx64 ")", be64toh(dinode->ino));
+	XAL_DEBUG("INFO: Inline Directory Extents ino(0x%" PRIx64 ") @ ofz(%" PRIu64 ")", ino,
+		  xal_ino_decode_absolute_offset(xal, ino));
 
 	buf = xnvme_buf_alloc(xal->dev, BUF_NBYTES);
 	if (!buf) {
