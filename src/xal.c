@@ -1052,18 +1052,23 @@ int
 process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
 	uint8_t dblock[ODF_BLOCK_FS_BYTES_MAX] = {0};
-	struct xfs_odf_dir_blk_hdr *hdr = (void *)(dblock);
+	union xal_odf_btree_magic *magic = (void *)(dblock);
 	size_t ofz_disk = xal_fsbno_offset(xal, fsbno);
 	int err;
+
+	XAL_DEBUG("ENTER");
 
 	err = dev_read_into(xal->dev, xal->buf, xal->sb.dirblocksize, ofz_disk, dblock);
 	if (err) {
 		XAL_DEBUG("FAILED: !dev_read(directory-extent)");
 		return err;
 	}
-	if ((be32toh(hdr->magic) != XAL_ODF_DIR3_DATA_MAGIC) &&
-	    (be32toh(hdr->magic) != XAL_ODF_DIR3_BLOCK_MAGIC)) {
-		XAL_DEBUG("FAILED: unexpected magic(0x%" PRIx32 ")", be32toh(hdr->magic));
+
+	XAL_DEBUG("INFO: magic('%.4s', 0x%" PRIx32 "); ", magic->text, magic->num);
+
+	if ((be32toh(magic->num) != XAL_ODF_DIR3_DATA_MAGIC) &&
+	    (be32toh(magic->num) != XAL_ODF_DIR3_BLOCK_MAGIC)) {
+		XAL_DEBUG("FAILED: looks like invalid magic value");
 		return err;
 	}
 
@@ -1113,6 +1118,8 @@ process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_in
 		}
 	}
 
+	XAL_DEBUG("EXIT");
+
 	return 0;
 }
 
@@ -1150,6 +1157,7 @@ process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_in
  * way to put a useful upper-bound on it. E.g. even with a very small amount of extents, then each
  * of these have a 'count' of blocks. This 200bits worth of blocks... thats an awful lot of blocks.
  */
+
 int
 process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
