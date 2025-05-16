@@ -1399,9 +1399,6 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 				return err;
 			}
 			memcpy(inodechunk, xal->buf, chunk_nbytes);
-
-			printf("chunk_nbytes(%" PRIu64 "), BUF_NBYTES(%" PRIu64 ")\n", chunk_nbytes,
-			       BUF_NBYTES);
 		}
 
 		/**
