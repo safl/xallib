@@ -17,11 +17,12 @@
 #include <xal_pool.h>
 #include <xal_pp.h>
 
-#define BUF_NBYTES 4096 * 32UL		 ///< Number of bytes in a buffer
-#define CHUNK_NINO 64			 ///< Number of inodes in a chunk
-#define BUF_BLOCKSIZE 4096		 ///< Number of bytes in a block
-#define ODF_BLOCK_MAX_NBYTES 64UL * 1024 ///< Maximum size of a block
-#define ODF_INODE_MAX_NBYTES 2048	 ///< Maximum size of an inode
+#define BUF_NBYTES 4096 * 32UL		    ///< Number of bytes in a buffer
+#define CHUNK_NINO 64			    ///< Number of inodes in a chunk
+#define BUF_BLOCKSIZE 4096		    ///< Number of bytes in a block
+#define ODF_BLOCK_DIR_BYTES_MAX 64UL * 1024 ///< Maximum size of a directory block
+#define ODF_BLOCK_FS_BYTES_MAX 64UL * 1024  ///< Maximum size of a filestem block
+#define ODF_INODE_MAX_NBYTES 2048	    ///< Maximum size of an inode
 
 struct pair_u64 {
 	uint64_t l0;
@@ -659,7 +660,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 int
 process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
-	uint64_t pointers[ODF_BLOCK_MAX_NBYTES / 8] = {0};
+	uint64_t pointers[ODF_BLOCK_FS_BYTES_MAX / 8] = {0};
 	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
 	struct xal_odf_btree_lfmt node = {0};
 	size_t pointers_ofz;
@@ -668,9 +669,9 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 
 	XAL_DEBUG("ENTER: File Extents -- B+Tree -- Internal Node");
 
-	if (xal->sb.blocksize > ODF_BLOCK_MAX_NBYTES) {
-		XAL_DEBUG("FAILED: blocksize(%" PRIu32 ") > ODF_BLOCK_MAX_NBYTES(%" PRIu64 ")",
-			  xal->sb.blocksize, ODF_BLOCK_MAX_NBYTES);
+	if (xal->sb.blocksize > ODF_BLOCK_FS_BYTES_MAX) {
+		XAL_DEBUG("FAILED: blocksize(%" PRIu32 ") > ODF_BLOCK_FS_BYTES_MAX(%" PRIu64 ")",
+			  xal->sb.blocksize, ODF_BLOCK_FS_BYTES_MAX);
 		return -EINVAL;
 	}
 
@@ -1047,7 +1048,7 @@ decode_dentry(void *buf, struct xal_inode *dentry)
 int
 process_dinode_dir_extents_block(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
-	uint8_t block[ODF_BLOCK_MAX_NBYTES] = {0};
+	uint8_t block[ODF_BLOCK_FS_BYTES_MAX] = {0};
 	struct xfs_odf_dir_blk_hdr *hdr = (void *)(block);
 	size_t ofz_disk = xal_fsbno_offset(xal, fsbno);
 	int err;
@@ -1161,6 +1162,8 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	if (!nextents) {
 		nextents = be64toh(dinode->di_big_nextents);
 	}
+
+	XAL_DEBUG("!!!!!!!!!! nextents(%" PRIu64 ")", nextents);
 
 	/**
 	 * A single inode is claimed, this is to get the pointer to the start of the array,
@@ -1441,7 +1444,7 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 int
 retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
 {
-	uint8_t block[ODF_BLOCK_MAX_NBYTES] = {0};
+	uint8_t block[ODF_BLOCK_FS_BYTES_MAX] = {0};
 	struct xal_odf_btree_sfmt *root = (void *)block;
 	int err;
 
