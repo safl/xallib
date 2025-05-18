@@ -1164,6 +1164,7 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	struct pair_u64 *extents = (void *)(((uint8_t *)dinode) + sizeof(struct xal_odf_dinode));
 	const uint32_t fsblk_per_dblk = xal->sb.dirblocksize / xal->sb.blocksize;
 	uint64_t nextents = be32toh(dinode->di_nextents);
+	int64_t nbytes = be64toh(dinode->size);
 	int err;
 
 	/**
@@ -1176,7 +1177,7 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	}
 	XAL_DEBUG("INFO:       nextents(%" PRIu64 ")", nextents);
 	XAL_DEBUG("INFO: fsblk_per_dblk(%" PRIu32 ")", fsblk_per_dblk);
-
+	XAL_DEBUG("INFO:         nbytes(%" PRIu64 ")", nbytes);
 	/**
 	 * A single inode is claimed, this is to get the pointer to the start of the array,
 	 * additional calls to claim will be called as extents/dentries are decoded, however, only
@@ -1192,10 +1193,11 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	/**
 	 * Decode the extents and process each block
 	 */
-	for (uint64_t i = 0; i < nextents; ++i) {
+	for (uint64_t i = 0; (nbytes > 0) && (i < nextents); ++i) {
 		struct xal_extent extent = {0};
 
 		XAL_DEBUG("INFO: extent(%" PRIu64 "/%" PRIu64 ")", i + 1, nextents);
+		XAL_DEBUG("INFO: nbytes(%" PRIu64 ")", nbytes);
 
 		decode_xfs_extent(be64toh(extents[i].l0), be64toh(extents[i].l1), &extent);
 
@@ -1215,6 +1217,8 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 				return err;
 			}
 		}
+
+		nbytes -= extent.nblocks * xal->sb.blocksize;
 	}
 
 	return err;
@@ -1254,7 +1258,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 		}
 	}
 
-	self->size = be64toh(dinode->di_size);
+	self->size = be64toh(dinode->size);
 	self->ino = be64toh(dinode->ino);
 
 	XAL_DEBUG("INFO: ino(0x%" PRIx64 ") @ ofz(%" PRIu64 "), name(%.*s)[%" PRIu8 "]", ino,

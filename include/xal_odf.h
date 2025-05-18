@@ -98,7 +98,7 @@ struct xal_odf_sb {
 	uint64_t icount; ///< allocated inodes
 
 	uint8_t _reserved_7[56];
-	
+
 	uint8_t dirblklog;
 
 	uint8_t _reserved_8[56];
@@ -261,7 +261,7 @@ struct xal_odf_dinode {
 	xfs_timestamp_t di_atime; /* time last accessed */
 	xfs_timestamp_t di_mtime; /* time last modified */
 	xfs_timestamp_t di_ctime; /* time created/inode modified */
-	uint64_t di_size;	  /* number of bytes in file */
+	uint64_t size;		  /* number of bytes in file */
 	uint64_t di_nblocks;	  /* # of direct & btree blocks used */
 	uint32_t di_extsize;	  /* basic/minimum extent size for file */
 	union {
