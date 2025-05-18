@@ -1264,6 +1264,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	XAL_DEBUG("INFO: ino(0x%" PRIx64 ") @ ofz(%" PRIu64 "), name(%.*s)[%" PRIu8 "]", ino,
 		  xal_ino_decode_absolute_offset(xal, ino), self->namelen, self->name,
 		  self->namelen);
+	XAL_DEBUG("INFO: format(0x%"PRIu8")", dinode->di_format);
 
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_BTREE:
