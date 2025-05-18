@@ -51,15 +51,31 @@ def provoke_odf_dir_fmt_local(args: Namespace, cijoe: Cijoe) -> int:
     )
 
 
-def provoke_odf_dir_fmt_extents(args: Namespace, cijoe: Cijoe) -> int:
+def provoke_odf_dir_fmt_extents_few(args: Namespace, cijoe: Cijoe) -> int:
     """
     Create a directory with more files than what can fit in FMT_LOCAL, triggering the
     use of FMT_EXTENTS. This should still not provoke the use of FMT_BTREE, since that
     would require more fragmentation.
+
+    This be possible with a single extents
     """
 
     return create_directory_with_urandom_content(
-        args, cijoe, args.mountpoint / "should-be-dir-fmt_extents", 100, "4K"
+        args, cijoe, args.mountpoint / "should-be-dir-fmt_extents-few", 100, "4K"
+    )
+
+
+def provoke_odf_dir_fmt_extents_more(args: Namespace, cijoe: Cijoe) -> int:
+    """
+    Create a directory with more files than what can fit in FMT_LOCAL, triggering the
+    use of FMT_EXTENTS. This should still not provoke the use of FMT_BTREE, since that
+    would require more fragmentation.
+
+    This spills into multiple extents.
+    """
+
+    return create_directory_with_urandom_content(
+        args, cijoe, args.mountpoint / "should-be-dir-fmt_extents-more", 500, "4K"
     )
 
 
@@ -170,7 +186,10 @@ def populate(args, cijoe) -> int:
     if err := provoke_odf_dir_fmt_local(args, cijoe):
         return err
 
-    if err := provoke_odf_dir_fmt_extents(args, cijoe):
+    if err := provoke_odf_dir_fmt_extents_few(args, cijoe):
+        return err
+
+    if err := provoke_odf_dir_fmt_extents_more(args, cijoe):
         return err
 
     if err := provoke_odf_dir_fmt_btree(args, cijoe):
