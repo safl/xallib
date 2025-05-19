@@ -180,8 +180,8 @@ def populate(args, cijoe) -> int:
     if err := provoke_odf_iabt_lvl0(args, cijoe):
         return err
 
-    #    if err := provoke_odf_iabt_lvl1(args, cijoe):
-    #        return err
+    if err := provoke_odf_iabt_lvl1(args, cijoe):
+        return err
 
     if err := provoke_odf_dir_fmt_local(args, cijoe):
         return err
