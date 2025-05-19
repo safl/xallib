@@ -1495,8 +1495,11 @@ int
 retrieve_dinodes_via_iab3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
 {
 	uint8_t block[ODF_BLOCK_FS_BYTES_MAX] = {0};
-	struct xal_odf_btree_sfmt *root = (void *)block;
+	struct xal_odf_btree_sfmt *node = (void *)block;
 	int err;
+
+	XAL_DEBUG("ENTER");
+	XAL_DEBUG("INFO: seqno(%" PRIu32 "), blkno(0x%" PRIx64 ")", ag->seqno, blkno);
 
 	err = read_iab3_block(xal, ag, blkno, block);
 	if (err) {
@@ -1518,9 +1521,11 @@ retrieve_dinodes_via_iab3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, ui
 		break;
 
 	default:
-		XAL_DEBUG("FAILED: iab3->level(%" PRIu16 ")?", root->pos.level);
+		XAL_DEBUG("FAILED: iab3->level(%" PRIu16 ")?", node->pos.level);
 		return -EINVAL;
 	}
+
+	XAL_DEBUG("EXIT");
 
 	return 0;
 }
