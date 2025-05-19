@@ -1264,7 +1264,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	XAL_DEBUG("INFO: ino(0x%" PRIx64 ") @ ofz(%" PRIu64 "), name(%.*s)[%" PRIu8 "]", ino,
 		  xal_ino_decode_absolute_offset(xal, ino), self->namelen, self->name,
 		  self->namelen);
-	XAL_DEBUG("INFO: format(0x%"PRIu8")", dinode->di_format);
+	XAL_DEBUG("INFO: format(0x%" PRIu8 ")", dinode->di_format);
 
 	switch (dinode->di_format) {
 	case XAL_DINODE_FMT_BTREE:
@@ -1467,7 +1467,7 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
  * It is assumed that the inode-allocation-b+tree is rooted at the given 'blkno'
  */
 int
-retrieve_dinodes_via_iabt3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
+retrieve_dinodes_via_iab3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
 {
 	uint8_t block[ODF_BLOCK_FS_BYTES_MAX] = {0};
 	struct xal_odf_btree_sfmt *root = (void *)block;
@@ -1514,9 +1514,9 @@ xal_dinodes_retrieve(struct xal *xal)
 		struct xal_ag *ag = &xal->ags[seqno];
 		int err;
 
-		err = retrieve_dinodes_via_iabt3(xal, ag, ag->agi_root, &index);
+		err = retrieve_dinodes_via_iab3(xal, ag, ag->agi_root, &index);
 		if (err) {
-			XAL_DEBUG("FAILED: retrieve_dinodes_via_iabt3(); err(%d)", err);
+			XAL_DEBUG("FAILED: retrieve_dinodes_via_iab3(); err(%d)", err);
 			free(xal->dinodes);
 			xal->dinodes = NULL;
 			return err;
