@@ -1486,6 +1486,44 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 	return err;
 }
 
+int
+retrieve_dinodes_via_iab3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index);
+
+/**
+ * Decodes the node and invokes retrieve_dinodes_via_iab3() for each decoded record.
+ */
+static int
+decode_iab3_node_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t *index)
+{
+	uint32_t pointers[ODF_BLOCK_FS_BYTES_MAX / sizeof(uint32_t)] = {0};
+	struct xal_odf_btree_sfmt *node = (void *)buf;
+	uint8_t *cursor = buf;
+	size_t pointers_ofz;
+	int err;
+
+	XAL_DEBUG("ENTER");
+
+	btree_block_sfmt_meta(xal, NULL, NULL, &pointers_ofz);
+
+	memcpy(&pointers, cursor + pointers_ofz, xal->sb.blocksize - pointers_ofz);
+
+	XAL_DEBUG("#### Processing Pointers ###");
+	for (uint16_t rec = 0; rec < node->pos.numrecs; ++rec) {
+		uint32_t blkno = be32toh(pointers[rec]);
+
+		XAL_DEBUG("INFO: ptr[%" PRIu16 "] = 0x%" PRIx32, rec, blkno);
+		err = retrieve_dinodes_via_iab3(xal, ag, blkno, index);
+		if (err) {
+			XAL_DEBUG("FAILED: retrieve_dinodes_via_iab3() : err(%d)", err);
+			return err;
+		}
+	}
+
+	XAL_DEBUG("EXIT");
+
+	return 0;
+}
+
 /**
  * Retrieve all the allocated inodes stored within the given allocation group
  *
@@ -1507,10 +1545,14 @@ retrieve_dinodes_via_iab3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, ui
 		return err;
 	}
 
-	switch (root->pos.level) {
+	switch (node->pos.level) {
 	case 1:
-		XAL_DEBUG("FAILED: iab3->level(%" PRIu16 ")?", root->pos.level);
-		return -EINVAL;
+		err = decode_iab3_node_records(xal, ag, block, index);
+		if (err) {
+			XAL_DEBUG("FAILED: decode_iab3_node(); err(%d)", err);
+			return err;
+		}
+		break;
 
 	case 0:
 		err = decode_iab3_leaf_records(xal, ag, block, index);
