@@ -1530,14 +1530,19 @@ xal_dinodes_retrieve(struct xal *xal)
 {
 	uint64_t index = 0;
 
+	XAL_DEBUG("ENTER");
+
 	xal->dinodes = calloc(1, xal->sb.nallocated * xal->sb.inodesize);
 	if (!xal->dinodes) {
+		XAL_DEBUG("FAILED: calloc()");
 		return -errno;
 	}
 
 	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
 		struct xal_ag *ag = &xal->ags[seqno];
 		int err;
+
+		XAL_DEBUG("INFO: seqno: %" PRIu32 "", seqno);
 
 		err = retrieve_dinodes_via_iab3(xal, ag, ag->agi_root, &index);
 		if (err) {
@@ -1547,6 +1552,8 @@ xal_dinodes_retrieve(struct xal *xal)
 			return err;
 		}
 	}
+
+	XAL_DEBUG("EXIT");
 
 	return 0;
 }
