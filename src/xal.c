@@ -1415,6 +1415,8 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 	struct xal_odf_btree_sfmt *root = (void *)buf;
 	int err;
 
+	XAL_DEBUG("ENTER");
+
 	for (uint16_t reci = 0; reci < root->pos.numrecs; ++reci) {
 		uint8_t inodechunk[BUF_NBYTES] = {0};
 		struct xal_odf_inobt_rec *rec;
@@ -1478,6 +1480,8 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 			*index += 1;
 		}
 	}
+
+	XAL_DEBUG("EXIT");
 
 	return err;
 }
