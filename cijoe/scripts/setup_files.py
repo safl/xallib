@@ -85,7 +85,7 @@ def provoke_odf_dir_fmt_btree(args: Namespace, cijoe: Cijoe) -> int:
     """
 
     return create_directory_with_urandom_content(
-        args, cijoe, args.mountpoint / "should-be-dir-fmt_btree", 10000, "5M"
+        args, cijoe, args.mountpoint / "should-be-dir-fmt_btree", 5000, "4K"
     )
 
 

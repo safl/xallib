@@ -13,7 +13,7 @@ steps:
   uses: setup_zram
   with:
     dev-path: /dev/zram0
-    size-in-gb: 55
+    size-in-gb: 10
 
 - name: setup_filesystem
   uses: setup_xfs
