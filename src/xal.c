@@ -33,7 +33,7 @@ int
 decode_dentry(void *buf, struct xal_inode *dentry);
 
 static void
-btree_block_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
+btree_block_lfmt_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
 {
 	size_t hdr_nbytes = sizeof(struct xal_odf_btree_lfmt);
 	size_t mrecs = (xal->sb.blocksize - hdr_nbytes) / 16;
@@ -675,7 +675,7 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 		return -EINVAL;
 	}
 
-	btree_block_meta(xal, &maxrecs, NULL, &pointers_ofz);
+	btree_block_lfmt_meta(xal, &maxrecs, NULL, &pointers_ofz);
 
 	XAL_DEBUG("INFO: maxrecs(%zu)", maxrecs);
 	XAL_DEBUG("INFO: pointers_ofz(%zu)", pointers_ofz);
