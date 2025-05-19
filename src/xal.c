@@ -49,6 +49,23 @@ btree_block_lfmt_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *po
 	}
 }
 
+static void
+btree_block_sfmt_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
+{
+	size_t hdr_nbytes = sizeof(struct xal_odf_btree_sfmt);
+	size_t mrecs = (xal->sb.blocksize - hdr_nbytes) / 8;
+
+	if (maxrecs) {
+		*maxrecs = mrecs;
+	}
+	if (keys) {
+		*keys = hdr_nbytes;
+	}
+	if (pointers) {
+		*pointers = hdr_nbytes + mrecs * 4;
+	}
+}
+
 void
 decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 {
