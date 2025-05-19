@@ -1369,11 +1369,13 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 static int
 read_iab3_block(struct xal *xal, struct xal_ag *ag, uint64_t blkno, void *buf)
 {
+	uint64_t ofz = xal_agbno_absolute_offset(xal, ag->seqno, blkno);
 	struct xal_odf_btree_sfmt *block = (void *)buf;
 	int err;
 
-	err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize,
-			    xal_agbno_absolute_offset(xal, ag->seqno, blkno), buf);
+	XAL_DEBUG("ENTER: blkno(0x%" PRIx64 ", %" PRIu64 ") @ ofz(%" PRIu64 ")", blkno, blkno, ofz);
+
+	err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize, ofz, buf);
 	if (err) {
 		XAL_DEBUG("FAILED: dev_read_into(); err(%d)", err);
 		return err;
@@ -1401,6 +1403,8 @@ read_iab3_block(struct xal *xal, struct xal_ag *ag, uint64_t blkno, void *buf)
 		  xal_agbno_absolute_offset(xal, ag->seqno, blkno));
 	XAL_DEBUG("INFO: rightsib(0x%08" PRIx32 " @ %" PRIu64 ")", block->siblings.right,
 		  xal_agbno_absolute_offset(xal, ag->seqno, block->siblings.right));
+
+	XAL_DEBUG("EXIT");
 
 	return 0;
 }
