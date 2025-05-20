@@ -198,6 +198,8 @@ dev_read(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
 	const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
 	int err;
 
+	XAL_DEBUG("INFO: count(%zu), offset(%zu)", count, offset);
+
 	if (count > geo->mdts_nbytes) {
 		XAL_DEBUG("FAILED: dev_read(...) -- count(%zu) > mdts_nbytes(%" PRIu32 ")", count,
 			  geo->mdts_nbytes);
@@ -217,7 +219,7 @@ dev_read(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
 	err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), offset / geo->lba_nbytes,
 			     (count / geo->lba_nbytes) - 1, buf, NULL);
 	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
-		XAL_DEBUG("FAILED: xnvme_nvm_read(...);");
+		XAL_DEBUG("FAILED: xnvme_nvm_read(...):err(%d)", err);
 		return -EIO;
 	}
 
