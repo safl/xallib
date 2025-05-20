@@ -414,6 +414,8 @@ readLeafData(struct xal *xal, struct xal_inode *self, uint64_t bmbtptrs,
 {
 	int err = 0;
 
+	XAL_DEBUG("ENTER");
+
 	uint64_t block_number = bmbtptrs;
 	uint64_t physicalblk = getPhysicalblockFromFs(xal, block_number);
 	uint64_t block_offset = (physicalblk * xal->sb.blocksize);
@@ -503,6 +505,8 @@ exit:
 	xnvme_buf_free(xal->dev, buf);
 	xnvme_buf_free(xal->dev, block_databuf);
 
+	XAL_DEBUG("ENTER");
+
 	return err;
 }
 
@@ -510,6 +514,8 @@ int
 readBlockData(struct xal *xal, void *buf, uint64_t block_number)
 {
 	int err;
+
+	XAL_DEBUG("ENTER");
 
 	// Calculate the Physical blcok from FS Block
 	uint64_t physicalblk = getPhysicalblockFromFs(xal, block_number);
@@ -522,6 +528,9 @@ readBlockData(struct xal *xal, void *buf, uint64_t block_number)
 		XAL_DEBUG("FAILED: dev_read()\n");
 		return -errno;
 	}
+
+	XAL_DEBUG("INFO");
+	
 	return 0;
 }
 
@@ -540,6 +549,8 @@ process_dinode_dir_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 
 	int err;
 	uint8_t *leafbuf[4];
+
+	XAL_DEBUG("ENTER");
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
@@ -579,6 +590,8 @@ process_dinode_dir_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 		readLeafData(xal, self, bmbtptrs[i], lfd);
 	}
 
+	XAL_DEBUG("EXIT");
+
 	return 0;
 
 exit:
@@ -588,6 +601,8 @@ exit:
 			xnvme_buf_free(xal->dev, leafbuf[i]);
 		}
 	}
+
+	XAL_DEBUG("EXIT");
 
 	return err;
 }
