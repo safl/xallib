@@ -106,7 +106,7 @@ xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **
 		return -EINVAL;
 	}
 
-	if ((pool->allocated + count) >= pool->free) {
+	if (pool->allocated <= (pool->free + count)) {
 		err = xal_pool_grow(pool, pool->growby);
 		if (err) {
 			XAL_DEBUG("xal_pool_grow(); err(%d)", err);
