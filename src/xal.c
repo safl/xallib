@@ -1415,7 +1415,7 @@ static int
 decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t *index)
 {
 	struct xal_odf_btree_sfmt *root = (void *)buf;
-	int err;
+	int err = 0;
 
 	XAL_DEBUG("ENTER");
 
