@@ -658,19 +658,6 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 
 	XAL_DEBUG("EXIT");
 
-	/**
-	It seems like this is not needed. It looks like the parent node has all the siblings in the
-	array of pointers, these left/right pointers **should** then point to each other, but they
-	do not have to, and if both the parent invokes the leaf-decoder for each record, and the
-	leaf-decoder then calls recursively, then each leaf is processed (n (n+1))/2 times, which is
-	less than ideal :)
-	It is left as a comment here, and removed entirely in the node-decoder.
-
-	if (rightsib != 0xFFFFFFFFFFFFFFFF) {
-		err = process_file_btree_leaf(xal, rightsib, self);
-	}
-	*/
-
 	return err;
 }
 
