@@ -156,7 +156,15 @@ btree_sblock_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointe
 	}
 }
 
-void
+/**
+ * Decodes the XFS Extent information in l0 and l1 into the given 'extent' structure
+ *
+ * I guess this assumes that the host is little-endian...
+ *
+ * @param l0 First 64bits in host-endiannes
+ * @param l1 First 64bits in host-endiannes
+ */
+static void
 decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 {
 	// Extract start offset (l0:9-62)
