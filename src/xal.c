@@ -32,6 +32,39 @@ struct pair_u64 {
 int
 decode_dentry(void *buf, struct xal_inode *dentry);
 
+/**
+ * Derive the values needed to decode the records of a btree-root-node embedded in a dinode
+ *
+ * @param xal The xal instance
+ * @param dinode The dinode in question
+ * @param maxrecs Optional Maximum number of records in the dinode
+ * @param keys Optional pointer to store dinode-offset to keys
+ * @param pointers Optional pointer to store dinode-offset to pointers
+ */
+static void
+btree_dinode_meta(struct xal *xal, struct xal_odf_dinode *dinode, size_t *maxrecs, size_t *keys,
+		  size_t *pointers)
+{
+	size_t core_nbytes = sizeof(*dinode);
+	size_t attr_ofz = core_nbytes + dinode->di_forkoff * 8UL;
+	size_t attr_nbytes = xal->sb.inodesize - attr_ofz;
+	size_t data_nbytes = xal->sb.inodesize - core_nbytes - attr_nbytes;
+	size_t mrecs = (data_nbytes - 4) / 16;
+
+	XAL_DEBUG("di_forkoff(%" PRIu16 ", %" PRIu64 ")", dinode->di_forkoff,
+		  dinode->di_forkoff * 8UL);
+
+	if (maxrecs) {
+		*maxrecs = mrecs;
+	}
+	if (keys) {
+		*keys = core_nbytes + 2 + 2;
+	}
+	if (pointers) {
+		*pointers = core_nbytes + 2 + 2 + mrecs * 8;
+	}
+}
+
 static void
 btree_block_lfmt_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
 {
@@ -751,36 +784,6 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	XAL_DEBUG("EXIT");
 
 	return err;
-}
-
-/**
- * Derive the values needed to decode the records of a btree-root-node embedded in a dinode
- *
- * @param xal The xal instance
- * @param dinode The dinode in question
- * @param maxrecs Optional Maximum number of records in the dinode
- * @param keys Optional pointer to store dinode-offset to keys
- * @param pointers Optional pointer to store dinode-offset to pointers
- */
-static void
-btree_dinode_meta(struct xal *xal, struct xal_odf_dinode *dinode, size_t *maxrecs, size_t *keys,
-		  size_t *pointers)
-{
-	size_t core_nbytes = sizeof(*dinode);
-	size_t attr_ofz = core_nbytes + dinode->di_forkoff * 8UL;
-	size_t attr_nbytes = xal->sb.inodesize - attr_ofz;
-	size_t data_nbytes = xal->sb.inodesize - core_nbytes - attr_nbytes;
-	size_t mrecs = (data_nbytes - 4) / 16;
-
-	if (maxrecs) {
-		*maxrecs = mrecs;
-	}
-	if (keys) {
-		*keys = core_nbytes + 2 + 2;
-	}
-	if (pointers) {
-		*pointers = core_nbytes + 2 + 2 + mrecs * 8;
-	}
 }
 
 /**
