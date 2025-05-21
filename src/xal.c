@@ -66,7 +66,7 @@ btree_dinode_meta(struct xal *xal, struct xal_odf_dinode *dinode, size_t *maxrec
 }
 
 static void
-btree_block_lfmt_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
+btree_lblock_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
 {
 	size_t hdr_nbytes = sizeof(struct xal_odf_btree_lfmt);
 	size_t mrecs = (xal->sb.blocksize - hdr_nbytes) / 16;
@@ -83,7 +83,7 @@ btree_block_lfmt_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *po
 }
 
 static void
-btree_block_sfmt_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
+btree_sblock_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
 {
 	size_t hdr_nbytes = sizeof(struct xal_odf_btree_sfmt);
 	size_t mrecs = (xal->sb.blocksize - hdr_nbytes) / 8;
@@ -729,7 +729,7 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 		return -EINVAL;
 	}
 
-	btree_block_lfmt_meta(xal, &maxrecs, NULL, &pointers_ofz);
+	btree_lblock_meta(xal, &maxrecs, NULL, &pointers_ofz);
 
 	XAL_DEBUG("INFO: maxrecs(%zu)", maxrecs);
 	XAL_DEBUG("INFO: pointers_ofz(%zu)", pointers_ofz);
@@ -1510,7 +1510,7 @@ decode_iab3_node_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 
 	XAL_DEBUG("ENTER");
 
-	btree_block_sfmt_meta(xal, NULL, NULL, &pointers_ofz);
+	btree_sblock_meta(xal, NULL, NULL, &pointers_ofz);
 
 	memcpy(&pointers, cursor + pointers_ofz, xal->sb.blocksize - pointers_ofz);
 
