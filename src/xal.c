@@ -445,6 +445,206 @@ int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
 /**
+ * Read the B+Tree block at 'fsbno' into 'buf'
+ *
+ * @param xal
+ * @param fsbno File-System Block number in host-endianess
+ * @param buf
+ * @return On success 0 is returned. On error, negative error number is returned.
+ */
+static int
+btree_lblock_read(struct xal *xal, uint64_t fsbno, void *buf)
+{
+	struct xal_odf_btree_lfmt *block = (void *)buf;
+	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
+	int err = -ENOSYS;
+
+	XAL_DEBUG("ENTER: fsbno(0x%" PRIx64 ", %" PRIu64 ") @ ofz(%" PRIu64 ")", fsbno, fsbno, ofz);
+
+	err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize, ofz, buf);
+	if (err) {
+		XAL_DEBUG("FAILED: dev_read_into(); err(%d)", err);
+		return err;
+	}
+
+	block->level = be16toh(block->level);
+	block->numrecs = be16toh(block->numrecs);
+	block->leftsib = be64toh(block->leftsib);
+	block->rightsib = be64toh(block->rightsib);
+
+	XAL_DEBUG("INFO:    magic(%.4s, 0x%" PRIx32 ")", block->magic.text, block->magic.num);
+	XAL_DEBUG("INFO:    level(%" PRIu16 ")", block->level);
+	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", block->numrecs);
+	XAL_DEBUG("INFO:  leftsib(0x%08" PRIx64 " @ %" PRIu64 ")", block->leftsib,
+		  xal_fsbno_offset(xal, block->leftsib));
+	XAL_DEBUG("INFO:    fsbno(0x%08" PRIx64 " @ %" PRIu64 ")", fsbno,
+		  xal_fsbno_offset(xal, fsbno));
+	XAL_DEBUG("INFO: rightsib(0x%08" PRIx64 " @ %" PRIu64 ")", block->leftsib,
+		  xal_fsbno_offset(xal, block->rightsib));
+
+	XAL_DEBUG("EXIT");
+
+	return err;
+}
+
+/**
+ * Decodes BMA3 Block of directory-extents in the given 'buf' and
+ */
+static int
+btree_lblock_decode_leaf_records(struct xal *xal, void *buf, struct xal_inode *self)
+{
+	struct xal_odf_btree_lfmt *leaf = buf;
+	size_t pointers_ofz = sizeof(*leaf);
+	struct pair_u64 *pairs = (void *)(((uint8_t *)buf) + pointers_ofz);
+	const uint32_t fsblk_per_dblk = xal->sb.dirblocksize / xal->sb.blocksize;
+
+	XAL_DEBUG("ENTER: Directory Extents -- B+Tree -- Leaf Node");
+
+	if (XAL_ODF_BMAP_CRC_MAGIC != be32toh(leaf->magic.num)) {
+		XAL_DEBUG("FAILED: expected magic(BMA3) got magic('%.4s', 0x%" PRIx32 "); ",
+			  leaf->magic.text, leaf->magic.num);
+		return -EINVAL;
+	}
+	if (leaf->level != 0) {
+		XAL_DEBUG("FAILED: expecting a leaf; got level(%" PRIu16 ")", leaf->level);
+		return -EINVAL;
+	}
+
+	for (uint16_t rec = 0; rec < leaf->numrecs; ++rec) {
+		struct xal_extent extent = {0};
+
+		XAL_DEBUG("rec(%" PRIu16 "), l0(0x%" PRIx64 "), l1(0x%" PRIx64 ")", rec,
+			  pairs[rec].l0, pairs[rec].l1);
+
+		decode_xfs_extent(be64toh(pairs[rec].l0), be64toh(pairs[rec].l1), &extent);
+
+		for (size_t fsblk = 0; fsblk < extent.nblocks; fsblk += fsblk_per_dblk) {
+			uint8_t dblock[ODF_BLOCK_FS_BYTES_MAX] = {0};
+			uint64_t fsbno = extent.start_block + fsblk;
+
+			union xal_odf_btree_magic *magic = (void *)(dblock);
+			size_t ofz_disk = xal_fsbno_offset(xal, fsbno);
+			int err;
+
+			XAL_DEBUG("INFO:  fsbno(0x%" PRIu64 ") @ ofz(%" PRIu64 ")", fsbno,
+				  xal_fsbno_offset(xal, fsbno));
+			XAL_DEBUG("INFO:  fsblk(%zu : %zu/%zu)", fsblk, fsblk + 1, extent.nblocks);
+			XAL_DEBUG("INFO:   dblk(%zu/%zu)", (fsblk / fsblk_per_dblk) + 1,
+				  extent.nblocks / fsblk_per_dblk);
+
+			err = dev_read_into(xal->dev, xal->buf, xal->sb.dirblocksize, ofz_disk,
+					    dblock);
+			if (err) {
+				XAL_DEBUG("FAILED: !dev_read(directory-extent)");
+				return err;
+			}
+
+			XAL_DEBUG("INFO: magic('%.4s', 0x%" PRIx32 "); ", magic->text, magic->num);
+
+			if ((be32toh(magic->num) != XAL_ODF_DIR3_DATA_MAGIC) &&
+			    (be32toh(magic->num) != XAL_ODF_DIR3_BLOCK_MAGIC)) {
+				XAL_DEBUG("FAILED: looks like invalid magic value");
+				return err;
+			}
+
+			for (uint64_t ofz = 64; ofz < xal->sb.dirblocksize;) {
+				uint8_t *dentry_cursor = dblock + ofz;
+				struct xal_inode dentry = {0};
+
+				ofz += decode_dentry(dentry_cursor, &dentry);
+
+				/**
+				 * Seems like the only way to determine that there are no more
+				 * entries are if one start to decode uinvalid entries.
+				 * Such as a namelength of 0 or inode number 0.
+				 * Thus, checking for that here.
+				 */
+				if ((!dentry.ino) || (!dentry.namelen)) {
+					break;
+				}
+
+				/**
+				 * Skip processing the mandatory dentries: '.' and '..'
+				 */
+				if ((dentry.namelen == 1) && (dentry.name[0] == '.')) {
+					continue;
+				}
+				if ((dentry.namelen == 2) && (dentry.name[0] == '.') &&
+				    (dentry.name[1] == '.')) {
+					continue;
+				}
+
+				dentry.parent = self;
+				self->content.dentries.inodes[self->content.dentries.count] =
+				    dentry;
+
+				self->content.dentries.count += 1;
+
+				err = xal_pool_claim_inodes(&xal->inodes, 1, NULL);
+				if (err) {
+					XAL_DEBUG("FAILED: xal_pool_claim_inodes(...)");
+					return err;
+				}
+			}
+		}
+	}
+
+	XAL_DEBUG("EXIT");
+
+	return 0;
+}
+
+static int
+btree_lblock_decode_node_records(struct xal *XAL_UNUSED(xal), void *XAL_UNUSED(buf),
+				 struct xal_inode *XAL_UNUSED(self))
+{
+	XAL_DEBUG("ENTER");
+
+	printf("--==={[ I am so sorry about this ... ]}===--\n\n"
+	       "Directory-Extents B+Tree with level > 0; currently not supported.\n"
+	       "Triggering this state requires directories with 500K+ long-named files\n"
+	       "Support will be added, however, less of a priority than other br0k3n things\n"
+	       "--==={[ ... please send a PR :)      ]}===--\n");
+
+	XAL_DEBUG("EXIT");
+
+	return -ENOSYS;
+}
+
+/**
+ * Retrieve a block decode it using the leaf and node helpers
+ *
+ * @param fsbno File-System Block number in host-endianess
+ */
+static int
+btree_lblock_process(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
+{
+	uint8_t block[ODF_BLOCK_FS_BYTES_MAX] = {0};
+	struct xal_odf_btree_lfmt *lblock = (void *)block;
+	int err;
+
+	XAL_DEBUG("ENTER");
+
+	err = btree_lblock_read(xal, fsbno, lblock);
+	if (err) {
+		XAL_DEBUG("FAILED: btree_lblock_read():err(%d)", err);
+		return err;
+	}
+
+	switch (lblock->level) {
+	case 0:
+		return btree_lblock_decode_leaf_records(xal, lblock, self);
+
+	default:
+		return btree_lblock_decode_node_records(xal, lblock, self);
+	}
+
+	XAL_DEBUG("EXIT");
+
+	return err;
+}
+
+/**
  * B+tree Directories decoding and inode population
  *
  * @see XFS Algorithms & Data Structures - 3rd Edition - 20.5 B+tree Directories" for details
@@ -453,9 +653,52 @@ int
 process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 			      struct xal_inode *self)
 {
-	int err = -ENOSYS;
+	uint8_t *cursor = (void *)dinode;
+	uint16_t level;	  // Level in the btree, expecting >= 1
+	uint16_t numrecs; // Number of records in the inode itself
+	size_t ofz_ptr;	  // Offset from start of dinode to start of embedded pointers
+	int err;
 
-	XAL_DEBUG("ENTER");
+	XAL_DEBUG("ENTER: Directory Extents -- B+Tree -- Root Node");
+
+	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
+
+	level = be16toh(*((uint16_t *)cursor));
+	cursor += 2;
+
+	numrecs = be16toh(*((uint16_t *)cursor));
+	cursor += 2;
+
+	if (level < 1) {
+		XAL_DEBUG("FAILED: level(%" PRIu16 "); expected > 0", level);
+		return -EINVAL;
+	}
+
+	btree_dinode_meta(xal, dinode, NULL, NULL, &ofz_ptr);
+
+	XAL_DEBUG("=### Processing: File-System Block Pointers ###=");
+	for (uint16_t rec = 0; rec < numrecs; ++rec) {
+		uint64_t *pointer = (uint64_t *)(((uint8_t *)dinode) + ofz_ptr);
+
+		XAL_DEBUG("INFO: ptr[%" PRIu16 "] = 0x%" PRIx64, rec, be64toh(pointer[rec]));
+
+		err = btree_lblock_process(xal, be64toh(pointer[rec]), self);
+		if (err) {
+			XAL_DEBUG("FAILED: btree_lblock_process():err(%d)", err);
+			return err;
+		}
+	}
+
+	XAL_DEBUG("=### Processing: inodes constructed when chasing File-System Block Pointers")
+	for (uint32_t i = 0; i < self->content.dentries.count; ++i) {
+		struct xal_inode *inode = &self->content.dentries.inodes[i];
+
+		err = process_ino(xal, inode->ino, inode);
+		if (err) {
+			XAL_DEBUG("FAILED: process_ino():err(%d)", err);
+			return err;
+		}
+	}
 
 	XAL_DEBUG("EXIT");
 
@@ -1114,6 +1357,8 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_BTREE:
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
+			xal_pool_current_inode(&xal->inodes, &self->content.dentries.inodes);
+
 			err = process_dinode_dir_btree_root(xal, dinode, self);
 			if (err) {
 				XAL_DEBUG("FAILED: process_dinode_dir_btree():err(%d)", err);
