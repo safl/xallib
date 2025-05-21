@@ -20,11 +20,13 @@ def create_directory_with_urandom_content(
     In 'dir' create 'count' files with 'size' amount of content from '/dev/urandom'
     """
 
+    filler = "i"*200
+
     for cmd in [
         f"mkdir -p {dir}",
         (
             f"for ((i=0; i<={count}; i++)); do "
-            f"dd if=/dev/urandom of={dir}/file-rand-{size}-$i-{count}.bin status=none "
+            f"dd if=/dev/urandom of={dir}/file-rand-f{filler}l-{size}-$i-{count}.bin status=none "
             f"bs={size} count=1"
             "; done"
         ),
