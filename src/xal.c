@@ -36,8 +36,6 @@ dev_read(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
 	const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
 	int err;
 
-	XAL_DEBUG("INFO: count(%zu), offset(%zu)", count, offset);
-
 	if (count > geo->mdts_nbytes) {
 		XAL_DEBUG("FAILED: dev_read(...) -- count(%zu) > mdts_nbytes(%" PRIu32 ")", count,
 			  geo->mdts_nbytes);
