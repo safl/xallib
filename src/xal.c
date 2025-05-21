@@ -581,7 +581,8 @@ readBlockData(struct xal *xal, void *buf, uint64_t block_number)
  * @see XFS Algorithms & Data Structures - 3rd Edition - 20.5 B+tree Directories" for details
  */
 int
-process_dinode_dir_btree(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
+process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
+			      struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
 	uint16_t numrec; // Number of records in this block
@@ -1300,7 +1301,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_BTREE:
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			err = process_dinode_dir_btree(xal, dinode, self);
+			err = process_dinode_dir_btree_root(xal, dinode, self);
 			if (err) {
 				XAL_DEBUG("FAILED: process_dinode_dir_btree():err(%d)", err);
 				return err;
