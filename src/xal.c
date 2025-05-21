@@ -65,6 +65,9 @@ btree_dinode_meta(struct xal *xal, struct xal_odf_dinode *dinode, size_t *maxrec
 	}
 }
 
+/**
+ * Compute max records in a long-format btree block with key/pointer offsets
+ */
 static void
 btree_lblock_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
 {
@@ -82,6 +85,9 @@ btree_lblock_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointe
 	}
 }
 
+/**
+ * Compute max records in a short-format btree block with key/pointer offsets
+ */
 static void
 btree_sblock_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointers)
 {
@@ -565,7 +571,7 @@ readBlockData(struct xal *xal, void *buf, uint64_t block_number)
 	}
 
 	XAL_DEBUG("INFO");
-	
+
 	return 0;
 }
 
