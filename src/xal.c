@@ -29,6 +29,57 @@ struct pair_u64 {
 	uint64_t l1;
 };
 
+static int
+dev_read(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
+{
+	struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+	const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
+	int err;
+
+	XAL_DEBUG("INFO: count(%zu), offset(%zu)", count, offset);
+
+	if (count > geo->mdts_nbytes) {
+		XAL_DEBUG("FAILED: dev_read(...) -- count(%zu) > mdts_nbytes(%" PRIu32 ")", count,
+			  geo->mdts_nbytes);
+		return -EINVAL;
+	}
+	if (count % geo->lba_nbytes) {
+		XAL_DEBUG("FAILED: dev_read(...) -- unaligned count(%zu);", count);
+		return -EINVAL;
+	}
+	if (offset % geo->lba_nbytes) {
+		XAL_DEBUG("FAILED: dev_read(...) -- unaligned offset(%zu);", offset);
+		return -EINVAL;
+	}
+
+	memset(buf, 0, count);
+
+	err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), offset / geo->lba_nbytes,
+			     (count / geo->lba_nbytes) - 1, buf, NULL);
+	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+		XAL_DEBUG("FAILED: xnvme_nvm_read(...):err(%d)", err);
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int
+dev_read_into(struct xnvme_dev *dev, void *iobuf, size_t count, off_t offset, void *buf)
+{
+	int err;
+
+	err = dev_read(dev, iobuf, count, offset);
+	if (err) {
+		XAL_DEBUG("FAILED: dev_read_into(); err(%d)", err);
+		return err;
+	}
+
+	memcpy(buf, iobuf, count);
+
+	return 0;
+}
+
 int
 decode_dentry(void *buf, struct xal_inode *dentry);
 
@@ -228,57 +279,6 @@ xal_close(struct xal *xal)
 	xal_pool_unmap(&xal->extents);
 	free(xal->dinodes);
 	free(xal);
-}
-
-static int
-dev_read(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
-{
-	struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
-	const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
-	int err;
-
-	XAL_DEBUG("INFO: count(%zu), offset(%zu)", count, offset);
-
-	if (count > geo->mdts_nbytes) {
-		XAL_DEBUG("FAILED: dev_read(...) -- count(%zu) > mdts_nbytes(%" PRIu32 ")", count,
-			  geo->mdts_nbytes);
-		return -EINVAL;
-	}
-	if (count % geo->lba_nbytes) {
-		XAL_DEBUG("FAILED: dev_read(...) -- unaligned count(%zu);", count);
-		return -EINVAL;
-	}
-	if (offset % geo->lba_nbytes) {
-		XAL_DEBUG("FAILED: dev_read(...) -- unaligned offset(%zu);", offset);
-		return -EINVAL;
-	}
-
-	memset(buf, 0, count);
-
-	err = xnvme_nvm_read(&ctx, xnvme_dev_get_nsid(dev), offset / geo->lba_nbytes,
-			     (count / geo->lba_nbytes) - 1, buf, NULL);
-	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
-		XAL_DEBUG("FAILED: xnvme_nvm_read(...):err(%d)", err);
-		return -EIO;
-	}
-
-	return 0;
-}
-
-static int
-dev_read_into(struct xnvme_dev *dev, void *iobuf, size_t count, off_t offset, void *buf)
-{
-	int err;
-
-	err = dev_read(dev, iobuf, count, offset);
-	if (err) {
-		XAL_DEBUG("FAILED: dev_read_into(); err(%d)", err);
-		return err;
-	}
-
-	memcpy(buf, iobuf, count);
-
-	return 0;
 }
 
 /**
