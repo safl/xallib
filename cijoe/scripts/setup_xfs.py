@@ -23,8 +23,7 @@ def add_args(parser: ArgumentParser):
 def main(args: Namespace, cijoe: Cijoe):
     """Entry-point of the cijoe-script"""
 
-#    err, state = cijoe.run(f"sudo mkfs.xfs -f {args.dev_path}")
-    err, state = cijoe.run(f"sudo mkfs.xfs -b size=4096 -n size=16384 -f {args.dev_path}")
+    err, state = cijoe.run(f"sudo mkfs.xfs -b size=4096 -n size=8192 -f {args.dev_path}")
     if err:
         log.error("Failed creating filesystem")
         return err
