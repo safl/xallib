@@ -108,6 +108,15 @@ int
 xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t element_size);
 
 /**
+ * Claims the current inode-offset
+ *
+ * This is utilized when decoding device-entries and the amount is not known ahead of time,
+ * thus, the current position is written to 'inode', subsequent calls to
+ */
+void
+xal_pool_current_inode(struct xal_pool *pool, struct xal_inode **inode);
+
+/**
  *
  */
 int
