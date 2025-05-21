@@ -70,4 +70,6 @@ xal_cli = executable('xal',
   install: true
 )
 
+subdir('tools')
+
 install_headers(public_headers, subdir: 'xal')
