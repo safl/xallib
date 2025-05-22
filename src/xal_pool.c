@@ -103,6 +103,14 @@ xal_pool_claim_inodes(struct xal_pool *pool, size_t count, struct xal_inode **in
 	return 0;
 }
 
+void
+xal_pool_current_extent(struct xal_pool *pool, struct xal_extent **extent)
+{
+	uint8_t *cursor = pool->memory;
+
+	*extent = (void *)&cursor[pool->free * pool->element_size];
+}
+
 int
 xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **extents)
 {
