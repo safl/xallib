@@ -1161,7 +1161,7 @@ process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_in
 
 	for (uint64_t ofz = 64; ofz < xal->sb.dirblocksize;) {
 		uint8_t *dentry_cursor = dblock + ofz;
-		struct xal_inode dentry = {0};
+		struct xal_inode dentry = {.parent = self};
 
 		ofz += decode_dentry(dentry_cursor, &dentry);
 
@@ -1185,23 +1185,14 @@ process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_in
 			continue;
 		}
 
-		dentry.parent = self;
-		self->content.dentries.inodes[self->content.dentries.count] = dentry;
-
-		err = process_ino(xal, dentry.ino,
-				  &self->content.dentries.inodes[self->content.dentries.count]);
-		if (err) {
-			XAL_DEBUG("FAILED: process_ino(...)")
-			return err;
-		}
-
-		self->content.dentries.count += 1;
-
 		err = xal_pool_claim_inodes(&xal->inodes, 1, NULL);
 		if (err) {
 			XAL_DEBUG("FAILED: xal_pool_claim_inodes(...)");
 			return err;
 		}
+
+		self->content.dentries.inodes[self->content.dentries.count] = dentry;
+		self->content.dentries.count += 1;
 	}
 
 	XAL_DEBUG("EXIT");
@@ -1264,17 +1255,8 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	XAL_DEBUG("INFO:       nextents(%" PRIu64 ")", nextents);
 	XAL_DEBUG("INFO: fsblk_per_dblk(%" PRIu32 ")", fsblk_per_dblk);
 	XAL_DEBUG("INFO:         nbytes(%" PRIu64 ")", nbytes);
-	/**
-	 * A single inode is claimed, this is to get the pointer to the start of the array,
-	 * additional calls to claim will be called as extents/dentries are decoded, however, only
-	 * the first call provides a pointer, since the start of the array, that consists of all
-	 * the children is only rooted once.
-	 */
-	err = xal_pool_claim_inodes(&xal->inodes, 1, &self->content.dentries.inodes);
-	if (err) {
-		XAL_DEBUG("FAILED: !xal_pool_claim_inodes(); err(%d)", err)
-		return err;
-	}
+
+	xal_pool_current_inode(&xal->inodes, &self->content.dentries.inodes);
 
 	/**
 	 * Decode the extents and process each block
@@ -1305,6 +1287,17 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 		}
 
 		nbytes -= extent.nblocks * xal->sb.blocksize;
+	}
+
+	XAL_DEBUG("=### Processing: inodes constructed when decoding dir(FMT_EXTENTS)")
+	for (uint32_t i = 0; i < self->content.dentries.count; ++i) {
+		struct xal_inode *inode = &self->content.dentries.inodes[i];
+
+		err = process_ino(xal, inode->ino, inode);
+		if (err) {
+			XAL_DEBUG("FAILED: process_ino():err(%d)", err);
+			return err;
+		}
 	}
 
 	return err;
