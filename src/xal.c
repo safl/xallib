@@ -652,13 +652,13 @@ process_dinode_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 	sanity checking during developement.
 	For example, comparing the decoded keys against the keys parsed by 'xfs_db' and when
 	inspecting the disk via hexdump, then one can look for the key-values in the data-dump.
-	 */
 	for (uint16_t rec = 0; rec < numrecs; ++rec) {
 		uint64_t key = be64toh(*((uint64_t *)cursor));
 		cursor += sizeof(uint64_t);
 
 		XAL_DEBUG("INFO:      key[%" PRIu16 "] = %" PRIu64, rec, key);
 	}
+	 */
 
 	/**
 	For some reason, there is an unexplained 64-byte gap between the last key and the start of
