@@ -1542,13 +1542,14 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 			uint8_t *chunk_cursor = &inodechunk[chunk_index * xal->sb.inodesize];
 			uint64_t is_unused = (rec->holemask & (1ULL << chunk_index)) >> chunk_index;
 			uint64_t is_free = (rec->free & (1ULL << chunk_index)) >> chunk_index;
+			struct xal_odf_dinode *dinode;
 
 			if (is_unused || is_free) {
 				continue;
 			}
 
-			memcpy((void *)(&xal->dinodes[*index * xal->sb.inodesize]),
-			       (void *)chunk_cursor, xal->sb.inodesize);
+			dinode = (void *)&xal->dinodes[*index * xal->sb.inodesize];
+			memcpy(dinode, (void *)chunk_cursor, xal->sb.inodesize);
 			*index += 1;
 		}
 	}
