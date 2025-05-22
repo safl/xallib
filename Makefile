@@ -1,5 +1,6 @@
 BUILDDIR = build
 BUILD_TYPE ?= release
+DEBUG_MESSAGES ?= false
 
 .PHONY: all
 all: clean configure build install
@@ -13,7 +14,7 @@ clean:
 
 .PHONY: configure
 configure:
-	meson setup $(BUILDDIR) --buildtype=$(BUILD_TYPE)
+	meson setup $(BUILDDIR) --buildtype=$(BUILD_TYPE) -Ddebug_messages=$(DEBUG_MESSAGES)
 
 .PHONY: build
 build:
