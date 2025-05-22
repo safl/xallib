@@ -52,7 +52,7 @@ sources = files(
   'src/utils.c'
 )
 
-include_dirs = include_directories('include')
+include_dirs = include_directories('include', 'tp')
 
 xal_library = library('xal',
   sources: sources,

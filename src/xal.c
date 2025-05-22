@@ -5,6 +5,7 @@
 #include <endian.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <khash.h>
 #include <libxal.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -28,6 +29,8 @@ struct pair_u64 {
 	uint64_t l0;
 	uint64_t l1;
 };
+
+KHASH_MAP_INIT_INT64(ino_to_dinode, struct xal_odf_dinode *);
 
 static int
 dev_read(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
@@ -183,23 +186,19 @@ decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 int
 dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
 {
-	for (uint64_t idx = 0; idx < xal->sb.nallocated; ++idx) {
-		struct xal_odf_dinode *cand = (void *)(xal->dinodes + idx * xal->sb.inodesize);
+	kh_ino_to_dinode_t *dinode_map = xal->dinodes_map;
+	khiter_t iter;
 
-		if (be64toh(cand->ino) != ino) {
-			continue;
-		}
-
-		/** Halt when the dinode is invalid */
-		assert(cand->di_magic == 0x4E49);
-
-		*dinode = cand;
-
-		return 0;
+	iter = kh_get(ino_to_dinode, dinode_map, ino);
+	if (iter == kh_end(dinode_map)) {
+		XAL_DEBUG("FAILED: kh_get(0x%" PRIx64 ")", ino);
+		return -EINVAL;
 	}
 
-	XAL_DEBUG("FAILED: no match for ino(0x%" PRIx64 ")", ino);
-	return -EINVAL;
+	XAL_DEBUG("INFO: found ino(0x%" PRIx64 ")", ino);
+	*dinode = kh_val(dinode_map, iter);
+
+	return 0;
 }
 
 uint32_t
@@ -281,6 +280,7 @@ xal_close(struct xal *xal)
 	xnvme_buf_free(xal->dev, xal->buf);
 	xal_pool_unmap(&xal->inodes);
 	xal_pool_unmap(&xal->extents);
+	kh_destroy(ino_to_dinode, xal->dinodes_map);
 	free(xal->dinodes);
 	free(xal);
 }
@@ -1188,8 +1188,7 @@ process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_in
 		dentry.parent = self;
 		self->content.dentries.inodes[self->content.dentries.count] = dentry;
 
-		err = process_ino(xal,
-				  self->content.dentries.inodes[self->content.dentries.count].ino,
+		err = process_ino(xal, dentry.ino,
 				  &self->content.dentries.inodes[self->content.dentries.count]);
 		if (err) {
 			XAL_DEBUG("FAILED: process_ino(...)")
@@ -1542,7 +1541,9 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 			uint8_t *chunk_cursor = &inodechunk[chunk_index * xal->sb.inodesize];
 			uint64_t is_unused = (rec->holemask & (1ULL << chunk_index)) >> chunk_index;
 			uint64_t is_free = (rec->free & (1ULL << chunk_index)) >> chunk_index;
+			khash_t(ino_to_dinode) *dinodes_map = xal->dinodes_map;
 			struct xal_odf_dinode *dinode;
+			khiter_t iter;
 
 			if (is_unused || is_free) {
 				continue;
@@ -1550,13 +1551,21 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 
 			dinode = (void *)&xal->dinodes[*index * xal->sb.inodesize];
 			memcpy(dinode, (void *)chunk_cursor, xal->sb.inodesize);
+
+			iter = kh_put(ino_to_dinode, dinodes_map, be64toh(dinode->ino), &err);
+			if (err < 0) {
+				XAL_DEBUG("FAILED: kh_put()");
+				return -EIO;
+			}
+			kh_value(dinodes_map, iter) = dinode;
+
 			*index += 1;
 		}
 	}
 
 	XAL_DEBUG("EXIT");
 
-	return err;
+	return 0;
 }
 
 int
@@ -1651,6 +1660,12 @@ xal_dinodes_retrieve(struct xal *xal)
 	uint64_t index = 0;
 
 	XAL_DEBUG("ENTER");
+
+	xal->dinodes_map = kh_init(ino_to_dinode);
+	if (!xal->dinodes_map) {
+		XAL_DEBUG("FAILED: kh_init()");
+		return -EINVAL;
+	}
 
 	xal->dinodes = calloc(1, xal->sb.nallocated * xal->sb.inodesize);
 	if (!xal->dinodes) {
