@@ -67,7 +67,7 @@ struct xal_inode {
 	uint8_t ftype;			      ///< File-type (directory, filename, symlink etc.)
 	uint8_t namelen;		      ///< Length of the name; not counting nul-termination
 	char name[XAL_INODE_NAME_MAXLEN + 1]; ///< Name; not including nul-termination
-	uint8_t reserved[30];
+	uint8_t reserved[22];
 	struct xal_inode *parent;
 };
 
