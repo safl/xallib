@@ -1017,6 +1017,7 @@ process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, stru
 		XAL_DEBUG("FAILED: xal_pool_claim()...");
 		return err;
 	}
+	self->content.extents.count = nextents;
 
 	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
