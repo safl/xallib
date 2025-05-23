@@ -653,37 +653,37 @@ int
 process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 			      struct xal_inode *self)
 {
-	void *dfork = ((uint8_t *)dinode) + sizeof(struct xal_odf_dinode);
-	struct xal_odf_btree_pos pos = {0};
-	uint64_t *fsbnos;
-	size_t ofz_ptr; // Offset from start of dinode to start of embedded pointers
+	uint8_t *cursor = (void *)dinode;
+	uint16_t level;	  // Level in the btree, expecting >= 1
+	uint16_t numrecs; // Number of records in the inode itself
+	size_t ofz_ptr;	  // Offset from start of dinode to start of embedded pointers
 	int err;
 
 	XAL_DEBUG("ENTER: Directory Extents -- B+Tree -- Root Node");
 
-	pos.level = be16toh(*((uint16_t *)dfork));
-	pos.numrecs = be16toh(*((uint16_t *)dfork));
+	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
 
-	if (pos.level < 1) {
-		XAL_DEBUG("FAILED: level(%" PRIu16 "); expected > 0", pos.level);
+	level = be16toh(*((uint16_t *)cursor));
+	cursor += 2;
+
+	numrecs = be16toh(*((uint16_t *)cursor));
+	cursor += 2;
+
+	cursor += 32; // Advance past startoff[i]
+
+	cursor += (16 * 8); //Advance past metadata
+	if (level < 1) {
+		XAL_DEBUG("FAILED: level(%" PRIu16 "); expected > 0", level);
 		return -EINVAL;
 	}
 
 	btree_dinode_meta(xal, dinode, NULL, NULL, &ofz_ptr);
-	fsbnos = (void *)(((uint8_t *)dinode) + ofz_ptr);
-
-	if (self->content.dentries.count) {
-		XAL_DEBUG("INFO: dentries.count(%" PRIu32 ")", self->content.dentries.count);
-		return -EINVAL;
-	}
-	xal_pool_current_inode(&xal->inodes, &self->content.dentries.inodes);
-
 	XAL_DEBUG("=### Processing: File-System Block Pointers ###=");
-	XAL_DEBUG("INFO: pos.numrecs(%" PRIu16 ")", pos.numrecs);
-	for (uint16_t rec = 0; rec < pos.numrecs; ++rec) {
-		XAL_DEBUG("INFO: ptr[%" PRIu16 "] = 0x%" PRIx64, rec, be64toh(fsbnos[rec]));
-
-		err = btree_lblock_process(xal, be64toh(fsbnos[rec]), self);
+	for (uint16_t rec = 0; rec < numrecs; ++rec) {
+		uint64_t pointer = be64toh(*((uint64_t *)cursor));
+		cursor += 8;
+		XAL_DEBUG("INFO: ptr[%" PRIu16 "] = 0x%" PRIx64, rec, pointer);
+		err = btree_lblock_process(xal, pointer, self);
 		if (err) {
 			XAL_DEBUG("FAILED: btree_lblock_process():err(%d)", err);
 			return err;
@@ -691,7 +691,6 @@ process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 	}
 
 	XAL_DEBUG("=### Processing: inodes constructed when chasing File-System Block Pointers")
-	XAL_DEBUG("INFO: dentries.count(%" PRIu32 ")", self->content.dentries.count);
 	for (uint32_t i = 0; i < self->content.dentries.count; ++i) {
 		struct xal_inode *inode = &self->content.dentries.inodes[i];
 
@@ -703,7 +702,6 @@ process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 	}
 
 	XAL_DEBUG("EXIT");
-
 	return err;
 }
 
