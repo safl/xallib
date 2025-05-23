@@ -131,6 +131,10 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 		       xal_ino_decode_absolute_offset(xal, inode->ino));
 	}
 
+	if (XAL_ODF_DIR3_FT_DIR == inode->ftype) {
+		return;
+	}
+
 	for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
 		struct xal_extent *extent = &inode->content.extents.extent[i];
 		size_t fofz_begin, fofz_end, bofz_begin, bofz_end;
