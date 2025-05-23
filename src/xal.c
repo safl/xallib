@@ -883,69 +883,11 @@ process_dinode_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 	XAL_DEBUG("INFO:    level(%" PRIu16 ")", level);
 	XAL_DEBUG("INFO:  numrecs(%" PRIu16 ")", numrecs);
 
-	/**
-	The keys are great if we were seeking to a given position within the file, however, since
-	we just want all the extent info, then we have no use for the keys except for debugging /
-	sanity checking during developement.
-	For example, comparing the decoded keys against the keys parsed by 'xfs_db' and when
-	inspecting the disk via hexdump, then one can look for the key-values in the data-dump.
-	for (uint16_t rec = 0; rec < numrecs; ++rec) {
-		uint64_t key = be64toh(*((uint64_t *)cursor));
-		cursor += sizeof(uint64_t);
-
-		XAL_DEBUG("INFO:      key[%" PRIu16 "] = %" PRIu64, rec, key);
-	}
-	 */
-
-	/**
-	For some reason, there is an unexplained 64-byte gap between the last key and the start of
-	the pointers. This was observed in a dinode with level 1. At level 2, different offsets were
-	observed.
-	When inspecting the data on disk then there is a bunch of zeroes... after fiddling
-	then it looks like some kind of padding is happening... the amount of zeroes depended on
-	numrec, the more records, the less zeroes.
-
-	Looking at a disk with hexdump, then looking at a start-sequence starting 'level', then 192
-	bytes later then the file-attributes start. This kinda looks like there is allocated 3 x 64
-	bytes to: level, numrecs, keys, ptrs.
-
-	Thus, although the XFS-documentation visualizes it as 'pointers' start right after 'keys',
-	then it looks more like some padded and aligned struct:
-
-	struct foo {
-		uint16_t level;
-		uint16_t numrecs;
-		uint64_t keys[?];
-		uint64_t pointers[?];
-	}
-
-	Another observation is that the first pointer seem to start af 96 bytes. This is exactly
-	half of the 3x64. Since there has to be room for level and numrecs, then it would seem like
-	a maxrecs would be something like: floor(((3 * 64 / 2) - 4) / 8) = 11.
-
-	So, will attempt to use it as offset from the last the key to the first pointer.
-	Specifically: "cursor += (maxrecs - numrecs) * 8;"... no nothing adds up here...
-
-	Ohhh! There is a 'di_forkoff' in the dinode! Just RTFM Chapter 18 On-disk Inode.
-
-	core_offset: 176 bytes
-	attr_offset: di_forkoff (8bit value that needs to be multiplied)
-	Then the amount of bytes for records become:
-
-	nbytes = be8toh(di_forkoff) * 8 - core_offset?
-	*/
-
 	btree_dinode_meta(xal, dinode, NULL, NULL, &ofz_ptr);
 
 	// Let's try resetting the cursor...
 	cursor = (uint8_t *)dinode + ofz_ptr;
 
-	/**
-	We will need a lot more extents, however, we start by claiming one, such that the inode
-	gets its content initialized. Subsequent claims will be growing from that point on. This is
-	of course inherently non-thread-safe, so should the decoding at any point be re-implemented
-	in parallel, then this is one of the main things to handle.
-	*/
 	err = xal_pool_claim_extents(&xal->extents, 1, &self->content.extents.extent);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim_extents(); err(%d)", err);
