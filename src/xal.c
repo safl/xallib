@@ -994,7 +994,7 @@ process_dinode_dir_local(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 	return 0;
 }
 
-int
+static int
 process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
