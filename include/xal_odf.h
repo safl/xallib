@@ -324,8 +324,8 @@ struct xal_odf_btree_pos {
 };
 
 struct xal_odf_btree_siblings_short {
-	uint32_t left;	///< Left sibling block (AG-relative)
-	uint32_t right; ///< Right sibling block (AG-relative)
+	uint32_t left;	///< Left sibling block (AG-relative block number)
+	uint32_t right; ///< Right sibling block (AG-relative block number)
 };
 
 struct xal_odf_btree_sfmt {
@@ -341,12 +341,15 @@ struct xal_odf_btree_sfmt {
 	uint32_t bb_crc; ///< In little-endian
 };
 
+struct xal_odf_btree_siblings_long {
+	uint64_t left;	///< Left sibling block (File-system block number)
+	uint64_t right; ///< Right sibling block (File-system block number)
+};
+
 struct xal_odf_btree_lfmt {
 	union xal_odf_btree_magic magic; // E.g. 'IAB3' for inode B+Tree or 'BMAP' for file-extents
-	uint16_t level;			 // Tree level (0 = leaf, >0 = interior)
-	uint16_t numrecs;		 // Number of records in this node
-	uint64_t leftsib;		 // Left sibling block (AG-relative)
-	uint64_t rightsib;		 // Right sibling block (AG-relative)
+	struct xal_odf_btree_pos pos;
+	struct xal_odf_btree_siblings_long siblings;
 
 	uint64_t blkno; ///< blkno; seems like this is only filled when mkfs use-crc
 	uint64_t bb_lsn;
