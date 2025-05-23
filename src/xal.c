@@ -672,6 +672,12 @@ process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 	btree_dinode_meta(xal, dinode, NULL, NULL, &ofz_ptr);
 	fsbnos = (void *)(((uint8_t *)dinode) + ofz_ptr);
 
+	if (self->content.dentries.count) {
+		XAL_DEBUG("INFO: dentries.count(%" PRIu32 ")", self->content.dentries.count);
+		return -EINVAL;
+	}
+	xal_pool_current_inode(&xal->inodes, &self->content.dentries.inodes);
+
 	XAL_DEBUG("=### Processing: File-System Block Pointers ###=");
 	XAL_DEBUG("INFO: pos.numrecs(%" PRIu16 ")", pos.numrecs);
 	for (uint16_t rec = 0; rec < pos.numrecs; ++rec) {
@@ -888,12 +894,12 @@ process_dinode_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 	// Let's try resetting the cursor...
 	cursor = (uint8_t *)dinode + ofz_ptr;
 
-	err = xal_pool_claim_extents(&xal->extents, 1, &self->content.extents.extent);
-	if (err) {
-		XAL_DEBUG("FAILED: xal_pool_claim_extents(); err(%d)", err);
-		return err;
+	if (self->content.extents.count) {
+		XAL_DEBUG("FAILED: self->content.extents.count(%" PRIu32 ")",
+			  self->content.extents.count);
+		return -EINVAL;
 	}
-	self->content.extents.count = 1;
+	xal_pool_current_extent(&xal->extents, &self->content.extents.extent);
 
 	XAL_DEBUG("#### Processing Pointers ###");
 	for (uint16_t rec = 0; rec < numrecs; ++rec) {
