@@ -494,8 +494,7 @@ static int
 btree_lblock_decode_leaf_records(struct xal *xal, void *buf, struct xal_inode *self)
 {
 	struct xal_odf_btree_lfmt *leaf = buf;
-	size_t pointers_ofz = sizeof(*leaf);
-	struct pair_u64 *pairs = (void *)(((uint8_t *)buf) + pointers_ofz);
+	struct pair_u64 *pairs = (void *)(((uint8_t *)buf) + sizeof(*leaf));
 	const uint32_t fsblk_per_dblk = xal->sb.dirblocksize / xal->sb.blocksize;
 
 	XAL_DEBUG("ENTER: Directory Extents -- B+Tree -- Leaf Node");
