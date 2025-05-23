@@ -994,6 +994,11 @@ process_dinode_dir_local(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 	return 0;
 }
 
+/**
+ * For some reason then di_big_nextents is populated. As far as i understand that should
+ * not happen for format=0x2 "extents" as this should have all extent-records inline in the
+ * inode. Thus this abomination... just grabbing whatever has a value...
+ */
 static int
 process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
@@ -1001,15 +1006,12 @@ process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, stru
 	uint64_t nextents;
 	int err;
 
-	XAL_DEBUG("ENTER: File Extents -- Dinode Inline");
-
-	/**
-	 * For some reason then di_big_nextents is populated. As far as i understand that should
-	 * not happen for format=0x2 "extents" as this should have all extent-records inline in the
-	 * inode. Thus this abomination... just grabbing whatever has a value...
-	 */
 	nextents =
 	    (dinode->di_nextents) ? be32toh(dinode->di_nextents) : be64toh(dinode->di_big_nextents);
+
+	XAL_DEBUG("ENTER: File Extents -- Dinode Inline");
+	XAL_DEBUG("INFO: name(%.*s)", self->namelen, self->name);
+	XAL_DEBUG("INFO: nextents(%" PRIu64 ")", nextents);
 
 	err = xal_pool_claim_extents(&xal->extents, nextents, &self->content.extents.extent);
 	if (err) {
@@ -1030,6 +1032,8 @@ process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, stru
 
 		decode_xfs_extent(l0, l1, &self->content.extents.extent[i]);
 	}
+
+	XAL_DEBUG("INFO: content.dentries(%" PRIu32 ")", self->content.dentries.count);
 
 	XAL_DEBUG("EXIT");
 	return 0;
