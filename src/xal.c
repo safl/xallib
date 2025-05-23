@@ -695,6 +695,7 @@ process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 	for (uint32_t i = 0; i < self->content.dentries.count; ++i) {
 		struct xal_inode *inode = &self->content.dentries.inodes[i];
 
+		XAL_DEBUG("INFO: inode->name(%.*s)", inode->namelen, inode->name);
 		err = process_ino(xal, inode->ino, inode);
 		if (err) {
 			XAL_DEBUG("FAILED: process_ino():err(%d)", err);
@@ -712,6 +713,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
 	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
 	struct xal_odf_btree_lfmt leaf = {0};
+	struct xal_extent *extents;
 	int err;
 
 	XAL_DEBUG("ENTER: File Extents -- B+Tree -- Leaf Node");
@@ -747,6 +749,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	XAL_DEBUG("INFO: rightsib(0x%016" PRIx64 " @ %" PRIu64 ")", leaf.siblings.right,
 		  xal_fsbno_offset(xal, leaf.siblings.right));
 
+	extents = &self->content.extents.extent[self->content.extents.count];
 	err = xal_pool_claim_extents(&xal->extents, leaf.pos.numrecs, NULL);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim_extents(); err(%d)", err);
@@ -755,8 +758,6 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	self->content.extents.count += leaf.pos.numrecs;
 
 	for (uint16_t rec = 0; rec < leaf.pos.numrecs; ++rec) {
-		size_t idx_ofz = self->content.extents.count - leaf.pos.numrecs;
-		struct xal_extent *extent = &self->content.extents.extent[idx_ofz + rec];
 		uint8_t *cursor = xal->buf;
 		uint64_t l0, l1;
 
@@ -768,7 +769,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 		l1 = be64toh(*((uint64_t *)cursor));
 		cursor += 8;
 
-		decode_xfs_extent(l0, l1, extent);
+		decode_xfs_extent(l0, l1, &extents[rec]);
 	}
 
 	XAL_DEBUG("EXIT");
