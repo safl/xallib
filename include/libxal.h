@@ -116,6 +116,9 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t el
 void
 xal_pool_current_inode(struct xal_pool *pool, struct xal_inode **inode);
 
+void
+xal_pool_current_extent(struct xal_pool *pool, struct xal_extent **extent);
+
 /**
  *
  */
