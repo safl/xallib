@@ -1001,7 +1001,8 @@ process_dinode_dir_local(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 static int
 process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
-	uint8_t *cursor = (void *)dinode;
+	struct pair_u64 *pairs = (void *)((uint8_t *)dinode + sizeof(*dinode));
+	struct xal_extent *extents;
 	uint64_t nextents;
 	int err;
 
@@ -1019,23 +1020,16 @@ process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, stru
 	}
 	self->content.extents.count = nextents;
 
-	cursor += sizeof(struct xal_odf_dinode); ///< Advance past inode data
+	extents = self->content.extents.extent;
+	for (uint64_t rec = 0; rec < nextents; ++rec) {
+		XAL_DEBUG("INFO: i(%" PRIu64 ")", rec);
 
-	for (uint64_t i = 0; i < nextents; ++i) {
-		uint64_t l0, l1;
-
-		l0 = be64toh(*((uint64_t *)cursor));
-		cursor += 8;
-
-		l1 = be64toh(*((uint64_t *)cursor));
-		cursor += 8;
-
-		decode_xfs_extent(l0, l1, &self->content.extents.extent[i]);
+		decode_xfs_extent(be64toh(pairs[rec].l0), be64toh(pairs[rec].l1), &extents[rec]);
 	}
 
 	XAL_DEBUG("INFO: content.dentries(%" PRIu32 ")", self->content.dentries.count);
-
 	XAL_DEBUG("EXIT");
+
 	return 0;
 }
 
