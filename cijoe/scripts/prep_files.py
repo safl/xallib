@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Populate a mountpoint with files and dictories allocated with different on-disk-format
 ======================================================================================
@@ -11,6 +12,11 @@ import logging as log
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from cijoe.core.command import Cijoe
+import os
+import re
+import json
+
+COLUMNS = ["startoffset", "endoffset", "startblock", "endblock"]
 
 
 def create_directory_with_urandom_content(
@@ -249,6 +255,60 @@ def mount(args: Namespace, cijoe: Cijoe) -> int:
     return 0
 
 
+def produce_bmap(args: Namespace, cijoe: Cijoe):
+
+    def get_extents(path: Path):
+        """The given path is expected to be absolute"""
+
+        regex = (
+            r"^(?P<ident>\d+):\s+"
+            r"\[(?P<startoffset>\d+)\.\.(?P<endoffset>\d+)\]:\s+"
+            r"(?P<startblock>\d+)\.\.(?P<endblock>\d+)$"
+        )
+
+        cmd = f"xfs_bmap {path}"
+        err, state = cijoe.run(cmd)
+        if err:
+            print("Failed running: %s" % " ".join(cmd))
+            return err
+
+        extents = []
+        for line in state.output().splitlines():
+            match = re.match(regex, line.strip())
+            if match:
+                extent = {key: int(val) for key, val in match.groupdict().items()}
+                extents.append([extent.get(col) for col in COLUMNS])
+
+        return extents
+
+    result = {}
+
+    for root, _, files in os.walk(args.mountpoint):
+        for name in files:
+            path = Path(root) / name
+
+            result[str(path)] = (os.stat(path).st_ino, get_extents(path))
+
+    path_bmap = Path(cijoe.getconf("xal.artifacts.path")) / "bmap.json"
+    path_bmap.parent.mkdir(exist_ok=True, parents=True)
+    path_bmap.write_text(json.dumps(result))
+
+    return 0
+
+
+def produce_index(args: Namespace, cijoe: Cijoe):
+    """Create a recursive index of all the files and directories in args.mountpoint"""
+
+    path_index = Path(cijoe.getconf("xal.artifacts.path")) / "find.output"
+    path_index.parent.mkdir(exist_ok=True, parents=True)
+
+    err, state = cijoe.run(f"find {args.mountpoint} | sort > {path_index}")
+    if err:
+        return err
+
+    return 0
+
+
 def add_args(parser: ArgumentParser):
     """Optional function for defining command-line arguments for this script"""
 
@@ -262,6 +322,16 @@ def add_args(parser: ArgumentParser):
         type=Path,
         help="Path to mountpoint",
     )
+    parser.add_argument(
+        "--produce_index",
+        type=Path,
+        help="Produce an recursive index of all the files at --mountpoint",
+    )
+    parser.add_argument(
+        "--produce_bmap",
+        type=Path,
+        help="Produce a bmap.json file containing all extents for files",
+    )
 
 
 def main(args: Namespace, cijoe: Cijoe) -> int:
@@ -272,6 +342,14 @@ def main(args: Namespace, cijoe: Cijoe) -> int:
 
     if err := populate(args, cijoe):
         return err
+
+    if args.produce_index:
+        if err := produce_index(args, cijoe):
+            return err
+
+    if args.produce_bmap:
+        if err := produce_bmap(args, cijoe):
+            return err
 
     if err := umount(args, cijoe):
         return err

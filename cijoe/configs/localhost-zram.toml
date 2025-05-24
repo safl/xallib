@@ -4,3 +4,7 @@ fail_fast=true
 
 [xal]
 dev_path="/dev/zram0"
+mountpoint="/tmp/xal_testing"
+
+[xal.artifacts]
+path="/tmp/artifacts"

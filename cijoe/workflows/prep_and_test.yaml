@@ -1,0 +1,42 @@
+---
+doc: |
+  Prepare a block device for testing xal
+
+  * Assumes a block-device is available at 'config.xal.dev_path'
+    - If it is not availble, then a zram instances is created
+  * Formats block-device with XFS
+  * Mounts the file-system
+  * Fills it with a bunch of files
+  * Extracts an index of generated files
+  * Extracts a block-map / extents for all files in the file-system
+  * Run tests
+  
+  zram: https://docs.kernel.org/admin-guide/blockdev/zram.html
+
+steps:
+- name: prep_bdev
+  uses: prep_zram
+  with:
+    dev-path: '{{ config.xal.dev_path }}'
+    size-in-gb: 10
+
+- name: prep_fs
+  uses: prep_xfs
+  with:
+    dev-path: '{{ config.xal.dev_path }}'
+    mountpoint: '{{ config.xal.mountpoint }}'
+
+- name: prep_files
+  uses: prep_files
+  with:
+    dev-path: '{{ config.xal.dev_path }}'
+    mountpoint: '{{ config.xal.mountpoint }}'
+    produce_index: true
+    produce_bmap: true
+
+- name: test
+  uses: core.testrunner
+  with:
+    run_local: true
+    random_order: false
+    args: "tests"

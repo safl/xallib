@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Virtual block-device using zram
 ===============================
@@ -36,11 +37,17 @@ def add_args(parser: ArgumentParser):
 def main(args: Namespace, cijoe: Cijoe):
     """Entry-point of the cijoe-script"""
 
+    if "zram" not in args.dev_path:
+        log.info("Substr 'zram' not i args.dev_path({args.dev_path}); skipping")
+        return 0
+
     size_bytes = int(args.size_in_gb << 30)
 
     cijoe.run(f'sudo swapoff {args.dev_path} || echo "Above error is OK."')
     cijoe.run(f'sudo zramctl --reset {args.dev_path} || echo "Above is OK."')
     cijoe.run(f'sudo modprobe -r zram || echo "Above is OK."')
+
+    err, state = cijoe.run(f"[[ -f {args.dev_path} ]]")
 
     err, state = cijoe.run(f"sudo modprobe zram num_devices=1")
     if err:
@@ -52,7 +59,7 @@ def main(args: Namespace, cijoe: Cijoe):
         log.error("Failing resizing device")
         return err
 
-    err, state = cijoe.run(f"sudo chown $USER:$USER /dev/zram0")
+    err, state = cijoe.run(f"sudo chown $USER:$USER {args.dev_path}")
     if err:
         log.error("...")
         return err
