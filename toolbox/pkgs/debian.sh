@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # Query the linker version
 ld -v || true
 
@@ -21,7 +22,7 @@ apt-get -qy install \
  xfslibs-dev \
  xfsprogs
 
-pipx install cijoe==v0.9.51 --force
+pipx install cijoe==v0.9.51 --force --include-deps
 pipx ensurepath
 
 # Retrieve, build and install xNVMe from source
