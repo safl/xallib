@@ -103,7 +103,7 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 	switch (inode->ftype) {
 	case XAL_ODF_DIR3_FT_DIR:
 		args->ndirs += 1;
-		break;
+		return;
 
 	case XAL_ODF_DIR3_FT_REG_FILE:
 		args->nfiles += 1;
@@ -120,20 +120,13 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 	}
 	xal_inode_path_pp(inode);
 	printf("':");
+
 	if (!inode->content.extents.count) {
 		printf(" ~\n");
 		return;
 	}
+
 	printf("\n");
-
-	if (args->cli_args->meta) {
-		printf("- {'ino': 0x%" PRIx64 ", 'ofz': %" PRIu64 "}\n", inode->ino,
-		       xal_ino_decode_absolute_offset(xal, inode->ino));
-	}
-
-	if (XAL_ODF_DIR3_FT_DIR == inode->ftype) {
-		return;
-	}
 
 	for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
 		struct xal_extent *extent = &inode->content.extents.extent[i];
