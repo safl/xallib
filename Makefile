@@ -30,6 +30,18 @@ test-using-nvme:
 		--config configs/localhost-nvme.toml \
 		--monitor
 
+.PHONY: test-using-nbd
+test-using-nbd:
+	cd cijoe && cijoe workflows/prep_and_test.yaml \
+		--config configs/localhost-nbd.toml \
+		--monitor
+
+.PHONY: test-using-loop
+test-using-loop:
+	cd cijoe && cijoe workflows/prep_and_test.yaml \
+		--config configs/localhost-loop.toml \
+		--monitor
+
 .PHONY: test-using-zram
 test-using-zram:
 	cd cijoe && cijoe workflows/prep_and_test.yaml \
@@ -37,4 +49,4 @@ test-using-zram:
 		--monitor
 
 .PHONY: test
-test: test-using-zram
+test: test-using-loop

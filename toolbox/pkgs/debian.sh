@@ -17,6 +17,8 @@ apt-get -qy --no-install-recommends install apt-utils
 apt-get -qy autoclean
 apt-get -qy install \
  meson \
+ nbd-client \
+ nbdkit \
  pipx \
  sudo \
  xfslibs-dev \

@@ -1,0 +1,10 @@
+[cijoe.workflow]
+# Change this to true to stop processing additional workflow steps when a step fails
+fail_fast=true
+
+[xal]
+dev_path="/dev/loop7"
+mountpoint="/tmp/xal_testing"
+
+[xal.artifacts]
+path="/tmp/artifacts"

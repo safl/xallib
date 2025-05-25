@@ -1,0 +1,61 @@
+name: build_install_verify
+
+on:
+  push:
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build_install_verify:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v4.2.2
+
+    - name: Prep, Packages
+      run: |
+        sudo ./toolbox/pkgs/debian.sh
+
+    - name: Prep, set PATH
+      run: |
+        echo "/opt/pipx_bin" >> $GITHUB_PATH
+        echo "$(pipx environment | grep 'PIPX_BIN_DIR=' | cut -d '=' -f2)" >> $GITHUB_PATH
+        cijoe --help || true
+        cijoe --version || true
+
+    - name: Prep, cijoe
+      run: |
+        cijoe --help
+        cijoe --version
+
+    - name: Configure
+      run: make configure
+
+    - name: Build
+      run: make build
+
+    - name: Install
+      run: sudo make install
+
+    - name: Test
+      run: make test-using-loop
+
+    - name: Upload CIJOE report
+      if: always()
+      uses: actions/upload-artifact@v4.3.0
+      with:
+        name: cijoe-report
+        path: |
+          cijoe/cijoe-output
+
+    - name: Upload index and block map artifacts
+      if: always()
+      uses: actions/upload-artifact@v4.3.0
+      with:
+        name: artifacts
+        path: |
+          /tmp/artifacts

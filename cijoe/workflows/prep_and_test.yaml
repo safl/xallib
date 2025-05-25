@@ -15,7 +15,7 @@ doc: |
 
 steps:
 - name: prep_bdev
-  uses: prep_zram
+  uses: prep_loop
   with:
     dev-path: '{{ config.xal.dev_path }}'
     size-in-gb: 10
