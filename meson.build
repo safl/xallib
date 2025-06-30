@@ -75,4 +75,4 @@ subdir('tools')
 
 pkg.generate(xal_library)
 
-install_headers(public_headers, subdir: 'xal')
+install_headers(public_headers)
