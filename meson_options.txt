@@ -1,1 +1,0 @@
-option('debug_messages', type: 'boolean', value: false, description: 'Enable debug messages in xal')
