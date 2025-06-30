@@ -10,6 +10,7 @@ project('xal', 'c',
   ],
 )
 
+pkg = import('pkgconfig')
 cc = meson.get_compiler('c')
 
 conf_data = configuration_data()
@@ -71,5 +72,7 @@ xal_cli = executable('xal',
 )
 
 subdir('tools')
+
+pkg.generate(xal_library)
 
 install_headers(public_headers, subdir: 'xal')
