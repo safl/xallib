@@ -189,7 +189,7 @@ struct xal {
 	struct xal_ag ags[]; ///< Array of 'agcount' number of allocation-groups
 };
 
-typedef void (*xal_walk_cb)(struct xal *xal, struct xal_inode *inode, void *cb_args, int level);
+typedef int (*xal_walk_cb)(struct xal *xal, struct xal_inode *inode, void *cb_args, int level);
 
 int
 xal_pp(struct xal *xal);
