@@ -1656,8 +1656,12 @@ xal_index(struct xal *xal)
 int
 _walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 {
+	int err;
 	if (cb_func) {
-		cb_func(xal, inode, cb_data, depth);
+		err = cb_func(xal, inode, cb_data, depth);
+		if (err) {
+			return err;
+		}
 	}
 
 	switch (inode->ftype) {
@@ -1665,7 +1669,10 @@ _walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb_da
 		struct xal_inode *inodes = inode->content.dentries.inodes;
 
 		for (uint32_t i = 0; i < inode->content.dentries.count; ++i) {
-			_walk(xal, &inodes[i], cb_func, cb_data, depth + 1);
+			err = _walk(xal, &inodes[i], cb_func, cb_data, depth + 1);
+			if (err) {
+				return err;
+			}
 		}
 	} break;
 

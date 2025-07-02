@@ -67,7 +67,7 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 /**
  * Produces output on stdout similar to the output produced by running "find /mount/point"
  */
-void
+int
 node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *cb_args,
 		    int XAL_UNUSED(level))
 {
@@ -83,7 +83,7 @@ node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *
 		break;
 	default:
 		printf("# UNKNOWN(%.*s)", inode->namelen, inode->name);
-		return;
+		return 0;
 	}
 
 	printf("%s", args->cli_args->mountpoint);
@@ -93,9 +93,10 @@ node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *
 	}
 	xal_inode_path_pp(inode);
 	printf("\n");
+	return 0;
 }
 
-void
+int
 node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int XAL_UNUSED(level))
 {
 	struct xal_nodeinspector_args *args = cb_args;
@@ -103,14 +104,14 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 	switch (inode->ftype) {
 	case XAL_ODF_DIR3_FT_DIR:
 		args->ndirs += 1;
-		return;
+		return 0;
 
 	case XAL_ODF_DIR3_FT_REG_FILE:
 		args->nfiles += 1;
 		break;
 	default:
 		printf("# UNKNOWN(%.*s)", inode->namelen, inode->name);
-		return;
+		return 0;
 	}
 
 	printf("'%s", args->cli_args->mountpoint);
@@ -123,7 +124,7 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 
 	if (!inode->content.extents.count) {
 		printf(" ~\n");
-		return;
+		return 0;
 	}
 
 	printf("\n");
@@ -140,6 +141,7 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 		printf("- [%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]\n", fofz_begin,
 		       fofz_end, bofz_begin, bofz_end);
 	}
+	return 0;
 }
 
 int
