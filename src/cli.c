@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <xal_odf.h>
 
 #define BUF_NBYTES 4096
 
@@ -73,15 +72,11 @@ node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *
 {
 	struct xal_nodeinspector_args *args = cb_args;
 
-	switch (inode->ftype) {
-	case XAL_ODF_DIR3_FT_DIR:
+	if (xal_inode_is_dir(inode)) {
 		args->ndirs += 1;
-		break;
-
-	case XAL_ODF_DIR3_FT_REG_FILE:
+	} else if (xal_inode_is_file(inode)) {
 		args->nfiles += 1;
-		break;
-	default:
+	} else {
 		printf("# UNKNOWN(%.*s)", inode->namelen, inode->name);
 		return 0;
 	}
@@ -101,15 +96,12 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 {
 	struct xal_nodeinspector_args *args = cb_args;
 
-	switch (inode->ftype) {
-	case XAL_ODF_DIR3_FT_DIR:
+	if (xal_inode_is_dir(inode)) {
 		args->ndirs += 1;
 		return 0;
-
-	case XAL_ODF_DIR3_FT_REG_FILE:
+	} else if (xal_inode_is_file(inode)) {
 		args->nfiles += 1;
-		break;
-	default:
+	} else {
 		printf("# UNKNOWN(%.*s)", inode->namelen, inode->name);
 		return 0;
 	}
