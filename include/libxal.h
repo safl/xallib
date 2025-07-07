@@ -302,3 +302,23 @@ xal_inode_path_pp(struct xal_inode *inode);
  */
 uint64_t
 xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint64_t agbno);
+
+/**
+ * Determine if the given inode is a directory
+ *
+ * @param inode The pointer to the inode
+ *
+ * @returns True if the inode is a directory
+ */
+bool
+xal_inode_is_dir(struct xal_inode *inode);
+
+/**
+ * Determine if the given inode is a regular file
+ *
+ * @param inode The pointer to the inode
+ *
+ * @returns True if the inode is a regular file
+ */
+bool
+xal_inode_is_file(struct xal_inode *inode);

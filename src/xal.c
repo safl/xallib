@@ -1710,3 +1710,15 @@ xal_inode_path_pp(struct xal_inode *inode)
 
 	return wrtn;
 }
+
+bool
+xal_inode_is_dir(struct xal_inode *inode)
+{
+	return inode->ftype == XAL_ODF_DIR3_FT_DIR;
+}
+
+bool
+xal_inode_is_file(struct xal_inode *inode)
+{
+	return inode->ftype == XAL_ODF_DIR3_FT_REG_FILE;
+}
