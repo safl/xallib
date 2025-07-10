@@ -257,7 +257,7 @@ xal_walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb
  * @param agbino The inode relative to the AG-relative block
  */
 void
-xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint32_t *agbno, uint32_t *agbino);
+xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint64_t *agbno, uint32_t *agbino);
 
 /**
  * Decodes the inode number in Absolute Inode number format
@@ -271,7 +271,7 @@ xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint32_t *agbno, uint32_t
  * @param agbino The inode relative to the AG-relative block
  */
 void
-xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint32_t *agbno,
+xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint64_t *agbno,
 			uint32_t *agbino);
 
 /**
@@ -301,4 +301,4 @@ xal_inode_path_pp(struct xal_inode *inode);
  * encoded in the block number.
  */
 uint64_t
-xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint32_t agbno);
+xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint64_t agbno);
