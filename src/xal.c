@@ -33,7 +33,7 @@ struct pair_u64 {
 KHASH_MAP_INIT_INT64(ino_to_dinode, struct xal_odf_dinode *);
 
 static int
-dev_read(struct xnvme_dev *dev, void *buf, size_t count, off_t offset)
+dev_read(struct xnvme_dev *dev, void *buf, size_t count, uint64_t offset)
 {
 	struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
 	const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
@@ -208,7 +208,7 @@ ino_abs_to_rel(struct xal *xal, uint64_t inoabs)
 }
 
 void
-xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint32_t *agbno, uint32_t *agbino)
+xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint64_t *agbno, uint32_t *agbino)
 {
 	// Block Number relative to Allocation Group
 	*agbno = (ino >> xal->sb.inopblog) & ((1ULL << xal->sb.agblklog) - 1);
@@ -218,7 +218,7 @@ xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint32_t *agbno, uint32_t
 }
 
 void
-xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint32_t *agbno,
+xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint64_t *agbno,
 			uint32_t *agbino)
 {
 	// Allocation Group Number -- represented usually stored in 'ag.seqno'
@@ -250,7 +250,7 @@ xal_fsbno_offset(struct xal *xal, uint64_t fsbno)
  * Compute the absolute disk offset of the given agbno reltive to the ag with 'seqno'
  */
 uint64_t
-xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint32_t agbno)
+xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint64_t agbno)
 {
 	// Absolute Inode offset in bytes
 	return (seqno * (uint64_t)xal->sb.agblocks + agbno) * xal->sb.blocksize;
@@ -259,8 +259,8 @@ xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint32_t agbno)
 uint64_t
 xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino)
 {
-	uint32_t seqno, agbno, agbino;
-	uint64_t offset;
+	uint32_t seqno, agbino;
+	uint64_t offset, agbno;
 
 	xal_ino_decode_absolute(xal, ino, &seqno, &agbno, &agbino);
 
@@ -1427,7 +1427,8 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 	for (uint16_t reci = 0; reci < root->pos.numrecs; ++reci) {
 		uint8_t inodechunk[BUF_NBYTES] = {0};
 		struct xal_odf_inobt_rec *rec;
-		uint32_t agbno, agbino;
+		uint32_t agbino;
+		uint64_t agbno;
 
 		rec = (void *)(((uint8_t *)buf) + sizeof(*root) + reci * sizeof(*rec));
 		rec->startino = be32toh(rec->startino);
@@ -1456,7 +1457,7 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 		{
 			uint64_t chunk_nbytes =
 			    (CHUNK_NINO / xal->sb.inopblock) * xal->sb.blocksize;
-			off_t chunk_offset = agbno * xal->sb.blocksize + ag->offset;
+			uint64_t chunk_offset = agbno * xal->sb.blocksize + ag->offset;
 
 			assert(chunk_nbytes < BUF_NBYTES);
 
