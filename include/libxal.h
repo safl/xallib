@@ -40,6 +40,13 @@ struct xal_extent {
 	uint8_t flag;
 } __attribute__((packed));
 
+struct xal_file_metadata {
+	size_t fofz_begin;
+	size_t fofz_end;
+	size_t bofz_begin;
+	size_t bofz_end;
+};
+
 int
 xal_extent_pp(struct xal_extent *extent);
 
@@ -52,6 +59,7 @@ struct xal_dentries {
 
 struct xal_extents {
 	struct xal_extent *extent; ///< Pointer to array of 'struct xal_extent'
+	struct xal_file_metadata *filemetadata; ///< on-disk offset and filesystem block number
 	uint32_t count;		   ///< Number of extents
 };
 
@@ -182,6 +190,7 @@ struct xal {
 	void *buf;		 ///< A single buffer for repetitive IO
 	uint8_t *dinodes;	 ///< Array of inodes in on-disk-format
 	void *dinodes_map;	 ///< Map of dinodes for O(1) ~ avg. lookup
+	void *filemetadata_map;	 ///< Map of Filename with its metadata for O(1) ~ avg. lookup
 	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
 	struct xal_pool extents; ///< Pool of extents in host-native format
 	struct xal_inode *root;	 ///< Root of the file-system
@@ -189,7 +198,7 @@ struct xal {
 	struct xal_ag ags[]; ///< Array of 'agcount' number of allocation-groups
 };
 
-typedef int (*xal_walk_cb)(struct xal *xal, struct xal_inode *inode, void *cb_args, int level);
+typedef void (*xal_walk_cb)(struct xal *xal, struct xal_inode *inode, void *cb_args, int level);
 
 int
 xal_pp(struct xal *xal);
@@ -303,22 +312,11 @@ xal_inode_path_pp(struct xal_inode *inode);
 uint64_t
 xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint64_t agbno);
 
-/**
- * Determine if the given inode is a directory
- *
- * @param inode The pointer to the inode
- *
- * @returns True if the inode is a directory
- */
-bool
-xal_inode_is_dir(struct xal_inode *inode);
+int
+hash_table_insert(struct xal *xal, const char *key, struct xal_extents value);
 
-/**
- * Determine if the given inode is a regular file
- *
- * @param inode The pointer to the inode
- *
- * @returns True if the inode is a regular file
- */
-bool
-xal_inode_is_file(struct xal_inode *inode);
+void
+hash_table_search(struct xal *xal, const char *key);
+
+void
+create_hash_map(struct xal *xal);
