@@ -5,7 +5,7 @@
 #include <endian.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <khash.h>
+#include "khash.h"
 #include <libxal.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -29,6 +29,9 @@ struct pair_u64 {
 	uint64_t l0;
 	uint64_t l1;
 };
+
+// Declare the hash map type
+KHASH_MAP_INIT_STR(my_struct_map, struct xal_extents)
 
 KHASH_MAP_INIT_INT64(ino_to_dinode, struct xal_odf_dinode *);
 
@@ -281,6 +284,7 @@ xal_close(struct xal *xal)
 	xal_pool_unmap(&xal->inodes);
 	xal_pool_unmap(&xal->extents);
 	kh_destroy(ino_to_dinode, xal->dinodes_map);
+	kh_destroy(my_struct_map, xal->filemetadata_map);
 	free(xal->dinodes);
 	free(xal);
 }
@@ -1656,12 +1660,8 @@ xal_index(struct xal *xal)
 int
 _walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 {
-	int err;
 	if (cb_func) {
-		err = cb_func(xal, inode, cb_data, depth);
-		if (err) {
-			return err;
-		}
+		cb_func(xal, inode, cb_data, depth);
 	}
 
 	switch (inode->ftype) {
@@ -1669,10 +1669,7 @@ _walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb_da
 		struct xal_inode *inodes = inode->content.dentries.inodes;
 
 		for (uint32_t i = 0; i < inode->content.dentries.count; ++i) {
-			err = _walk(xal, &inodes[i], cb_func, cb_data, depth + 1);
-			if (err) {
-				return err;
-			}
+			_walk(xal, &inodes[i], cb_func, cb_data, depth + 1);
 		}
 	} break;
 
@@ -1711,14 +1708,88 @@ xal_inode_path_pp(struct xal_inode *inode)
 	return wrtn;
 }
 
-bool
-xal_inode_is_dir(struct xal_inode *inode)
+// Function to insert a key-value pair into the hash map
+void
+insert_map(void *map_ptr, const char *key, struct xal_extents value)
 {
-	return inode->ftype == XAL_ODF_DIR3_FT_DIR;
+	khash_t(my_struct_map) *map = (khash_t(my_struct_map) *)map_ptr;
+	khiter_t k;
+	int absent;
+
+	// Check if the key already exists
+	k = kh_put(my_struct_map, map, key, &absent);
+
+	if (absent) {
+		// Key doesn't exist, insert new entry
+		kh_value(map, k) = value;
+	} else {
+		// Key exists, update the value
+		kh_value(map, k) = value;
+	}
 }
 
-bool
-xal_inode_is_file(struct xal_inode *inode)
+// Function to search for a key in the hash map
+struct xal_extents *
+search_map(khash_t(my_struct_map) * map, const char *key)
 {
-	return inode->ftype == XAL_ODF_DIR3_FT_REG_FILE;
+	khiter_t k = kh_get(my_struct_map, map, key);
+	if (k == kh_end(map)) {
+		return NULL; // Key not found
+	}
+	return &kh_value(map, k);
+}
+
+int
+hash_table_insert(struct xal *xal, const char *key, struct xal_extents value)
+{
+	// Insert key-value pairs
+	insert_map(xal->filemetadata_map, key, value);
+	return 0;
+}
+
+void
+hash_table_search(struct xal *xal, const char *key)
+{
+	uint64_t start_offset;
+	uint64_t start_block;
+	uint64_t nblocks;
+	uint8_t flag;
+	size_t fofz_begin;
+	size_t fofz_end;
+	size_t bofz_begin;
+	size_t bofz_end;
+
+	struct xal_extents *extents = search_map(xal->filemetadata_map, key);
+	if (extents != NULL) {
+		for (unsigned int i = 0; i < extents->count; i++) {
+			start_offset = extents->extent->start_offset;
+			start_block = extents->extent->start_block;
+			nblocks = extents->extent->nblocks;
+			flag = extents->extent->flag;
+
+			fofz_begin = extents->filemetadata[0].fofz_begin;
+			fofz_end = extents->filemetadata[0].fofz_end;
+			bofz_begin = extents->filemetadata[0].bofz_begin;
+			bofz_end = extents->filemetadata[0].bofz_end;
+			printf("\nFile: %s Metadata\n", key);
+			printf(
+			    "fofz_begin = %lu, fofz_end = %lu, bofz_begin = %lu, bofz_end = %lu\n",
+			    fofz_begin, fofz_end, bofz_begin, bofz_end);
+			printf(
+			    "start_offset = %lu, start_block = %lu, nblocks = %lu, flag = %hhu\n",
+			    start_offset, start_block, nblocks, flag);
+		}
+	} else {
+		printf("Key not found.\n");
+	}
+}
+
+void
+create_hash_map(struct xal* xal)
+{
+	// Create a new hash map
+	xal->filemetadata_map = kh_init(my_struct_map);
+	if (!xal->filemetadata_map) {
+		XAL_DEBUG("FAILED: kh_init()");
+	}
 }
