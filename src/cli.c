@@ -21,7 +21,7 @@ struct xal_cli_args {
 	bool find;
 	bool meta;
 	bool stats;
-	char *mountpoint;
+	char *dev_uri;
 };
 
 struct xal_nodeinspector_args {
@@ -34,7 +34,7 @@ int
 parse_args(int argc, char *argv[], struct xal_cli_args *args)
 {
 	if (argc < 2) {
-		fprintf(stderr, "Usage: %s [-b | --verbose] <mountpoint>\n", argv[0]);
+		fprintf(stderr, "Usage: %s [-b | --verbose] <dev_uri>\n", argv[0]);
 		return -EINVAL;
 	}
 
@@ -47,16 +47,16 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 			args->meta = 1;
 		} else if (strcmp(argv[i], "--stats") == 0) {
 			args->stats = 1;
-		} else if (args->mountpoint == NULL) {
-			args->mountpoint = argv[i];
+		} else if (args->dev_uri == NULL) {
+			args->dev_uri = argv[i];
 		} else {
 			fprintf(stderr, "Unexpected argument: %s\n", argv[i]);
 			return -EINVAL;
 		}
 	}
 
-	if (args->mountpoint == NULL) {
-		fprintf(stderr, "Error: Mountpoint is required\n");
+	if (args->dev_uri == NULL) {
+		fprintf(stderr, "Error: Device uri is required\n");
 		return -EINVAL;
 	}
 
@@ -81,9 +81,9 @@ node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *
 		return 0;
 	}
 
-	printf("%s", args->cli_args->mountpoint);
+	printf("%s", args->cli_args->dev_uri);
 	if ((inode->parent) &&
-	    (args->cli_args->mountpoint[strlen(args->cli_args->mountpoint) - 1] == '/')) {
+	    (args->cli_args->dev_uri[strlen(args->cli_args->dev_uri) - 1] == '/')) {
 		printf("/");
 	}
 	xal_inode_path_pp(inode);
@@ -106,9 +106,9 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 		return 0;
 	}
 
-	printf("'%s", args->cli_args->mountpoint);
+	printf("'%s", args->cli_args->dev_uri);
 	if ((inode->parent) &&
-	    (args->cli_args->mountpoint[strlen(args->cli_args->mountpoint) - 1] == '/')) {
+	    (args->cli_args->dev_uri[strlen(args->cli_args->dev_uri) - 1] == '/')) {
 		printf("/");
 	}
 	xal_inode_path_pp(inode);
