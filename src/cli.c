@@ -21,6 +21,7 @@ struct xal_cli_args {
 	bool find;
 	bool meta;
 	bool stats;
+	bool path;
 	char *dev_uri;
 };
 
@@ -47,6 +48,8 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 			args->meta = 1;
 		} else if (strcmp(argv[i], "--stats") == 0) {
 			args->stats = 1;
+		} else if (strcmp(argv[i], "--path") == 0) {
+			args->path = 1;
 		} else if (args->dev_uri == NULL) {
 			args->dev_uri = argv[i];
 		} else {
@@ -142,7 +145,7 @@ main(int argc, char *argv[])
 	struct xal_cli_args args = {0};
 	struct xnvme_opts opts = {0};
 	struct xal_nodeinspector_args cb_args;
-	struct xnvme_dev *dev;
+	struct xnvme_dev *dev = NULL;
 	struct xal *xal;
 	int err;
 
@@ -151,18 +154,26 @@ main(int argc, char *argv[])
 		return err;
 	}
 
-	xnvme_opts_set_defaults(&opts);
+	if (!args.path) {
+		xnvme_opts_set_defaults(&opts);
 
-	dev = xnvme_dev_open(args.dev_uri, &opts);
-	if (!dev) {
-		printf("xnvme_dev_open(...); err(%d)\n", errno);
-		return -errno;
-	}
+		dev = xnvme_dev_open(args.dev_uri, &opts);
+		if (!dev) {
+			printf("xnvme_dev_open(...); err(%d)\n", errno);
+			return -errno;
+		}
 
-	err = xal_open(dev, &xal);
-	if (err < 0) {
-		printf("xal_open(...); err(%d)\n", err);
-		return -err;
+		err = xal_open(dev, &xal);
+		if (err < 0) {
+			printf("xal_open(...); err(%d)\n", err);
+			return -err;
+		}
+	} else {
+		err = xal_open_mountpoint(args.dev_uri, &xal);
+		if (err) {
+			printf("xal_open_mountpoint(...); err(%d)\n", err);
+			return -err;
+		}
 	}
 
 	if (args.meta) {
@@ -177,7 +188,7 @@ main(int argc, char *argv[])
 
 	err = xal_index(xal);
 	if (err) {
-		printf("xal_get_index(...); err(%d)\n", err);
+		printf("xal_index(...); err(%d)\n", err);
 		goto exit;
 	}
 
@@ -209,7 +220,7 @@ main(int argc, char *argv[])
 
 exit:
 	xal_close(xal);
-	xnvme_dev_close(dev);
+	if (dev) xnvme_dev_close(dev);
 
 	return -err;
 }
