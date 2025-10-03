@@ -32,6 +32,7 @@
 #include <sys/types.h>
 
 #define XAL_INODE_NAME_MAXLEN 255
+#define XAL_PATH_MAXLEN 255
 
 struct xal_extent {
 	uint64_t start_offset;
@@ -180,6 +181,7 @@ struct xal_sb {
 struct xal {
 	struct xnvme_dev *dev;
 	void *buf;		 ///< A single buffer for repetitive IO
+	char *mountpoint;	 ///< Path to mountpoint of dev. Will be NULL if not opened with xal_open_with_mountpoint()
 	uint8_t *dinodes;	 ///< Array of inodes in on-disk-format
 	void *dinodes_map;	 ///< Map of dinodes for O(1) ~ avg. lookup
 	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
@@ -208,6 +210,9 @@ xal_pp(struct xal *xal);
  */
 int
 xal_open(struct xnvme_dev *dev, struct xal **xal);
+
+int
+xal_open_with_mountpoint(struct xnvme_dev *dev, struct xal **xal);
 
 void
 xal_close(struct xal *xal);

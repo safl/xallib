@@ -21,6 +21,7 @@ struct xal_cli_args {
 	bool find;
 	bool meta;
 	bool stats;
+	bool use_mountpoint;
 	char *dev_uri;
 };
 
@@ -47,6 +48,8 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 			args->meta = 1;
 		} else if (strcmp(argv[i], "--stats") == 0) {
 			args->stats = 1;
+		} else if (strcmp(argv[i], "--use-mountpoint") == 0) {
+			args->use_mountpoint = 1;
 		} else if (args->dev_uri == NULL) {
 			args->dev_uri = argv[i];
 		} else {
@@ -159,10 +162,18 @@ main(int argc, char *argv[])
 		return -errno;
 	}
 
-	err = xal_open(dev, &xal);
-	if (err < 0) {
-		printf("xal_open(...); err(%d)\n", err);
-		return -err;
+	if (!args.use_mountpoint) {
+		err = xal_open(dev, &xal);
+		if (err < 0) {
+			printf("xal_open(...); err(%d)\n", err);
+			return -err;
+		}
+	} else {
+		err = xal_open_with_mountpoint(dev, &xal);
+		if (err) {
+			printf("xal_open_with_mountpoint(...); err(%d)\n", err);
+			return -err;
+		}
 	}
 
 	if (args.meta) {
@@ -177,7 +188,7 @@ main(int argc, char *argv[])
 
 	err = xal_index(xal);
 	if (err) {
-		printf("xal_get_index(...); err(%d)\n", err);
+		printf("xal_index(...); err(%d)\n", err);
 		goto exit;
 	}
 
