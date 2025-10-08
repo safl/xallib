@@ -1,0 +1,1 @@
+option('debug-logging', type: 'boolean', value: true)
