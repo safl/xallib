@@ -21,7 +21,8 @@ struct xal_cli_args {
 	bool find;
 	bool meta;
 	bool stats;
-	char *mountpoint;
+	bool use_mountpoint;
+	char *dev_uri;
 };
 
 struct xal_nodeinspector_args {
@@ -34,7 +35,7 @@ int
 parse_args(int argc, char *argv[], struct xal_cli_args *args)
 {
 	if (argc < 2) {
-		fprintf(stderr, "Usage: %s [-b | --verbose] <mountpoint>\n", argv[0]);
+		fprintf(stderr, "Usage: %s [-b | --verbose] <dev_uri>\n", argv[0]);
 		return -EINVAL;
 	}
 
@@ -47,16 +48,18 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 			args->meta = 1;
 		} else if (strcmp(argv[i], "--stats") == 0) {
 			args->stats = 1;
-		} else if (args->mountpoint == NULL) {
-			args->mountpoint = argv[i];
+		} else if (strcmp(argv[i], "--use-mountpoint") == 0) {
+			args->use_mountpoint = 1;
+		} else if (args->dev_uri == NULL) {
+			args->dev_uri = argv[i];
 		} else {
 			fprintf(stderr, "Unexpected argument: %s\n", argv[i]);
 			return -EINVAL;
 		}
 	}
 
-	if (args->mountpoint == NULL) {
-		fprintf(stderr, "Error: Mountpoint is required\n");
+	if (args->dev_uri == NULL) {
+		fprintf(stderr, "Error: Device uri is required\n");
 		return -EINVAL;
 	}
 
@@ -81,9 +84,9 @@ node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *
 		return 0;
 	}
 
-	printf("%s", args->cli_args->mountpoint);
+	printf("%s", args->cli_args->dev_uri);
 	if ((inode->parent) &&
-	    (args->cli_args->mountpoint[strlen(args->cli_args->mountpoint) - 1] == '/')) {
+	    (args->cli_args->dev_uri[strlen(args->cli_args->dev_uri) - 1] == '/')) {
 		printf("/");
 	}
 	xal_inode_path_pp(inode);
@@ -106,9 +109,9 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 		return 0;
 	}
 
-	printf("'%s", args->cli_args->mountpoint);
+	printf("'%s", args->cli_args->dev_uri);
 	if ((inode->parent) &&
-	    (args->cli_args->mountpoint[strlen(args->cli_args->mountpoint) - 1] == '/')) {
+	    (args->cli_args->dev_uri[strlen(args->cli_args->dev_uri) - 1] == '/')) {
 		printf("/");
 	}
 	xal_inode_path_pp(inode);
@@ -153,16 +156,24 @@ main(int argc, char *argv[])
 
 	xnvme_opts_set_defaults(&opts);
 
-	dev = xnvme_dev_open(argv[argc - 1], &opts);
+	dev = xnvme_dev_open(args.dev_uri, &opts);
 	if (!dev) {
 		printf("xnvme_dev_open(...); err(%d)\n", errno);
 		return -errno;
 	}
 
-	err = xal_open(dev, &xal);
-	if (err < 0) {
-		printf("xal_open(...); err(%d)\n", err);
-		return -err;
+	if (!args.use_mountpoint) {
+		err = xal_open(dev, &xal);
+		if (err < 0) {
+			printf("xal_open(...); err(%d)\n", err);
+			return -err;
+		}
+	} else {
+		err = xal_open_with_mountpoint(dev, &xal);
+		if (err) {
+			printf("xal_open_with_mountpoint(...); err(%d)\n", err);
+			return -err;
+		}
 	}
 
 	if (args.meta) {
@@ -177,7 +188,7 @@ main(int argc, char *argv[])
 
 	err = xal_index(xal);
 	if (err) {
-		printf("xal_get_index(...); err(%d)\n", err);
+		printf("xal_index(...); err(%d)\n", err);
 		goto exit;
 	}
 
