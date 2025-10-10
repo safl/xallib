@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <xal_odf.h>
 
 #define BUF_NBYTES 4096
 
@@ -22,6 +23,7 @@ struct xal_cli_args {
 	bool meta;
 	bool stats;
 	char *mountpoint;
+	char *file_name;
 };
 
 struct xal_nodeinspector_args {
@@ -49,6 +51,8 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 			args->stats = 1;
 		} else if (args->mountpoint == NULL) {
 			args->mountpoint = argv[i];
+		} else if (args->file_name == NULL) {
+			args->file_name = argv[i];
 		} else {
 			fprintf(stderr, "Unexpected argument: %s\n", argv[i]);
 			return -EINVAL;
@@ -66,19 +70,23 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 /**
  * Produces output on stdout similar to the output produced by running "find /mount/point"
  */
-int
+void
 node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *cb_args,
 		    int XAL_UNUSED(level))
 {
 	struct xal_nodeinspector_args *args = cb_args;
 
-	if (xal_inode_is_dir(inode)) {
+	switch (inode->ftype) {
+	case XAL_ODF_DIR3_FT_DIR:
 		args->ndirs += 1;
-	} else if (xal_inode_is_file(inode)) {
+		break;
+
+	case XAL_ODF_DIR3_FT_REG_FILE:
 		args->nfiles += 1;
-	} else {
+		break;
+	default:
 		printf("# UNKNOWN(%.*s)", inode->namelen, inode->name);
-		return 0;
+		return;
 	}
 
 	printf("%s", args->cli_args->mountpoint);
@@ -88,22 +96,24 @@ node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *
 	}
 	xal_inode_path_pp(inode);
 	printf("\n");
-	return 0;
 }
 
-int
+void
 node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int XAL_UNUSED(level))
 {
 	struct xal_nodeinspector_args *args = cb_args;
 
-	if (xal_inode_is_dir(inode)) {
+	switch (inode->ftype) {
+	case XAL_ODF_DIR3_FT_DIR:
 		args->ndirs += 1;
-		return 0;
-	} else if (xal_inode_is_file(inode)) {
+		return;
+
+	case XAL_ODF_DIR3_FT_REG_FILE:
 		args->nfiles += 1;
-	} else {
+		break;
+	default:
 		printf("# UNKNOWN(%.*s)", inode->namelen, inode->name);
-		return 0;
+		return;
 	}
 
 	printf("'%s", args->cli_args->mountpoint);
@@ -116,10 +126,12 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 
 	if (!inode->content.extents.count) {
 		printf(" ~\n");
-		return 0;
+		return;
 	}
 
 	printf("\n");
+
+	inode->content.extents.filemetadata = malloc(inode->content.extents.count * sizeof(struct xal_file_metadata));
 
 	for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
 		struct xal_extent *extent = &inode->content.extents.extent[i];
@@ -132,8 +144,14 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 
 		printf("- [%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]\n", fofz_begin,
 		       fofz_end, bofz_begin, bofz_end);
+
+		inode->content.extents.filemetadata[i].bofz_begin = bofz_begin;
+		inode->content.extents.filemetadata[i].bofz_end = bofz_end;
+		inode->content.extents.filemetadata[i].fofz_begin = fofz_begin;
+		inode->content.extents.filemetadata[i].fofz_end = fofz_end;
 	}
-	return 0;
+
+	hash_table_insert(xal, inode->name, inode->content.extents);
 }
 
 int
@@ -153,7 +171,7 @@ main(int argc, char *argv[])
 
 	xnvme_opts_set_defaults(&opts);
 
-	dev = xnvme_dev_open(argv[argc - 1], &opts);
+	dev = xnvme_dev_open(args.mountpoint, &opts);
 	if (!dev) {
 		printf("xnvme_dev_open(...); err(%d)\n", errno);
 		return -errno;
@@ -164,6 +182,9 @@ main(int argc, char *argv[])
 		printf("xal_open(...); err(%d)\n", err);
 		return -err;
 	}
+
+	//Create new hash map
+	create_hash_map(xal);
 
 	if (args.meta) {
 		xal_pp(xal);
@@ -203,6 +224,10 @@ main(int argc, char *argv[])
 		}
 	}
 
+	if (args.file_name != NULL) {
+		hash_table_search(xal, args.file_name);
+	}
+
 	if (args.stats) {
 		printf("ndirs(%" PRIu64 "); nfiles(%" PRIu64 ")\n", cb_args.ndirs, cb_args.nfiles);
 	}
@@ -213,3 +238,4 @@ exit:
 
 	return -err;
 }
+
