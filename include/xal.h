@@ -1,5 +1,12 @@
 #include <unistd.h>
 
+#define BUF_NBYTES 4096 * 32UL		    ///< Number of bytes in a buffer
+#define CHUNK_NINO 64			    ///< Number of inodes in a chunk
+#define BUF_BLOCKSIZE 4096		    ///< Number of bytes in a block
+#define ODF_BLOCK_DIR_BYTES_MAX 64UL * 1024 ///< Maximum size of a directory block
+#define ODF_BLOCK_FS_BYTES_MAX 64UL * 1024  ///< Maximum size of a filestem block
+#define ODF_INODE_MAX_NBYTES 2048	    ///< Maximum size of an inode
+
 /**
  * XAL
  * 
