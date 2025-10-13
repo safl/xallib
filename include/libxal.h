@@ -32,9 +32,11 @@
 #include <sys/types.h>
 
 #define XAL_INODE_NAME_MAXLEN 255
+#define XAL_PATH_MAXLEN 255
 
 enum xal_backend {
 	XAL_BACKEND_XFS     = 1,
+	XAL_BACKEND_FIEMAP  = 2,
 };
 
 struct xal_opts {

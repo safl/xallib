@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <xal.h>
+#include <xal_be_fiemap.h>
 #include <xal_be_xfs.h>
 #include <xal_odf.h>
 #include <xal_pool.h>
@@ -98,7 +99,9 @@ xal_close(struct xal *xal)
 		return;
 	}
 
-	xnvme_buf_free(xal->dev, xal->buf);
+	if (xal->dev) {
+		xnvme_buf_free(xal->dev, xal->buf);
+	}
 	xal_pool_unmap(&xal->inodes);
 	xal_pool_unmap(&xal->extents);
 	kh_destroy(ino_to_dinode, xal->dinodes_map);
@@ -106,9 +109,41 @@ xal_close(struct xal *xal)
 	free(xal);
 }
 
+static int
+retrieve_mountpoint(const char *dev_uri, char *mntpnt)
+{
+	FILE *f;
+	char d[XAL_PATH_MAXLEN + 1], m[XAL_PATH_MAXLEN + 1];
+	bool found = false;
+
+	f = fopen("/proc/mounts", "r");
+	if (!f) {
+		XAL_DEBUG("FAILED: could not open /proc/mounts; errno(%d)", errno);
+		return -errno;
+	}
+
+	while (fscanf(f, "%s %s%*[^\n]\n", d, m) == 2) {
+		if (strcmp(d, dev_uri) == 0) {
+			strcpy(mntpnt, m);
+			found = true;
+			break;
+		}
+	}
+
+	fclose(f);
+
+	if (!found) {
+		XAL_DEBUG("FAILED: device(%s) not mounted", dev_uri);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 int
 xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 {
+	const struct xnvme_ident *ident;
 	struct xal_opts opts_default = {0};
 	char mountpoint[XAL_PATH_MAXLEN + 1] = {0};
 	int err;
@@ -121,9 +156,39 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 		opts = &opts_default;
 	}
 
+	ident = xnvme_dev_get_ident(dev);
+	if (!ident) {
+		XAL_DEBUG("FAILED: xnvme_dev_get_ident()");
+		return -EINVAL;
+	}
+
+	if (!opts->be) {
+		err = retrieve_mountpoint(ident->uri, mountpoint);
+		if (err) {
+			XAL_DEBUG("INFO: Failed retrieve_mountpoint(), this is OK");
+			opts->be = XAL_BACKEND_XFS;
+			err = 0;
+		} else {
+			XAL_DEBUG("INFO: dev(%s) mounted at path(%s)", ident->uri, mountpoint);
+			opts->be = XAL_BACKEND_FIEMAP;
+		}
+	}
+
 	switch (opts->be) {
 		case XAL_BACKEND_XFS:
 			return xal_open_be_xfs(dev, xal);
+
+		case XAL_BACKEND_FIEMAP:
+			if (strlen(mountpoint) == 0) {
+				err = retrieve_mountpoint(ident->uri, mountpoint);
+				if (err) {
+					XAL_DEBUG("FAILED: retrieve_mountpoint(); err(%d)", err);
+					return err;
+				}
+			}
+
+			return xal_open_be_fiemap(xal, mountpoint);
+
 		default:
 			XAL_DEBUG("FAILED: Unexpected backend(%d)", opts->be);
 			return -EINVAL;
@@ -133,6 +198,10 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 int
 xal_index(struct xal *xal)
 {
+	if (strlen(xal->mountpoint)) {
+		return xal_index_fiemap(xal);
+	}
+
 	return xal_index_xfs(xal);
 }
 

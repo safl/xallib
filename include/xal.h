@@ -18,6 +18,7 @@
 struct xal {
 	struct xnvme_dev *dev;
 	void *buf;		 ///< A single buffer for repetitive IO
+	char mountpoint[XAL_PATH_MAXLEN];	 ///< Path to mountpoint of dev. Will be NULL if not opened with xal_open_be_fiemap()
 	uint8_t *dinodes;	 ///< Array of inodes in on-disk-format
 	void *dinodes_map;	 ///< Map of dinodes for O(1) ~ avg. lookup
 	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
