@@ -21,6 +21,7 @@ struct xal_cli_args {
 	bool find;
 	bool meta;
 	bool stats;
+	char *backend;
 	char *dev_uri;
 };
 
@@ -47,6 +48,12 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 			args->meta = 1;
 		} else if (strcmp(argv[i], "--stats") == 0) {
 			args->stats = 1;
+		} else if (strcmp(argv[i], "--backend") == 0) {
+			if (i+1 >= argc) {
+				fprintf(stderr, "Error: Backend argument must define a valid backend (choices: xfs, fiemap)\n");
+				return -EINVAL;
+			}
+			args->backend = argv[++i];
 		} else if (args->dev_uri == NULL) {
 			args->dev_uri = argv[i];
 		} else {
@@ -161,7 +168,16 @@ main(int argc, char *argv[])
 		return -errno;
 	}
 
-	opts.be = XAL_BACKEND_XFS;
+	if (args.backend) {
+		if (strcmp(args.backend, "xfs") == 0) {
+			opts.be = XAL_BACKEND_XFS;
+		} else if (strcmp(args.backend, "fiemap") == 0) {
+			opts.be = XAL_BACKEND_FIEMAP;
+		} else {
+			printf("Invalid backend: %s; Valid choices: xfs, fiemap\n", args.backend);
+			return -EINVAL;
+		}
+	}
 
 	err = xal_open(dev, &xal, &opts);
 	if (err < 0) {
@@ -181,7 +197,7 @@ main(int argc, char *argv[])
 
 	err = xal_index(xal);
 	if (err) {
-		printf("xal_get_index(...); err(%d)\n", err);
+		printf("xal_index(...); err(%d)\n", err);
 		goto exit;
 	}
 
