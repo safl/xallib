@@ -153,7 +153,7 @@ main(int argc, char *argv[])
 
 	xnvme_opts_set_defaults(&opts);
 
-	dev = xnvme_dev_open(argv[argc - 1], &opts);
+	dev = xnvme_dev_open(args.dev_uri, &opts);
 	if (!dev) {
 		printf("xnvme_dev_open(...); err(%d)\n", errno);
 		return -errno;
