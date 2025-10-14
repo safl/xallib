@@ -33,6 +33,14 @@
 
 #define XAL_INODE_NAME_MAXLEN 255
 
+enum xal_backend {
+	XAL_BACKEND_XFS     = 1,
+};
+
+struct xal_opts {
+	enum xal_backend be;
+};
+
 struct xal_extent {
 	uint64_t start_offset;
 	uint64_t start_block;
@@ -209,11 +217,12 @@ xal_pp(struct xal *xal);
  *
  * @param dev Pointer to xnvme device handled as retrieved with xnvme_dev_open()
  * @param xal Pointer
+ * @param opts Pointer to options, see xal_opts
  *
  * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
  */
 int
-xal_open(struct xnvme_dev *dev, struct xal **xal);
+xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts);
 
 void
 xal_close(struct xal *xal);
