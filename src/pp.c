@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <xal.h>
 #include <xal_odf.h>
 
 int
