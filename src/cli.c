@@ -95,6 +95,7 @@ int
 node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int XAL_UNUSED(level))
 {
 	struct xal_nodeinspector_args *args = cb_args;
+	uint32_t blocksize = xal_get_sb_blocksize(xal);
 
 	if (xal_inode_is_dir(inode)) {
 		args->ndirs += 1;
@@ -125,10 +126,10 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 		struct xal_extent *extent = &inode->content.extents.extent[i];
 		size_t fofz_begin, fofz_end, bofz_begin, bofz_end;
 
-		fofz_begin = (extent->start_offset * xal->sb.blocksize) / 512;
-		fofz_end = fofz_begin + (extent->nblocks * xal->sb.blocksize) / 512 - 1;
+		fofz_begin = (extent->start_offset * blocksize) / 512;
+		fofz_end = fofz_begin + (extent->nblocks * blocksize) / 512 - 1;
 		bofz_begin = xal_fsbno_offset(xal, extent->start_block) / 512;
-		bofz_end = bofz_begin + (extent->nblocks * xal->sb.blocksize) / 512 - 1;
+		bofz_end = bofz_begin + (extent->nblocks * blocksize) / 512 - 1;
 
 		printf("- [%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]\n", fofz_begin,
 		       fofz_end, bofz_begin, bofz_end);
@@ -182,10 +183,12 @@ main(int argc, char *argv[])
 	}
 
 	if (args.bmap) {
+		struct xal_inode *root = xal_get_root(xal);
+
 		memset(&cb_args, 0, sizeof(cb_args));
 		cb_args.cli_args = &args;
 
-		err = xal_walk(xal, xal->root, node_inspector_bmap, &cb_args);
+		err = xal_walk(xal, root, node_inspector_bmap, &cb_args);
 		if (err) {
 			printf("xal_walk(.. node_visistor_bmap ..); err(%d)\n", err);
 			goto exit;
@@ -193,10 +196,12 @@ main(int argc, char *argv[])
 	}
 
 	if (args.find) {
+		struct xal_inode *root = xal_get_root(xal);
+
 		memset(&cb_args, 0, sizeof(cb_args));
 		cb_args.cli_args = &args;
 
-		err = xal_walk(xal, xal->root, node_inspector_find, &cb_args);
+		err = xal_walk(xal, root, node_inspector_find, &cb_args);
 		if (err) {
 			printf("xal_walk(.. node_visistor_find ..); err(%d)\n", err);
 			goto exit;

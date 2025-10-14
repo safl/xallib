@@ -1689,6 +1689,18 @@ xal_walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb
 	return _walk(xal, inode, cb_func, cb_data, 0);
 }
 
+struct xal_inode *
+xal_get_root(struct xal *xal)
+{
+	return xal->root;
+}
+
+uint32_t
+xal_get_sb_blocksize(struct xal *xal)
+{
+	return xal->sb.blocksize;
+}
+
 int
 xal_inode_path_pp(struct xal_inode *inode)
 {
