@@ -141,7 +141,8 @@ int
 main(int argc, char *argv[])
 {
 	struct xal_cli_args args = {0};
-	struct xnvme_opts opts = {0};
+	struct xnvme_opts xnvme_opts = {0};
+	struct xal_opts opts = {0};
 	struct xal_nodeinspector_args cb_args;
 	struct xnvme_dev *dev;
 	struct xal *xal;
@@ -152,15 +153,17 @@ main(int argc, char *argv[])
 		return err;
 	}
 
-	xnvme_opts_set_defaults(&opts);
+	xnvme_opts_set_defaults(&xnvme_opts);
 
-	dev = xnvme_dev_open(args.dev_uri, &opts);
+	dev = xnvme_dev_open(args.dev_uri, &xnvme_opts);
 	if (!dev) {
 		printf("xnvme_dev_open(...); err(%d)\n", errno);
 		return -errno;
 	}
 
-	err = xal_open(dev, &xal);
+	opts.be = XAL_BACKEND_XFS;
+
+	err = xal_open(dev, &xal, &opts);
 	if (err < 0) {
 		printf("xal_open(...); err(%d)\n", err);
 		return -err;

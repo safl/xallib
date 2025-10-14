@@ -107,9 +107,27 @@ xal_close(struct xal *xal)
 }
 
 int
-xal_open(struct xnvme_dev *dev, struct xal **xal)
+xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 {
-	return xal_open_be_xfs(dev, xal);
+	struct xal_opts opts_default = {0};
+	char mountpoint[XAL_PATH_MAXLEN + 1] = {0};
+	int err;
+
+	if (!dev) {
+		return -EINVAL;
+	}
+
+	if (!opts) {
+		opts = &opts_default;
+	}
+
+	switch (opts->be) {
+		case XAL_BACKEND_XFS:
+			return xal_open_be_xfs(dev, xal);
+		default:
+			XAL_DEBUG("FAILED: Unexpected backend(%d)", opts->be);
+			return -EINVAL;
+	}
 }
 
 int
