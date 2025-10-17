@@ -1248,10 +1248,6 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 
 /**
  * Internal helper recursively traversing the on-disk-format to build an index of the file-system
- *
- * - Retrieve the dinode
- * -
- *
  */
 int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
