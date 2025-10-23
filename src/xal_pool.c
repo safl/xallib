@@ -137,3 +137,18 @@ xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **
 
 	return 0;
 }
+
+int
+xal_pool_clear(struct xal_pool *pool)
+{
+	if (mprotect(pool->memory, pool->reserved, PROT_READ | PROT_WRITE)) {
+		XAL_DEBUG("FAILED: mprotect(...); errno(%d)", errno);
+		return -errno;
+	}
+	memset(pool->memory, 0, pool->reserved);
+
+	pool->free = 0;
+	pool->allocated = 0;
+
+	return 0;
+}

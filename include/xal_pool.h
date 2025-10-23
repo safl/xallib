@@ -52,3 +52,6 @@ xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **
 
 int
 xal_pool_claim_inodes(struct xal_pool *pool, size_t count, struct xal_inode **inodes);
+
+int
+xal_pool_clear(struct xal_pool *pool);
