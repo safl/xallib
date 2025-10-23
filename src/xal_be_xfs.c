@@ -1678,6 +1678,9 @@ xal_be_xfs_index(struct xal *xal)
 		return -EINVAL;
 	}
 
+	xal_pool_clear(&xal->inodes);
+	xal_pool_clear(&xal->extents);
+
 	err = xal_pool_claim_inodes(&xal->inodes, 1, &xal->root);
 	if (err) {
 		return err;
