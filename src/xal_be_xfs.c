@@ -25,13 +25,13 @@ struct pair_u64 {
 
 KHASH_MAP_INIT_INT64(ino_to_dinode, struct xal_odf_dinode *);
 
-int
+static int
 decode_dentry(void *buf, struct xal_inode *dentry);
 
-int
+static int
 retrieve_dinodes_via_iab3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index);
 
-int
+static int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
 
 static int
@@ -331,7 +331,7 @@ decode_iab3_node_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
  *
  * It is assumed that the inode-allocation-b+tree is rooted at the given 'blkno'
  */
-int
+static int
 retrieve_dinodes_via_iab3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, uint64_t *index)
 {
 	uint8_t block[ODF_BLOCK_FS_BYTES_MAX] = {0};
@@ -439,7 +439,7 @@ decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
  *
  * @return On success, 0 is returned. On error, -errno is returned to indicate the error.
  */
-int
+static int
 dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
 {
 	kh_ino_to_dinode_t *dinode_map = xal->dinodes_map;
@@ -472,7 +472,7 @@ dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
  *
  * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
  */
-int
+static int
 retrieve_and_decode_allocation_group(struct xnvme_dev *dev, void *buf, uint32_t seqno,
 				     struct xal *xal)
 {
@@ -515,7 +515,7 @@ retrieve_and_decode_allocation_group(struct xnvme_dev *dev, void *buf, uint32_t 
  *
  * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
  */
-int
+static int
 retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct xal **xal)
 {
 	const struct xal_odf_sb *psb = buf;
@@ -558,7 +558,7 @@ retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct 
 int
 xal_open_be_xfs(struct xnvme_dev *dev, struct xal **xal)
 {
-	struct xal *cand;
+	struct xal *cand = NULL;
 	void *buf;
 	int err;
 
@@ -817,7 +817,7 @@ btree_lblock_process(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
  *
  * @see XFS Algorithms & Data Structures - 3rd Edition - 20.5 B+tree Directories" for details
  */
-int
+static int
 process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 			      struct xal_inode *self)
 {
@@ -876,7 +876,7 @@ process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 	return err;
 }
 
-int
+static int
 process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
 	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
@@ -945,7 +945,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	return err;
 }
 
-int
+static int
 process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
 	uint64_t pointers[ODF_BLOCK_FS_BYTES_MAX / 8] = {0};
@@ -1030,7 +1030,7 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
  *
  * - Keys and pointers within the inode are 64 bits wide
  */
-int
+static int
 process_dinode_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 			       struct xal_inode *self)
 {
@@ -1097,7 +1097,7 @@ process_dinode_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
  *
  * @see XFS Algorithms & Data Structures - 3rd Edition - 20.1 Short Form Directories
  */
-int
+static int
 process_dinode_dir_local(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	uint8_t *cursor = (void *)dinode;
@@ -1207,7 +1207,7 @@ process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, stru
  *
  * @return The size, in bytes and including alignment padding, of the decoded directory entry.
  */
-int
+static int
 decode_dentry(void *buf, struct xal_inode *dentry)
 {
 	uint8_t *cursor = buf;
@@ -1247,7 +1247,7 @@ decode_dentry(void *buf, struct xal_inode *dentry)
 /**
  * Read a directory-block from disk and process the directory-entries within.
  */
-int
+static int
 process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
 	uint8_t dblock[ODF_BLOCK_FS_BYTES_MAX] = {0};
@@ -1347,7 +1347,7 @@ process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_in
  * of these have a 'count' of blocks. This 200bits worth of blocks... thats an awful lot of blocks.
  */
 
-int
+static int
 process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struct xal_inode *self)
 {
 	struct pair_u64 *extents = (void *)(((uint8_t *)dinode) + sizeof(struct xal_odf_dinode));
@@ -1418,7 +1418,7 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 /**
  * Internal helper recursively traversing the on-disk-format to build an index of the file-system
  */
-int
+static int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 {
 	struct xal_odf_dinode *dinode;
