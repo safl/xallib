@@ -153,7 +153,10 @@ xal_dinodes_retrieve(struct xal *xal);
 /**
  * Produce an index of the directory and files stored on the device
  *
- * Assumes that you have retrieved all the inodes from disk via xal_dinodes_retrieve()
+ * Assumes that you have retrieved all the inodes from disk via xal_dinodes_retrieve() if opened with
+ * backend XAL_BACKEND_XFS.
+ * 
+ * When called, any index created from previous calls to xal_index() are cleared.
  *
  * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
  */
