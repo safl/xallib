@@ -205,7 +205,7 @@ xal_index(struct xal *xal)
 	return xal_index_xfs(xal);
 }
 
-int
+static int
 _walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 {
 	int err;
