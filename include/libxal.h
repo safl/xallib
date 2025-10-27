@@ -39,8 +39,15 @@ enum xal_backend {
 	XAL_BACKEND_FIEMAP  = 2,
 };
 
+enum xal_watchmode {
+	XAL_WATCHMODE_NONE             = 0,  ///< There will be no notifications of changes to the filesystem.
+	XAL_WATCHMODE_DIRTY_DETECTION  = 1,  ///< When changes to the file system occurs, the xal struct will become "dirty" indicating that the representation of the file system is stale.
+	XAL_WATCHMODE_EXTENT_UPDATE    = 2,  ///< When other changes to the file system occurs, the xal struct will be automatically updated if the extent information is the only subject to change, otherwise the xal struct will become "dirty" indicating that the representation of the file system is stale.
+};
+
 struct xal_opts {
 	enum xal_backend be;
+	enum xal_watchmode watch_mode;
 };
 
 struct xal_extent {

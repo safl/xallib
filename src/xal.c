@@ -147,7 +147,7 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 				}
 			}
 
-			return xal_be_fiemap_open(xal, mountpoint);
+			return xal_be_fiemap_open(xal, mountpoint, opts);
 
 		default:
 			XAL_DEBUG("FAILED: Unexpected backend(%d)", opts->be);
