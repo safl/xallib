@@ -1692,5 +1692,13 @@ xal_be_xfs_index(struct xal *xal)
 	xal->root->content.extents.count = 0;
 	xal->root->content.dentries.count = 0;
 
-	return process_ino(xal, xal->root->ino, xal->root);
+	err = process_ino(xal, xal->root->ino, xal->root);
+	if (err) {
+		XAL_DEBUG("FAILED: process_ino(); err(%d)", err);
+		return err;
+	}
+
+	atomic_store(&xal->dirty, false);
+
+	return err;
 }

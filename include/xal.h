@@ -1,3 +1,4 @@
+#include <stdatomic.h>
 #include <unistd.h>
 #include <xal_pool.h>
 
@@ -44,4 +45,5 @@ struct xal {
 	struct xal_inode *root;	 ///< Root of the file-system
 	struct xal_sb sb;
 	uint8_t be[XAL_BACKEND_SIZE];
+	atomic_bool dirty;       ///< Whether the file system has changed since last index
 };
