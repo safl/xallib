@@ -65,7 +65,7 @@ retrieve_total_entries(char *path)
 
 	d = opendir(path);
 	if (!d) {
-		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); errno(%d)", errno);
+		XAL_DEBUG("FAILED: opendir(); errno(%d)", errno);
 		return -errno;
 	}
 
@@ -113,7 +113,7 @@ xal_be_fiemap_open(struct xal **xal, char *mountpoint)
 
 	cand = calloc(1, sizeof(*cand));
 	if (!cand) {
-		XAL_DEBUG("FAILED: calloc()");
+		XAL_DEBUG("FAILED: calloc(); errno(%d)", errno);
 		return -errno;
 	}
 
@@ -184,7 +184,7 @@ process_inode_dir_mounted_extents(struct xal *xal, char *path, struct xal_inode 
 	/* Count number of directory entried, no processing yet */
 	d = opendir(path);
 	if (!d) {
-		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); errno(%d)", errno);
+		XAL_DEBUG("FAILED: opendir(); errno(%d)", errno);
 		return -errno;
 	}
 
@@ -211,7 +211,7 @@ process_inode_dir_mounted_extents(struct xal *xal, char *path, struct xal_inode 
 	/* Actually process directory entries */
 	d = opendir(path);
 	if (!d) {
-		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); errno(%d)", errno);
+		XAL_DEBUG("FAILED: opendir(); errno(%d)", errno);
 		return -errno;
 	}
 
@@ -321,7 +321,7 @@ process_inode_file_mounted_extents(struct xal *xal, char *path, struct xal_inode
 
 	err = read_fiemap(fd, &fiemap);
 	if (err) {
-		XAL_DEBUG("FAILED: read_fiemap()");
+		XAL_DEBUG("FAILED: read_fiemap(); err(%d)", err);
 		goto failed;
 	}
 
@@ -395,14 +395,14 @@ process_ino_fiemap(struct xal *xal, char *path, struct xal_inode *self)
 		case XAL_ODF_DIR3_FT_DIR:
 			err = process_inode_dir_mounted_extents(xal, path, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_inode_dir_mounted_extents():err(%d)", err);
+				XAL_DEBUG("FAILED: process_inode_dir_mounted_extents(); err(%d)", err);
 				return err;
 			}
 			break;
 		case XAL_ODF_DIR3_FT_REG_FILE:
 			err = process_inode_file_mounted_extents(xal, path, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_inode_file_mounted_extents():err(%d)", err);
+				XAL_DEBUG("FAILED: process_inode_file_mounted_extents(); err(%d)", err);
 				return err;
 			}
 			break;
@@ -427,7 +427,7 @@ xal_be_fiemap_index(struct xal *xal)
 
 	err = xal_pool_claim_inodes(&xal->inodes, 1, &xal->root);
 	if (err) {
-		XAL_DEBUG("FAILED: xal_pool_claim_inodes()");
+		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); err(%d)", err);
 		return err;
 	}
 
