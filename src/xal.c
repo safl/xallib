@@ -221,6 +221,12 @@ xal_is_dirty(struct xal *xal)
 	return atomic_load(&xal->dirty);
 }
 
+int
+xal_get_seq_lock(struct xal *xal)
+{
+	return atomic_load(&xal->seq_lock);
+}
+
 uint32_t
 xal_get_sb_blocksize(struct xal *xal)
 {

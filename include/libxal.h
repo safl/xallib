@@ -135,6 +135,19 @@ xal_get_root(struct xal *xal);
 bool
 xal_is_dirty(struct xal *xal);
 
+/**
+ * Returns the current value of the sequence lock. 
+ * 
+ * An uneven number indicates the struct is being modified and is not safe to read. An even number
+ * indicates that the struct is safe to read.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * 
+ * @return the current value of the sequence lock
+ */
+int
+xal_get_seq_lock(struct xal *xal);
+
 uint32_t
 xal_get_sb_blocksize(struct xal *xal);
 
@@ -184,6 +197,37 @@ xal_dinodes_retrieve(struct xal *xal);
  */
 int
 xal_index(struct xal *xal);
+
+/**
+ * Start a background thread listening to inotify events of changes to the file system on the 
+ * block device.
+ * 
+ * Assumes that
+ *  - the file system is mounted, 
+ *  - you have run xal_open() with backend FIEMAP and a watch_mode other than XAL_WATCHMODE_NONE,
+ *  - you have indexed the file system with xal_index().
+ * 
+ * If these assumptions do not hold, this will result in an error.
+ * 
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_watch_filesystem(struct xal *xal);
+
+/**
+ * Stop the background thread listening to inotify events of changes to the file system on the 
+ * block device.
+ * 
+ * Assumes that
+ *  - you have run xal_open() with backend FIEMAP and a watch_mode other than XAL_WATCHMODE_NONE,
+ *  - the background thread is running, see`xal_watch_filesystem()`.
+ * 
+ * If these assumptions do not hold, this will result in an error.
+ * 
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_stop_watching_filesystem(struct xal *xal);
 
 /**
  * Recursively walk the given directory

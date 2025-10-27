@@ -6,6 +6,7 @@
 #include <libxal.h>
 #include <linux/fs.h>
 #include <poll.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -41,6 +42,10 @@ xal_be_fiemap_inotify_close(struct xal_inotify *inotify)
 	if (inotify->fd) {
 		close(inotify->fd);
 	}
+
+	if (inotify->flag & XAL_BE_FIEMAP_INOTIFY_RUNNING) {
+		pthread_cancel(inotify->watch_thread_id);
+	}
 }
 
 int
@@ -69,6 +74,23 @@ xal_be_fiemap_inotify_init(struct xal_inotify *inotify, enum xal_watchmode watch
 		XAL_DEBUG("FAILED: kh_init()");
 		return -EINVAL;
 	}
+
+	return 0;
+}
+
+int
+xal_be_fiemap_inotify_clear_inode_map(struct xal_inotify *inotify)
+{
+	khash_t(wd_to_inode) *inode_map;
+
+	if (!inotify) {
+		XAL_DEBUG("FAILED: No inotify object given");
+		return -EINVAL;
+	}
+
+	inode_map = inotify->inode_map;
+
+	kh_clear(wd_to_inode, inode_map);
 
 	return 0;
 }
@@ -250,6 +272,8 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 					return -EINVAL;
 				}
 
+				atomic_fetch_add(&xal->seq_lock, 1);
+
 				for (uint32_t j = 0; j < dir_inode->content.dentries.count; ++j) {
 					struct xal_inode *child = &dir_inode->content.dentries.inodes[j];
 
@@ -261,13 +285,14 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 
 				if (!inode) {
 					XAL_DEBUG("FAILED: could not find child with name(%s)", event->name);
-					return -EINVAL;
+					err = -EINVAL;
+					goto failed_with_lock;
 				}
 
 				err = get_inode_path(xal, inode, path);
 				if (err) {
 					XAL_DEBUG("FAILED: get_inode_path(); err(%d)", err);
-					return err;
+					goto failed_with_lock;
 				}
 
 				XAL_DEBUG("INFO: reprocessing inode:");
@@ -276,11 +301,13 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 				err = xal_be_fiemap_process_inode_file(xal, path, inode);
 				if (err) {
 					XAL_DEBUG("FAILED: xal_be_fiemap_process_inode_file(); err(%d)", err);
-					return err;
+					goto failed_with_lock;
 				}
 
 				XAL_DEBUG("INFO: finished reprocessing inode:");
 				XAL_DEBUG_FCALL(xal_inode_pp(inode));
+				
+				atomic_fetch_add(&xal->seq_lock, 1);
 
 			} else if (event->mask & (IN_CREATE | IN_DELETE | IN_MOVE)) {
 				XAL_DEBUG("INFO: File system has changed, event mask:%s", mask_pp);
@@ -292,6 +319,142 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 
 		len = read(inotify->fd, buf, sizeof buf);
 	}
+
+	return 0;
+
+failed_with_lock:
+	atomic_fetch_add(&xal->seq_lock, 1);
+
+	return err;
+}
+
+static void *
+background_thread_start(void *arg)
+{
+	struct xal *xal = arg;
+	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
+	int err = 0;
+
+	XAL_DEBUG("INFO: starting background thread");
+
+	if (!be->inotify) {
+		XAL_DEBUG("FAILED: inotify not initialised, exit thread");
+		goto exit_thread;
+	}
+
+	be->inotify->flag |= XAL_BE_FIEMAP_INOTIFY_RUNNING;
+
+	err = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	if (err) {
+		XAL_DEBUG("FAILED: pthread_setcancelstate(), exit thread; err(%d)", err);
+		goto exit_thread;
+	}
+
+	while (1) {
+		if (xal->dirty) {
+			continue;
+		}
+
+		err = check_events(xal, be->inotify);
+		if (err < 0) {
+			XAL_DEBUG("FAILED: xal_be_fiemap_inotify_check_events(), exit thread; err(%d)", err);
+			goto exit_thread;
+		}
+
+		if (err) {
+			XAL_DEBUG("INFO: Found breaking changes, setting xal->dirty to true");
+			xal->dirty = true;
+		}
+
+	}
+
+exit_thread:
+	XAL_DEBUG("INFO: unlocked xal lock");
+
+	be->inotify->flag &= ~XAL_BE_FIEMAP_INOTIFY_RUNNING;
+	pthread_exit((void *)(intptr_t)err);
+}
+
+int
+xal_watch_filesystem(struct xal *xal)
+{
+	struct xal_backend_base *base;
+	struct xal_be_fiemap *be;
+	int err;
+
+	if (!xal) {
+		XAL_DEBUG("FAILED: no xal given");
+		return -EINVAL;
+	}
+
+	base = (struct xal_backend_base *)&xal->be;
+	if (base->type != XAL_BACKEND_FIEMAP) {
+		XAL_DEBUG("FAILED: Invalid backend type(%d)", base->type);
+		return -EINVAL;
+	}
+
+	be = (struct xal_be_fiemap *)base;
+	if (!be->inotify || !be->inotify->watch_mode) {
+		XAL_DEBUG("FAILED: xal opened without watch mode");
+		return -EINVAL;
+	}
+
+	if (be->inotify->flag & XAL_BE_FIEMAP_INOTIFY_RUNNING) {
+		XAL_DEBUG("SKIPPED: thread already running");
+		return 0;
+	}
+
+	if (!xal->root) {
+		XAL_DEBUG("FAILED: Missing call to xal_index()");
+		return -EINVAL;
+	}
+
+	err = pthread_create(&be->inotify->watch_thread_id, NULL, &background_thread_start, xal);
+	if (err) {
+		XAL_DEBUG("FAILED: pthread_create(); err(%d)", err);
+		return -err;
+	}
+
+	return 0;
+}
+
+int
+xal_stop_watching_filesystem(struct xal *xal)
+{
+	struct xal_backend_base *base;
+	struct xal_be_fiemap *be;
+	int err;
+
+	if (!xal) {
+		XAL_DEBUG("FAILED: no xal given");
+		return -EINVAL;
+	}
+
+	base = (struct xal_backend_base *)&xal->be;
+	if (base->type != XAL_BACKEND_FIEMAP) {
+		XAL_DEBUG("FAILED: Invalid backend type(%d)", base->type);
+		return -EINVAL;
+	}
+
+	be = (struct xal_be_fiemap *)base;
+	if (!be->inotify || !be->inotify->watch_mode) {
+		XAL_DEBUG("FAILED: xal opened without watch mode");
+		return -EINVAL;
+	}
+
+	if (be->inotify->flag & ~XAL_BE_FIEMAP_INOTIFY_RUNNING) {
+		XAL_DEBUG("FAILED: thread is not running");
+		return -EINVAL;
+	}
+
+	pthread_cancel(be->inotify->watch_thread_id);
+	err = pthread_cancel(be->inotify->watch_thread_id);
+	if (err) {
+		XAL_DEBUG("FAILED: pthread_cancel(); err(%d)", err);
+		return -err;
+	}
+
+	be->inotify->flag &= ~XAL_BE_FIEMAP_INOTIFY_RUNNING;
 
 	return 0;
 }
