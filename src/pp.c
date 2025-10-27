@@ -6,7 +6,15 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <xal.h>
+#include <xal_be_fiemap.h>
+#include <xal_be_xfs.h>
 #include <xal_odf.h>
+
+static int
+xal_be_xfs_pp(struct xal *xal, struct xal_be_xfs *be);
+
+static int
+xal_be_fiemap_pp(struct xal_be_fiemap *be);
 
 int
 xal_ag_pp(struct xal_ag *ag)
@@ -32,12 +40,15 @@ xal_ag_pp(struct xal_ag *ag)
 int
 xal_pp(struct xal *xal)
 {
+	struct xal_backend_base *be;
 	int wrtn = 0;
 
 	if (!xal) {
 		wrtn += printf("xal: ~\n");
 		return wrtn;
 	}
+
+	be = (struct xal_backend_base *)&xal->be;
 
 	wrtn += printf("xal:\n");
 	wrtn += printf("  sb.blocksize: %" PRIu32 "\n", xal->sb.blocksize);
@@ -53,8 +64,15 @@ xal_pp(struct xal *xal)
 	wrtn += printf("  sb.agcount: %" PRIu32 "\n", xal->sb.agcount);
 	wrtn += printf("  sb.dirblocksize: %" PRIu32 "\n", xal->sb.dirblocksize);
 
-	for (uint32_t i = 0; i < xal->sb.agcount; ++i) {
-		wrtn += xal_ag_pp(&xal->ags[i]);
+	switch (be->type) {
+		case XAL_BACKEND_XFS:
+			struct xal_be_xfs *xfs = (struct xal_be_xfs *)be;
+			wrtn += xal_be_xfs_pp(xal, xfs);
+			break;
+		case XAL_BACKEND_FIEMAP:
+			struct xal_be_fiemap *fiemap = (struct xal_be_fiemap *)be;
+			wrtn += xal_be_fiemap_pp(fiemap);
+			break;
 	}
 
 	return wrtn;
@@ -264,6 +282,39 @@ xal_odf_inobt_rec_pp(struct xal_odf_inobt_rec *rec)
 	wrtn += printf("  count: %" PRIu8 "\n", rec->count);
 	wrtn += printf("  freecount: %" PRIu8 "\n", rec->freecount);
 	wrtn += printf("  free: %" PRIu64 "\n", rec->free);
+
+	return wrtn;
+}
+
+static int
+xal_be_xfs_pp(struct xal *xal, struct xal_be_xfs *be)
+{
+	int wrtn = 0;
+
+	if (!be) {
+		wrtn += printf("xal_be_xfs: ~\n");
+		return wrtn;
+	}
+	
+	for (uint32_t i = 0; i < xal->sb.agcount; ++i) {
+		wrtn += xal_ag_pp(&be->ags[i]);
+	}
+
+	return wrtn;
+}
+
+static int
+xal_be_fiemap_pp(struct xal_be_fiemap *be)
+{
+	int wrtn = 0;
+
+	if (!be) {
+		wrtn += printf("xal_be_fiemap: ~\n");
+		return wrtn;
+	}
+
+	wrtn += printf("xal_be_fiemap:\n");
+	wrtn += printf("  mountpoint: %s\n", be->mountpoint);
 
 	return wrtn;
 }

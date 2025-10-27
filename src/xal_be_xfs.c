@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <xal.h>
+#include <xal_be_xfs.h>
 #include <xal_odf.h>
 #include <xal_pool.h>
 
@@ -33,6 +34,9 @@ retrieve_dinodes_via_iab3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, ui
 
 static int
 process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self);
+
+int
+xal_be_xfs_index(struct xal *xal);
 
 static int
 dev_read(struct xnvme_dev *dev, void *buf, size_t count, uint64_t offset)
@@ -81,6 +85,20 @@ dev_read_into(struct xnvme_dev *dev, void *iobuf, size_t count, off_t offset, vo
 	memcpy(buf, iobuf, count);
 
 	return 0;
+}
+
+void
+xal_be_xfs_close(void *be_ptr)
+{
+	struct xal_be_xfs *be = (struct xal_be_xfs *)be_ptr;
+
+	if (!be) {
+		return;
+	}
+
+	xnvme_buf_free(be->dev, be->buf);
+	kh_destroy(ino_to_dinode, be->dinodes_map);
+	free(be->dinodes);
 }
 
 /**
@@ -157,18 +175,19 @@ btree_sblock_meta(struct xal *xal, size_t *maxrecs, size_t *keys, size_t *pointe
 }
 
 /**
- * Retrieve the IAB3 block 'blkno' in 'ag' via 'xal->buf' into 'buf' and convert endianess
+ * Retrieve the IAB3 block 'blkno' in 'ag' via 'xal->be.buf' into 'buf' and convert endianess
  */
 static int
 read_iab3_block(struct xal *xal, struct xal_ag *ag, uint64_t blkno, void *buf)
 {
 	uint64_t ofz = xal_agbno_absolute_offset(xal, ag->seqno, blkno);
 	struct xal_odf_btree_sfmt *block = (void *)buf;
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	int err;
 
 	XAL_DEBUG("ENTER: blkno(0x%" PRIx64 ", %" PRIu64 ") @ ofz(%" PRIu64 ")", blkno, blkno, ofz);
 
-	err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize, ofz, buf);
+	err = dev_read_into(be->dev, be->buf, xal->sb.blocksize, ofz, buf);
 	if (err) {
 		XAL_DEBUG("FAILED: dev_read_into(); err(%d)", err);
 		return err;
@@ -206,6 +225,7 @@ static int
 decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t *index)
 {
 	struct xal_odf_btree_sfmt *root = (void *)buf;
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	int err = 0;
 
 	XAL_DEBUG("ENTER");
@@ -247,14 +267,14 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 
 			assert(chunk_nbytes < BUF_NBYTES);
 
-			memset(xal->buf, 0, chunk_nbytes);
+			memset(be->buf, 0, chunk_nbytes);
 
-			err = dev_read(xal->dev, xal->buf, chunk_nbytes, chunk_offset);
+			err = dev_read(be->dev, be->buf, chunk_nbytes, chunk_offset);
 			if (err) {
 				XAL_DEBUG("FAILED: dev_read(chunk)");
 				return err;
 			}
-			memcpy(inodechunk, xal->buf, chunk_nbytes);
+			memcpy(inodechunk, be->buf, chunk_nbytes);
 		}
 
 		/**
@@ -264,7 +284,7 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 			uint8_t *chunk_cursor = &inodechunk[chunk_index * xal->sb.inodesize];
 			uint64_t is_unused = (rec->holemask & (1ULL << chunk_index)) >> chunk_index;
 			uint64_t is_free = (rec->free & (1ULL << chunk_index)) >> chunk_index;
-			khash_t(ino_to_dinode) *dinodes_map = xal->dinodes_map;
+			khash_t(ino_to_dinode) *dinodes_map = be->dinodes_map;
 			struct xal_odf_dinode *dinode;
 			khiter_t iter;
 
@@ -272,7 +292,7 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 				continue;
 			}
 
-			dinode = (void *)&xal->dinodes[*index * xal->sb.inodesize];
+			dinode = (void *)&be->dinodes[*index * xal->sb.inodesize];
 			memcpy(dinode, (void *)chunk_cursor, xal->sb.inodesize);
 
 			iter = kh_put(ino_to_dinode, dinodes_map, be64toh(dinode->ino), &err);
@@ -377,24 +397,30 @@ retrieve_dinodes_via_iab3(struct xal *xal, struct xal_ag *ag, uint64_t blkno, ui
 int
 xal_dinodes_retrieve(struct xal *xal)
 {
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	uint64_t index = 0;
+
+	if (be->base.type != XAL_BACKEND_XFS) {
+		XAL_DEBUG("SKIPPED: Backend is not XFS");
+		return 0;
+	}
 
 	XAL_DEBUG("ENTER");
 
-	xal->dinodes_map = kh_init(ino_to_dinode);
-	if (!xal->dinodes_map) {
+	be->dinodes_map = kh_init(ino_to_dinode);
+	if (!be->dinodes_map) {
 		XAL_DEBUG("FAILED: kh_init()");
 		return -EINVAL;
 	}
 
-	xal->dinodes = calloc(1, xal->sb.nallocated * xal->sb.inodesize);
-	if (!xal->dinodes) {
+	be->dinodes = calloc(1, xal->sb.nallocated * xal->sb.inodesize);
+	if (!be->dinodes) {
 		XAL_DEBUG("FAILED: calloc()");
 		return -errno;
 	}
 
 	for (uint32_t seqno = 0; seqno < xal->sb.agcount; ++seqno) {
-		struct xal_ag *ag = &xal->ags[seqno];
+		struct xal_ag *ag = &be->ags[seqno];
 		int err;
 
 		XAL_DEBUG("INFO: seqno: %" PRIu32 "", seqno);
@@ -402,8 +428,8 @@ xal_dinodes_retrieve(struct xal *xal)
 		err = retrieve_dinodes_via_iab3(xal, ag, ag->agi_root, &index);
 		if (err) {
 			XAL_DEBUG("FAILED: retrieve_dinodes_via_iab3(); err(%d)", err);
-			free(xal->dinodes);
-			xal->dinodes = NULL;
+			free(be->dinodes);
+			be->dinodes = NULL;
 			return err;
 		}
 	}
@@ -442,7 +468,8 @@ decode_xfs_extent(uint64_t l0, uint64_t l1, struct xal_extent *extent)
 static int
 dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
 {
-	kh_ino_to_dinode_t *dinode_map = xal->dinodes_map;
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
+	kh_ino_to_dinode_t *dinode_map = be->dinodes_map;
 	khiter_t iter;
 
 	iter = kh_get(ino_to_dinode, dinode_map, ino);
@@ -461,7 +488,7 @@ dinodes_get(struct xal *xal, uint64_t ino, void **dinode)
  * Retrieve and decode the allocation group headers for a given allocation group
  *
  * This will retrieve the block containing the superblock and allocation-group headers. A subset of
- * the allocation group headers is decoded and xal->ags[seqo] is populated with the decoded data.
+ * the allocation group headers is decoded and xal->be->ags[seqo] is populated with the decoded data.
  *
  * Assumes the following:
  *
@@ -476,6 +503,7 @@ static int
 retrieve_and_decode_allocation_group(struct xnvme_dev *dev, void *buf, uint32_t seqno,
 				     struct xal *xal)
 {
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	uint8_t *cursor = buf;
 	off_t offset = (off_t)seqno * (off_t)xal->sb.agblocks * (off_t)xal->sb.blocksize;
 	struct xal_odf_agi *agi = (void *)(cursor + xal->sb.sectsize * 2);
@@ -488,12 +516,12 @@ retrieve_and_decode_allocation_group(struct xnvme_dev *dev, void *buf, uint32_t 
 		return err;
 	}
 
-	xal->ags[seqno].seqno = seqno;
-	xal->ags[seqno].offset = offset;
-	xal->ags[seqno].agf_length = be32toh(agf->length);
-	xal->ags[seqno].agi_count = be32toh(agi->agi_count);
-	xal->ags[seqno].agi_level = be32toh(agi->agi_level);
-	xal->ags[seqno].agi_root = be32toh(agi->agi_root);
+	be->ags[seqno].seqno = seqno;
+	be->ags[seqno].offset = offset;
+	be->ags[seqno].agf_length = be32toh(agf->length);
+	be->ags[seqno].agi_count = be32toh(agi->agi_count);
+	be->ags[seqno].agi_level = be32toh(agi->agi_level);
+	be->ags[seqno].agi_root = be32toh(agi->agi_root);
 
 	/** minimalistic verification of headers **/
 	assert(be32toh(agf->magicnum) == XAL_ODF_AGF_MAGIC);
@@ -520,6 +548,7 @@ retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct 
 {
 	const struct xal_odf_sb *psb = buf;
 	struct xal *cand;
+	struct xal_be_xfs *be;
 	uint32_t agcount;
 	int err;
 
@@ -529,11 +558,19 @@ retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct 
 		return -errno;
 	}
 
+	cand = calloc(1, sizeof(*cand));
+	if (!cand) {
+		XAL_DEBUG("FAILED: calloc()\n");
+		return -errno;
+	}
+
+	be = (struct xal_be_xfs *)&cand->be;
+
 	agcount = be32toh(psb->agcount);
 
-	cand = calloc(1, sizeof(*cand) + sizeof(*(cand->ags)) * agcount);
-	if (!cand) {
-		XAL_DEBUG("FAILED: realloc()\n");
+	be->ags = calloc(1, sizeof(*(be->ags)) * agcount);
+	if (!be->ags) {
+		XAL_DEBUG("FAILED: calloc()\n");
 		return -errno;
 	}
 
@@ -556,9 +593,10 @@ retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct 
 }
 
 int
-xal_open_be_xfs(struct xnvme_dev *dev, struct xal **xal)
+xal_be_xfs_open(struct xnvme_dev *dev, struct xal **xal)
 {
 	struct xal *cand = NULL;
+	struct xal_be_xfs *be;
 	void *buf;
 	int err;
 
@@ -575,8 +613,14 @@ xal_open_be_xfs(struct xnvme_dev *dev, struct xal **xal)
 		return -errno;
 	}
 
-	cand->dev = dev;
-	cand->buf = buf;
+	be = (struct xal_be_xfs *)&cand->be;
+
+	be->base.type = XAL_BACKEND_XFS;
+	be->base.close = xal_be_xfs_close;
+	be->base.index = xal_be_xfs_index;
+
+	be->dev = dev;
+	be->buf = buf;
 
 	for (uint32_t seqno = 0; seqno < cand->sb.agcount; ++seqno) {
 		err = retrieve_and_decode_allocation_group(dev, buf, seqno, cand);
@@ -586,7 +630,7 @@ xal_open_be_xfs(struct xnvme_dev *dev, struct xal **xal)
 			goto failed;
 		}
 
-		cand->sb.nallocated += cand->ags[seqno].agi_count;
+		cand->sb.nallocated += be->ags[seqno].agi_count;
 	}
 
 	err =
@@ -625,12 +669,13 @@ static int
 btree_lblock_read(struct xal *xal, uint64_t fsbno, void *buf)
 {
 	struct xal_odf_btree_lfmt *block = (void *)buf;
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
 	int err = -ENOSYS;
 
 	XAL_DEBUG("ENTER: fsbno(0x%" PRIx64 ", %" PRIu64 ") @ ofz(%" PRIu64 ")", fsbno, fsbno, ofz);
 
-	err = dev_read_into(xal->dev, xal->buf, xal->sb.blocksize, ofz, buf);
+	err = dev_read_into(be->dev, be->buf, xal->sb.blocksize, ofz, buf);
 	if (err) {
 		XAL_DEBUG("FAILED: dev_read_into(); err(%d)", err);
 		return err;
@@ -664,6 +709,7 @@ btree_lblock_decode_leaf_records(struct xal *xal, void *buf, struct xal_inode *s
 {
 	struct xal_odf_btree_lfmt *leaf = buf;
 	struct pair_u64 *pairs = (void *)(((uint8_t *)buf) + sizeof(*leaf));
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	const uint32_t fsblk_per_dblk = xal->sb.dirblocksize / xal->sb.blocksize;
 
 	XAL_DEBUG("ENTER: Directory Extents -- B+Tree -- Leaf Node");
@@ -700,7 +746,7 @@ btree_lblock_decode_leaf_records(struct xal *xal, void *buf, struct xal_inode *s
 			XAL_DEBUG("INFO:   dblk(%zu/%zu)", (fsblk / fsblk_per_dblk) + 1,
 				  extent.nblocks / fsblk_per_dblk);
 
-			err = dev_read_into(xal->dev, xal->buf, xal->sb.dirblocksize, ofz_disk,
+			err = dev_read_into(be->dev, be->buf, xal->sb.dirblocksize, ofz_disk,
 					    dblock);
 			if (err) {
 				XAL_DEBUG("FAILED: !dev_read(directory-extent)");
@@ -879,6 +925,7 @@ process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 static int
 process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
 	struct xal_odf_btree_lfmt leaf = {0};
 	struct xal_extent *extents;
@@ -886,12 +933,12 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 
 	XAL_DEBUG("ENTER: File Extents -- B+Tree -- Leaf Node");
 
-	err = dev_read(xal->dev, xal->buf, xal->sb.blocksize, ofz);
+	err = dev_read(be->dev, be->buf, xal->sb.blocksize, ofz);
 	if (err) {
 		XAL_DEBUG("FAILED: dev_read(); err: %d", err);
 		return err;
 	}
-	memcpy(&leaf, xal->buf, sizeof(leaf));
+	memcpy(&leaf, be->buf, sizeof(leaf));
 
 	if (XAL_ODF_BMAP_CRC_MAGIC != be32toh(leaf.magic.num)) {
 		XAL_DEBUG("FAILED: expected magic(BMA3) got magic('%.4s', 0x%" PRIx32 "); ",
@@ -926,7 +973,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	self->content.extents.count += leaf.pos.numrecs;
 
 	for (uint16_t rec = 0; rec < leaf.pos.numrecs; ++rec) {
-		uint8_t *cursor = xal->buf;
+		uint8_t *cursor = be->buf;
 		uint64_t l0, l1;
 
 		cursor += sizeof(leaf) + 16ULL * rec;
@@ -948,6 +995,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 static int
 process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	uint64_t pointers[ODF_BLOCK_FS_BYTES_MAX / 8] = {0};
 	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
 	struct xal_odf_btree_lfmt node = {0};
@@ -968,13 +1016,13 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	XAL_DEBUG("INFO: maxrecs(%zu)", maxrecs);
 	XAL_DEBUG("INFO: pointers_ofz(%zu)", pointers_ofz);
 
-	err = dev_read(xal->dev, xal->buf, xal->sb.blocksize, ofz);
+	err = dev_read(be->dev, be->buf, xal->sb.blocksize, ofz);
 	if (err) {
 		XAL_DEBUG("FAILED: dev_read(); err: %d", err);
 		return err;
 	}
-	memcpy(&node, xal->buf, sizeof(node));
-	memcpy(&pointers, xal->buf + pointers_ofz, xal->sb.blocksize - pointers_ofz);
+	memcpy(&node, be->buf, sizeof(node));
+	memcpy(&pointers, be->buf + pointers_ofz, xal->sb.blocksize - pointers_ofz);
 
 	if (XAL_ODF_BMAP_CRC_MAGIC != be32toh(node.magic.num)) {
 		XAL_DEBUG("FAILED: expected magic(BMA3) got magic('%.4s', 0x%" PRIx32 "); ",
@@ -1250,6 +1298,7 @@ decode_dentry(void *buf, struct xal_inode *dentry)
 static int
 process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 {
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	uint8_t dblock[ODF_BLOCK_FS_BYTES_MAX] = {0};
 	union xal_odf_btree_magic *magic = (void *)(dblock);
 	size_t ofz_disk = xal_fsbno_offset(xal, fsbno);
@@ -1257,7 +1306,7 @@ process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_in
 
 	XAL_DEBUG("ENTER");
 
-	err = dev_read_into(xal->dev, xal->buf, xal->sb.dirblocksize, ofz_disk, dblock);
+	err = dev_read_into(be->dev, be->buf, xal->sb.dirblocksize, ofz_disk, dblock);
 	if (err) {
 		XAL_DEBUG("FAILED: !dev_read(directory-extent)");
 		return err;
@@ -1536,11 +1585,12 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 }
 
 int
-xal_index_xfs(struct xal *xal)
+xal_be_xfs_index(struct xal *xal)
 {
+	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	int err;
 
-	if (!xal->dinodes) {
+	if (!be->dinodes) {
 		return -EINVAL;
 	}
 
