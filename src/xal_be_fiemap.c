@@ -438,5 +438,13 @@ xal_be_fiemap_index(struct xal *xal)
 	xal->root->content.extents.count = 0;
 	xal->root->content.dentries.count = 0;
 
-	return process_ino_fiemap(xal, be->mountpoint, xal->root);
+	err = process_ino_fiemap(xal, be->mountpoint, xal->root);
+	if (err) {
+		XAL_DEBUG("FAILED: process_ino_fiemap(); err(%d)", err);
+		return err;
+	}
+
+	atomic_store(&xal->dirty, false);
+
+	return err;
 }

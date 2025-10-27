@@ -167,6 +167,12 @@ static int
 _walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data, int depth)
 {
 	int err;
+
+	if (atomic_load(&xal->dirty)) {
+		XAL_DEBUG("FAILED: File system has changed");
+		return -ESTALE;
+	}
+
 	if (cb_func) {
 		err = cb_func(xal, inode, cb_data, depth);
 		if (err) {
@@ -207,6 +213,12 @@ struct xal_inode *
 xal_get_root(struct xal *xal)
 {
 	return xal->root;
+}
+
+bool
+xal_is_dirty(struct xal *xal)
+{
+	return atomic_load(&xal->dirty);
 }
 
 uint32_t

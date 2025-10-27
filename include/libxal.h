@@ -113,6 +113,21 @@ struct xal;
 struct xal_inode *
 xal_get_root(struct xal *xal);
 
+/**
+ * Returns true if breaking changes to the mounted file-system have been found, which
+ * invalidates the representation of the file-system in the xal->root field. 
+ * 
+ * @note If the xal struct was not opened with backend "fiemap", this will always
+ * return false.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * 
+ * @return a boolean value, indicating whether breaking changes to the file-system have
+ *         been found.
+ */
+bool
+xal_is_dirty(struct xal *xal);
+
 uint32_t
 xal_get_sb_blocksize(struct xal *xal);
 
