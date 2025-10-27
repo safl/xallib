@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <xal.h>
 #include <xal_be_fiemap.h>
+#include <xal_be_fiemap_inotify.h>
 #include <xal_odf.h>
 
 static int
@@ -31,6 +32,10 @@ xal_be_fiemap_close(void *be_ptr)
 	struct xal_be_fiemap *be = (struct xal_be_fiemap *)be_ptr; 
 
 	free(be->mountpoint);
+
+	if (be->inotify) {
+		xal_be_fiemap_inotify_close(be->inotify);
+	}
 
 	return;
 }
@@ -98,7 +103,7 @@ retrieve_total_entries(char *path)
 }
 
 int
-xal_be_fiemap_open(struct xal **xal, char *mountpoint)
+xal_be_fiemap_open(struct xal **xal, char *mountpoint, struct xal_opts *opts)
 {
 	struct xal *cand;
 	struct stat sb;
@@ -130,6 +135,21 @@ xal_be_fiemap_open(struct xal **xal, char *mountpoint)
 	}
 
 	strcpy(be->mountpoint, mountpoint);
+
+	if (opts->watch_mode) {
+		be->inotify = calloc(1, sizeof(struct xal_inotify));
+		if (!be->inotify) {
+			XAL_DEBUG("FAILED: calloc(); errno(%d)", errno);
+			err = -errno;
+			goto failed;
+		}
+
+		err = xal_be_fiemap_inotify_init(be->inotify, opts->watch_mode);
+		if (err) {
+			XAL_DEBUG("FAILED: xal_be_fiemap_inotify_init()");
+			goto failed;
+		}
+	}
 
 	nallocated = retrieve_total_entries(be->mountpoint);
 	if (nallocated < 0) {
@@ -175,9 +195,23 @@ failed:
 static int
 xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *inode)
 {
+	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
 	struct dirent *entry;
 	DIR *d;
 	int count, err;
+
+	if (!xal_inode_is_dir(inode)) {
+		XAL_DEBUG("FAILED: cannot process directory at path(%s) - not a directory", path);
+		return -EINVAL;
+	}
+
+	if (be->inotify) {
+		err = xal_be_fiemap_inotify_add_watcher(be->inotify, path, inode);
+		if (err) {
+			XAL_DEBUG("FAILED: xal_be_fiemap_inotify_add_watcher(); err(%d)", err);
+			return err;
+		}
+	}
 
 	/* Count number of directory entried, no processing yet */
 	d = opendir(path);
@@ -303,6 +337,11 @@ xal_be_fiemap_process_inode_file(struct xal *xal, char *path, struct xal_inode *
 {
 	struct fiemap *fiemap;
 	int fd, err = 0;
+
+	if (!xal_inode_is_file(inode)) {
+		XAL_DEBUG("FAILED: cannot process file at path(%s) - not a file", path);
+		return -EINVAL;
+	}
 
 	fd = open(path, O_RDONLY);
 	if (fd < 0) {

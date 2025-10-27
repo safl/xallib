@@ -49,6 +49,7 @@ public_headers = files(
 sources = files(
   'src/xal.c',
   'src/xal_be_fiemap.c',
+  'src/xal_be_fiemap_inotify.c',
   'src/xal_be_xfs.c',
   'src/xal_pool.c',
   'src/pp.c',
