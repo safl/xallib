@@ -7,6 +7,7 @@
 #include <libxal.h>
 #include <linux/fiemap.h>
 #include <linux/fs.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -462,13 +463,24 @@ xal_be_fiemap_index(struct xal *xal)
 		return -EINVAL;
 	}
 
+	XAL_DEBUG("INFO: waiting for xal lock");
+	atomic_fetch_add(&xal->seq_lock, 1);
+
 	xal_pool_clear(&xal->inodes);
 	xal_pool_clear(&xal->extents);
+
+	if (be->inotify) {
+		err = xal_be_fiemap_inotify_clear_inode_map(be->inotify);
+		if (err) {
+			XAL_DEBUG("FAILED: xal_be_fiemap_inotify_clear_inode_map(); err(%d)", err);
+			goto exit;
+		}
+	}
 
 	err = xal_pool_claim_inodes(&xal->inodes, 1, &xal->root);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); err(%d)", err);
-		return err;
+		goto exit;
 	}
 
 	xal->root->ino = xal->sb.rootino;
@@ -480,10 +492,13 @@ xal_be_fiemap_index(struct xal *xal)
 	err = process_ino_fiemap(xal, be->mountpoint, xal->root);
 	if (err) {
 		XAL_DEBUG("FAILED: process_ino_fiemap(); err(%d)", err);
-		return err;
+		goto exit;
 	}
 
 	atomic_store(&xal->dirty, false);
+
+exit:
+	atomic_fetch_add(&xal->seq_lock, 1);
 
 	return err;
 }

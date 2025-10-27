@@ -46,4 +46,5 @@ struct xal {
 	struct xal_sb sb;
 	uint8_t be[XAL_BACKEND_SIZE];
 	atomic_bool dirty;       ///< Whether the file system has changed since last index
+	atomic_int seq_lock;     ///< An uneven number indicates the struct is being modified and is not safe to read
 };
