@@ -173,7 +173,7 @@ failed:
 }
 
 static int
-process_inode_dir_mounted_extents(struct xal *xal, char *path, struct xal_inode *inode)
+xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *inode)
 {
 	struct dirent *entry;
 	DIR *d;
@@ -298,8 +298,8 @@ read_fiemap(int fd, struct fiemap **fiemap_ptr)
 	return 0;
 }
 
-static int
-process_inode_file_mounted_extents(struct xal *xal, char *path, struct xal_inode *inode)
+int
+xal_be_fiemap_process_inode_file(struct xal *xal, char *path, struct xal_inode *inode)
 {
 	struct fiemap *fiemap;
 	int fd, err = 0;
@@ -391,16 +391,16 @@ process_ino_fiemap(struct xal *xal, char *path, struct xal_inode *self)
 
 	switch(self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			err = process_inode_dir_mounted_extents(xal, path, self);
+			err = xal_be_fiemap_process_inode_dir(xal, path, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_inode_dir_mounted_extents(); err(%d)", err);
+				XAL_DEBUG("FAILED: xal_be_fiemap_process_inode_dir(); err(%d)", err);
 				return err;
 			}
 			break;
 		case XAL_ODF_DIR3_FT_REG_FILE:
-			err = process_inode_file_mounted_extents(xal, path, self);
+			err = xal_be_fiemap_process_inode_file(xal, path, self);
 			if (err) {
-				XAL_DEBUG("FAILED: process_inode_file_mounted_extents(); err(%d)", err);
+				XAL_DEBUG("FAILED: xal_be_fiemap_process_inode_file(); err(%d)", err);
 				return err;
 			}
 			break;
