@@ -21,8 +21,6 @@
 #include <xal_pool.h>
 #include <xal_pp.h>
 
-KHASH_MAP_INIT_INT64(ino_to_dinode, struct xal_odf_dinode *);
-
 uint32_t
 ino_abs_to_rel(struct xal *xal, uint64_t inoabs)
 {
@@ -95,17 +93,18 @@ xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino)
 void
 xal_close(struct xal *xal)
 {
+	struct xal_backend_base *be;
+
 	if (!xal) {
 		return;
 	}
 
-	if (xal->dev) {
-		xnvme_buf_free(xal->dev, xal->buf);
-	}
 	xal_pool_unmap(&xal->inodes);
 	xal_pool_unmap(&xal->extents);
-	kh_destroy(ino_to_dinode, xal->dinodes_map);
-	free(xal->dinodes);
+
+	be = (struct xal_backend_base *)&xal->be;
+	be->close(be);
+
 	free(xal);
 }
 
@@ -176,7 +175,7 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 
 	switch (opts->be) {
 		case XAL_BACKEND_XFS:
-			return xal_open_be_xfs(dev, xal);
+			return xal_be_xfs_open(dev, xal);
 
 		case XAL_BACKEND_FIEMAP:
 			if (strlen(mountpoint) == 0) {
@@ -187,7 +186,7 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 				}
 			}
 
-			return xal_open_be_fiemap(xal, mountpoint);
+			return xal_be_fiemap_open(xal, mountpoint);
 
 		default:
 			XAL_DEBUG("FAILED: Unexpected backend(%d)", opts->be);
@@ -198,11 +197,9 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 int
 xal_index(struct xal *xal)
 {
-	if (strlen(xal->mountpoint)) {
-		return xal_index_fiemap(xal);
-	}
+	struct xal_backend_base *be = (struct xal_backend_base *)&xal->be;
 
-	return xal_index_xfs(xal);
+	return be->index(xal);
 }
 
 static int
