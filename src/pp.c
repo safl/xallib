@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <xal.h>
 #include <xal_be_fiemap.h>
+#include <xal_be_fiemap_inotify.h>
 #include <xal_be_xfs.h>
 #include <xal_odf.h>
 
@@ -315,6 +316,43 @@ xal_be_fiemap_pp(struct xal_be_fiemap *be)
 
 	wrtn += printf("xal_be_fiemap:\n");
 	wrtn += printf("  mountpoint: %s\n", be->mountpoint);
+
+	return wrtn;
+}
+
+int
+xal_inotify_pp(struct xal_inotify *inotify)
+{
+	int wrtn = 0;
+
+	if (!inotify) {
+		wrtn += printf("xal_inotify: ~\n");
+		return wrtn;
+	}
+
+	wrtn += printf("xal_inotify:\n");
+	wrtn += printf("  fd: %d\n", inotify->fd);
+	wrtn += printf("  inode_map addr: %p\n", inotify->inode_map);
+
+	switch (inotify->watch_mode) {
+		case XAL_WATCHMODE_NONE:
+			wrtn += printf("  watchmode: XAL_WATCHMODE_NONE\n");
+			break;
+
+		case XAL_WATCHMODE_DIRTY_DETECTION:
+			wrtn += printf("  watchmode: XAL_WATCHMODE_DIRTY_DETECTION\n");
+			break;
+
+		case XAL_WATCHMODE_EXTENT_UPDATE:
+			wrtn += printf("  watchmode: XAL_WATCHMODE_EXTENT_UPDATE\n");
+			break;
+
+		default:
+			wrtn += printf("  watchmode: ?\n");
+			break;
+	}
+
+	wrtn += printf("  watch_thread_id: %ld\n", inotify->watch_thread_id);
 
 	return wrtn;
 }

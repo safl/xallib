@@ -24,3 +24,6 @@ xal_odf_inobt_rec_pp(struct xal_odf_inobt_rec *rec);
 
 int
 xal_ag_pp(struct xal_ag *ag);
+
+int
+xal_inotify_pp(struct xal_inotify *inotify);
