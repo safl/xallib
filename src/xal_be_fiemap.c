@@ -147,7 +147,6 @@ xal_be_fiemap_open(struct xal **xal, char *mountpoint)
 
 	cand->sb.blocksize = sb.st_blksize;
 	cand->sb.rootino = sb.st_ino;
-	cand->sb.agblocks = 1; // To calculcate the on-disk offsets correctly
 
 	err =
 	    xal_pool_map(&cand->inodes, 40000000UL, nallocated, sizeof(struct xal_inode));

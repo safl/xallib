@@ -31,12 +31,24 @@
 uint64_t
 xal_fsbno_offset(struct xal *xal, uint64_t fsbno)
 {
-	uint64_t ag, bno;
+	struct xal_backend_base *be = (struct xal_backend_base *)&xal->be;
+	
+	switch (be->type) {
+		case XAL_BACKEND_FIEMAP:
+			return fsbno * xal->sb.blocksize;
+		
+		case XAL_BACKEND_XFS:
+			uint64_t ag, bno;
+			
+			ag = fsbno >> xal->sb.agblklog;
+			bno = fsbno & ((1 << xal->sb.agblklog) - 1);
 
-	ag = fsbno >> xal->sb.agblklog;
-	bno = fsbno & ((1 << xal->sb.agblklog) - 1);
-
-	return (ag * xal->sb.agblocks + bno) * xal->sb.blocksize;
+			return (ag * xal->sb.agblocks + bno) * xal->sb.blocksize;
+		
+		default:
+			XAL_DEBUG("FAILED: Unknown backend type(%d)", be->type);
+			return -EINVAL;
+	}
 }
 
 void
