@@ -18,7 +18,6 @@
 #include <xal_be_fiemap.h>
 #include <xal_be_xfs.h>
 #include <xal_odf.h>
-#include <xal_pool.h>
 #include <xal_pp.h>
 
 uint32_t

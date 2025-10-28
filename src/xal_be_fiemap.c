@@ -18,7 +18,6 @@
 #include <xal.h>
 #include <xal_be_fiemap.h>
 #include <xal_odf.h>
-#include <xal_pool.h>
 
 static int
 process_ino_fiemap(struct xal *xal, char *path, struct xal_inode *self);
