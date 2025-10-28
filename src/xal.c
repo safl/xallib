@@ -20,32 +20,6 @@
 #include <xal_odf.h>
 #include <xal_pp.h>
 
-uint32_t
-ino_abs_to_rel(struct xal *xal, uint64_t inoabs)
-{
-	return inoabs & ((1ULL << (xal->sb.agblklog + xal->sb.inopblog)) - 1);
-}
-
-void
-xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint64_t *agbno, uint32_t *agbino)
-{
-	// Block Number relative to Allocation Group
-	*agbno = (ino >> xal->sb.inopblog) & ((1ULL << xal->sb.agblklog) - 1);
-
-	// Inode number relative to Block
-	*agbino = ino & ((1ULL << xal->sb.inopblog) - 1);
-}
-
-void
-xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint64_t *agbno,
-			uint32_t *agbino)
-{
-	// Allocation Group Number -- represented usually stored in 'ag.seqno'
-	*seqno = ino >> (xal->sb.inopblog + xal->sb.agblklog);
-
-	xal_ino_decode_relative(xal, ino, agbno, agbino);
-}
-
 /**
  * Calculate the on-disk offset of the given filesystem block number
  *
@@ -63,30 +37,6 @@ xal_fsbno_offset(struct xal *xal, uint64_t fsbno)
 	bno = fsbno & ((1 << xal->sb.agblklog) - 1);
 
 	return (ag * xal->sb.agblocks + bno) * xal->sb.blocksize;
-}
-
-/**
- * Compute the absolute disk offset of the given agbno reltive to the ag with 'seqno'
- */
-uint64_t
-xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint64_t agbno)
-{
-	// Absolute Inode offset in bytes
-	return (seqno * (uint64_t)xal->sb.agblocks + agbno) * xal->sb.blocksize;
-}
-
-uint64_t
-xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino)
-{
-	uint32_t seqno, agbino;
-	uint64_t offset, agbno;
-
-	xal_ino_decode_absolute(xal, ino, &seqno, &agbno, &agbino);
-
-	// Absolute Inode offset in bytes
-	offset = (seqno * (uint64_t)xal->sb.agblocks + agbno) * xal->sb.blocksize;
-
-	return offset + ((uint64_t)agbino * xal->sb.inodesize);
 }
 
 void

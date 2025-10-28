@@ -86,6 +86,91 @@ dev_read_into(struct xnvme_dev *dev, void *iobuf, size_t count, off_t offset, vo
 	return 0;
 }
 
+static __attribute__((unused)) uint32_t
+ino_abs_to_rel(struct xal *xal, uint64_t inoabs)
+{
+	return inoabs & ((1ULL << (xal->sb.agblklog + xal->sb.inopblog)) - 1);
+}
+
+/**
+ * Decodes the given inode number in AG-Relative Inode number format
+ *
+ * For details on the format then see the description in section "13.3.1 Inode Numbers"
+ *
+ * @param xal Pointer to the xal-instance that the inode belongs to
+ * @param ino The absolute inode number to decode
+ * @param agbno Pointer to store the AG-relative block number
+ * @param agbino The inode relative to the AG-relative block
+ */
+static void
+xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint64_t *agbno, uint32_t *agbino)
+{
+	// Block Number relative to Allocation Group
+	*agbno = (ino >> xal->sb.inopblog) & ((1ULL << xal->sb.agblklog) - 1);
+
+	// Inode number relative to Block
+	*agbino = ino & ((1ULL << xal->sb.inopblog) - 1);
+}
+
+/**
+ * Decodes the inode number in Absolute Inode number format
+ *
+ * For details on the format then see the description in section "13.3.1 Inode Numbers"
+ *
+ * @param xal Pointer to the xal-instance that the inode belongs to
+ * @param ino The absolute inode number to decode
+ * @param seqno Pointer to store the AG number
+ * @param agbno Pointer to store the AG-relative block number
+ * @param agbino The inode relative to the AG-relative block
+ */
+static void
+xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint64_t *agbno,
+			uint32_t *agbino)
+{
+	// Allocation Group Number -- represented usually stored in 'ag.seqno'
+	*seqno = ino >> (xal->sb.inopblog + xal->sb.agblklog);
+
+	xal_ino_decode_relative(xal, ino, agbno, agbino);
+}
+
+/**
+ * Compute the absolute disk offset of the given 'agbno' relative to the ag with the given 'seqno'
+ *
+ * Relative block numbers are utilized in e.g. B+Tree sibilings and pointers when they only ever
+ * refer to blocks within a given allocation group, for example the B+Tree tracking all allocated
+ * inodes, the inode-allocation-btree.
+ * Generally, then they are used in the btree-short-form, whereas the btree-long-form has the seqno
+ * encoded in the block number.
+ */
+static uint64_t
+xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint64_t agbno)
+{
+	// Absolute Inode offset in bytes
+	return (seqno * (uint64_t)xal->sb.agblocks + agbno) * xal->sb.blocksize;
+}
+
+/**
+ * Compute the byte-offset on disk of the given inode in absolute inode number format
+ *
+ * @param xal Pointer to the xal-instance that the inode belongs to
+ * @param ino The absolute inode number to decode
+ *
+ * @returns The byte-offset on success.
+ */
+static __attribute__((unused)) uint64_t
+xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino)
+{
+	uint32_t seqno, agbino;
+	uint64_t offset, agbno;
+
+	xal_ino_decode_absolute(xal, ino, &seqno, &agbno, &agbino);
+
+	// Absolute Inode offset in bytes
+	offset = (seqno * (uint64_t)xal->sb.agblocks + agbno) * xal->sb.blocksize;
+
+	return offset + ((uint64_t)agbino * xal->sb.inodesize);
+}
+
 void
 xal_be_xfs_close(void *be_ptr)
 {

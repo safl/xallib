@@ -93,41 +93,6 @@ union xal_handle {
 };
 
 /**
- * XAL Allocation Group
- *
- * Contains a subset of allocation group fields, individual data for allocation
- * groups in host-endian
- *
- * Byte-order: host-endianess
- */
-struct xal_ag {
-	uint32_t seqno;
-	off_t offset;	     ///< Offset on disk in bytes; seqno * agblocks * blocksize
-	uint32_t agf_length; ///< Size of allocation group, in blocks
-	uint32_t agi_count;  ///< Number of allocated inodes, counting from 1
-	uint32_t agi_root;   ///< Block number positioned relative to the AG
-	uint32_t agi_level;  ///< levels in inode btree
-};
-
-int
-xal_ag_pp(struct xal_ag *ag);
-
-struct xal_sb {
-	uint32_t blocksize;    ///< Size of a block, in bytes
-	uint16_t sectsize;     ///< Size of a sector, in bytes
-	uint16_t inodesize;    ///< inode size, in bytes
-	uint16_t inopblock;    ///< inodes per block
-	uint8_t inopblog;      ///< log2 of inopblock
-	uint64_t icount;       ///< allocated inodes
-	uint64_t nallocated;   ///< Allocated inodes - sum of agi_count
-	uint64_t rootino;      ///< root inode number, in global-address format
-	uint32_t agblocks;     ///< Size of an allocation group, in blocks
-	uint8_t agblklog;      ///< log2 of 'agblocks' (rounded up)
-	uint32_t agcount;      ///< Number of allocation groups
-	uint32_t dirblocksize; ///< Size of a directory block, in bytes
-};
-
-/**
  * XAL
  *
  * Opaque struct.
@@ -209,62 +174,11 @@ xal_index(struct xal *xal);
 int
 xal_walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb_data);
 
-/**
- * Decodes the given inode number in AG-Relative Inode number format
- *
- * For details on the format then see the description in section "13.3.1 Inode Numbers"
- *
- * @param xal Pointer to the xal-instance that the inode belongs to
- * @param ino The absolute inode number to decode
- * @param agbno Pointer to store the AG-relative block number
- * @param agbino The inode relative to the AG-relative block
- */
-void
-xal_ino_decode_relative(struct xal *xal, uint32_t ino, uint64_t *agbno, uint32_t *agbino);
-
-/**
- * Decodes the inode number in Absolute Inode number format
- *
- * For details on the format then see the description in section "13.3.1 Inode Numbers"
- *
- * @param xal Pointer to the xal-instance that the inode belongs to
- * @param ino The absolute inode number to decode
- * @param seqno Pointer to store the AG number
- * @param agbno Pointer to store the AG-relative block number
- * @param agbino The inode relative to the AG-relative block
- */
-void
-xal_ino_decode_absolute(struct xal *xal, uint64_t ino, uint32_t *seqno, uint64_t *agbno,
-			uint32_t *agbino);
-
-/**
- * Compute the byte-offset on disk of the given inode in absolute inode number format
- *
- * @param xal Pointer to the xal-instance that the inode belongs to
- * @param ino The absolute inode number to decode
- *
- * @returns The byte-offset on success.
- */
-uint64_t
-xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino);
-
 uint64_t
 xal_fsbno_offset(struct xal *xal, uint64_t fsbno);
 
 int
 xal_inode_path_pp(struct xal_inode *inode);
-
-/**
- * Compute the absolute disk offset of the given 'agbno' relative to the ag with the given 'seqno'
- *
- * Relative block numbers are utilized in e.g. B+Tree sibilings and pointers when they only ever
- * refer to blocks within a given allocation group, for example the B+Tree tracking all allocated
- * inodes, the inode-allocation-btree.
- * Generally, then they are used in the btree-short-form, whereas the btree-long-form has the seqno
- * encoded in the block number.
- */
-uint64_t
-xal_agbno_absolute_offset(struct xal *xal, uint32_t seqno, uint64_t agbno);
 
 /**
  * Determine if the given inode is a directory
