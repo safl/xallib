@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <xal_pool.h>
 
 #define BUF_NBYTES 4096 * 32UL		    ///< Number of bytes in a buffer
 #define CHUNK_NINO 64			    ///< Number of inodes in a chunk
