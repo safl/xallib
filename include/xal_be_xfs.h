@@ -1,3 +1,20 @@
+/**
+ * XAL Allocation Group
+ *
+ * Contains a subset of allocation group fields, individual data for allocation
+ * groups in host-endian
+ *
+ * Byte-order: host-endianess
+ */
+struct xal_ag {
+	uint32_t seqno;
+	off_t offset;	     ///< Offset on disk in bytes; seqno * agblocks * blocksize
+	uint32_t agf_length; ///< Size of allocation group, in blocks
+	uint32_t agi_count;  ///< Number of allocated inodes, counting from 1
+	uint32_t agi_root;   ///< Block number positioned relative to the AG
+	uint32_t agi_level;  ///< levels in inode btree
+};
+
 struct xal_be_xfs {
 	struct xal_backend_base base;
 	struct xnvme_dev *dev;

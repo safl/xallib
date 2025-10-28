@@ -15,6 +15,21 @@ struct xal_backend_base {
 	void (*close)(void *be_ptr);
 };
 
+struct xal_sb {
+	uint32_t blocksize;    ///< Size of a block, in bytes
+	uint16_t sectsize;     ///< Size of a sector, in bytes
+	uint16_t inodesize;    ///< inode size, in bytes
+	uint16_t inopblock;    ///< inodes per block
+	uint8_t inopblog;      ///< log2 of inopblock
+	uint64_t icount;       ///< allocated inodes
+	uint64_t nallocated;   ///< Allocated inodes - sum of agi_count
+	uint64_t rootino;      ///< root inode number, in global-address format
+	uint32_t agblocks;     ///< Size of an allocation group, in blocks
+	uint8_t agblklog;      ///< log2 of 'agblocks' (rounded up)
+	uint32_t agcount;      ///< Number of allocation groups
+	uint32_t dirblocksize; ///< Size of a directory block, in bytes
+};
+
 /**
  * XAL
  * 
