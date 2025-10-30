@@ -31,10 +31,16 @@ static int
 xal_be_fiemap_index(struct xal *xal);
 
 void
-xal_be_fiemap_close(void *be_ptr)
+xal_be_fiemap_close(struct xal *xal)
 {
-	struct xal_be_fiemap *be = (struct xal_be_fiemap *)be_ptr; 
+	struct xal_be_fiemap *be;
 	kh_path_to_inode_t *inode_map;
+
+	if (!xal) {
+		return;
+	}
+
+	be = (struct xal_be_fiemap *)xal->be;
 
 	free(be->mountpoint);
 

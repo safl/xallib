@@ -13,7 +13,7 @@
 struct xal_backend_base {
 	enum xal_backend type;
 	int (*index)(struct xal *xal);
-	void (*close)(void *be_ptr);
+	void (*close)(struct xal *xal);
 };
 
 struct xal_sb {
@@ -40,6 +40,7 @@ struct xal_sb {
  * @struct xal
  */
 struct xal {
+	struct xnvme_dev *dev;
 	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
 	struct xal_pool extents; ///< Pool of extents in host-native format
 	struct xal_inode *root;	 ///< Root of the file-system

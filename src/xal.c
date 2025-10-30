@@ -63,7 +63,7 @@ xal_close(struct xal *xal)
 	xal_pool_unmap(&xal->extents);
 
 	be = (struct xal_backend_base *)&xal->be;
-	be->close(be);
+	be->close(xal);
 
 	free(xal);
 }
@@ -135,7 +135,13 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 
 	switch (opts->be) {
 		case XAL_BACKEND_XFS:
-			return xal_be_xfs_open(dev, xal);
+			err = xal_be_xfs_open(dev, xal);
+			if (err) {
+				XAL_DEBUG("FAILED: xal_be_xfs_open(); err(%d)", err);
+				return err;
+			}
+
+			break;
 
 		case XAL_BACKEND_FIEMAP:
 			if (strlen(mountpoint) == 0) {
@@ -146,12 +152,22 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 				}
 			}
 
-			return xal_be_fiemap_open(xal, mountpoint, opts);
+			err = xal_be_fiemap_open(xal, mountpoint, opts);
+			if (err) {
+				XAL_DEBUG("FAILED: xal_be_fiemap_open(); err(%d)", err);
+				return err;
+			}
+
+			break;
 
 		default:
 			XAL_DEBUG("FAILED: Unexpected backend(%d)", opts->be);
 			return -EINVAL;
 	}
+
+	(*xal)->dev = dev;
+
+	return 0;
 }
 
 int
