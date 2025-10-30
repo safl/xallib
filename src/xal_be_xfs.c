@@ -172,15 +172,17 @@ xal_ino_decode_absolute_offset(struct xal *xal, uint64_t ino)
 }
 
 void
-xal_be_xfs_close(void *be_ptr)
+xal_be_xfs_close(struct xal *xal)
 {
-	struct xal_be_xfs *be = (struct xal_be_xfs *)be_ptr;
+	struct xal_be_xfs *be;
 
-	if (!be) {
+	if (!xal) {
 		return;
 	}
 
-	xnvme_buf_free(be->dev, be->buf);
+	be = (struct xal_be_xfs *)xal->be;
+
+	xnvme_buf_free(xal->dev, be->buf);
 	kh_destroy(ino_to_dinode, be->dinodes_map);
 	free(be->dinodes);
 }
@@ -271,7 +273,7 @@ read_iab3_block(struct xal *xal, struct xal_ag *ag, uint64_t blkno, void *buf)
 
 	XAL_DEBUG("ENTER: blkno(0x%" PRIx64 ", %" PRIu64 ") @ ofz(%" PRIu64 ")", blkno, blkno, ofz);
 
-	err = dev_read_into(be->dev, be->buf, xal->sb.blocksize, ofz, buf);
+	err = dev_read_into(xal->dev, be->buf, xal->sb.blocksize, ofz, buf);
 	if (err) {
 		XAL_DEBUG("FAILED: dev_read_into(); err(%d)", err);
 		return err;
@@ -353,7 +355,7 @@ decode_iab3_leaf_records(struct xal *xal, struct xal_ag *ag, void *buf, uint64_t
 
 			memset(be->buf, 0, chunk_nbytes);
 
-			err = dev_read(be->dev, be->buf, chunk_nbytes, chunk_offset);
+			err = dev_read(xal->dev, be->buf, chunk_nbytes, chunk_offset);
 			if (err) {
 				XAL_DEBUG("FAILED: dev_read(chunk)");
 				return err;
@@ -703,7 +705,6 @@ xal_be_xfs_open(struct xnvme_dev *dev, struct xal **xal)
 	be->base.close = xal_be_xfs_close;
 	be->base.index = xal_be_xfs_index;
 
-	be->dev = dev;
 	be->buf = buf;
 
 	for (uint32_t seqno = 0; seqno < cand->sb.agcount; ++seqno) {
@@ -759,7 +760,7 @@ btree_lblock_read(struct xal *xal, uint64_t fsbno, void *buf)
 
 	XAL_DEBUG("ENTER: fsbno(0x%" PRIx64 ", %" PRIu64 ") @ ofz(%" PRIu64 ")", fsbno, fsbno, ofz);
 
-	err = dev_read_into(be->dev, be->buf, xal->sb.blocksize, ofz, buf);
+	err = dev_read_into(xal->dev, be->buf, xal->sb.blocksize, ofz, buf);
 	if (err) {
 		XAL_DEBUG("FAILED: dev_read_into(); err(%d)", err);
 		return err;
@@ -830,7 +831,7 @@ btree_lblock_decode_leaf_records(struct xal *xal, void *buf, struct xal_inode *s
 			XAL_DEBUG("INFO:   dblk(%zu/%zu)", (fsblk / fsblk_per_dblk) + 1,
 				  extent.nblocks / fsblk_per_dblk);
 
-			err = dev_read_into(be->dev, be->buf, xal->sb.dirblocksize, ofz_disk,
+			err = dev_read_into(xal->dev, be->buf, xal->sb.dirblocksize, ofz_disk,
 					    dblock);
 			if (err) {
 				XAL_DEBUG("FAILED: !dev_read(directory-extent)");
@@ -1017,7 +1018,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 
 	XAL_DEBUG("ENTER: File Extents -- B+Tree -- Leaf Node");
 
-	err = dev_read(be->dev, be->buf, xal->sb.blocksize, ofz);
+	err = dev_read(xal->dev, be->buf, xal->sb.blocksize, ofz);
 	if (err) {
 		XAL_DEBUG("FAILED: dev_read(); err: %d", err);
 		return err;
@@ -1100,7 +1101,7 @@ process_file_btree_node(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	XAL_DEBUG("INFO: maxrecs(%zu)", maxrecs);
 	XAL_DEBUG("INFO: pointers_ofz(%zu)", pointers_ofz);
 
-	err = dev_read(be->dev, be->buf, xal->sb.blocksize, ofz);
+	err = dev_read(xal->dev, be->buf, xal->sb.blocksize, ofz);
 	if (err) {
 		XAL_DEBUG("FAILED: dev_read(); err: %d", err);
 		return err;
@@ -1390,7 +1391,7 @@ process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_in
 
 	XAL_DEBUG("ENTER");
 
-	err = dev_read_into(be->dev, be->buf, xal->sb.dirblocksize, ofz_disk, dblock);
+	err = dev_read_into(xal->dev, be->buf, xal->sb.dirblocksize, ofz_disk, dblock);
 	if (err) {
 		XAL_DEBUG("FAILED: !dev_read(directory-extent)");
 		return err;
