@@ -59,6 +59,10 @@ retrieve_total_entries(char *path)
 
 	err = stat(path, &sb);
 	if (err) {
+		if (errno == ENOENT) {
+			XAL_DEBUG("FAILED: stat(%s); No such file or directory, try again", path);
+			return -EAGAIN;
+		}
 		XAL_DEBUG("FAILED: stat(%s); errno(%d)", path, errno);
 		return -errno;
 	}
@@ -411,6 +415,10 @@ process_ino_fiemap(struct xal *xal, char *path, struct xal_inode *self)
 
 	err = stat(path, &sb);
 	if (err) {
+		if (errno == ENOENT) {
+			XAL_DEBUG("FAILED: stat(%s); No such file or directory, try again", path);
+			return -EAGAIN;
+		}
 		XAL_DEBUG("FAILED: stat(%s); errno(%d)", path, errno);
 		return -errno;
 	}
