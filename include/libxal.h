@@ -96,6 +96,36 @@ xal_inode_pp(struct xal_inode *inode);
 struct xal;
 
 /**
+ * Returns the extent information in bytes.
+ * 
+ * Assumes that the extent information has not already been converted using xal_extent_in_bytes()
+ * or xal_extent_in_lba().
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param extent A pointer to a non-converted `xal_extent` 
+ * @param output A pointer to the output of the convertion
+ * 
+ * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_extent_in_bytes(struct xal *xal, const struct xal_extent *extent, struct xal_extent *output);
+
+/**
+ * Returns the extent information in blocks using the LBA format on the block device.
+ * 
+ * Assumes that the extent information has not already been converted using xal_extent_in_bytes()
+ * or xal_extent_in_lba().
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param extent A pointer to a non-converted `xal_extent` 
+ * @param output A pointer to the output of the convertion 
+ * 
+ * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_extent_in_lba(struct xal *xal, const struct xal_extent *extent, struct xal_extent *output);
+
+/**
  * Returns the root of the file-system
  * 
  * @param xal The xal struct obtained when opened with xal_open()
