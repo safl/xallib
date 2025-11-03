@@ -246,6 +246,35 @@ xal_extent_pp(struct xal_extent *extent)
 }
 
 int
+xal_extent_converted_pp(struct xal_extent_converted *extent)
+{
+	int wrtn = 0;
+
+	if (!extent) {
+		wrtn += printf("xal_extent_converted: ~\n");
+		return wrtn;
+	}
+
+	wrtn += printf("xal_extent_converted:\n");
+	wrtn += printf("  start_offset: %" PRIu64 "\n", extent->start_offset);
+	wrtn += printf("  start_block: %" PRIu64 "\n", extent->start_block);
+	
+	switch (extent->unit) {
+		case XAL_EXTENT_UNIT_BYTES:
+			wrtn += printf("  bytes: %" PRIu64 "\n", extent->size);
+			wrtn += printf("  unit: XAL_EXTENT_UNIT_BYTES\n");
+		break;
+		
+		case XAL_EXTENT_UNIT_LBA:
+			wrtn += printf("  nblocks: %" PRIu64 "\n", extent->size);
+			wrtn += printf("  unit: XAL_EXTENT_UNIT_LBA\n");
+			break;
+	}
+
+	return wrtn;
+}
+
+int
 xal_odf_btree_iab3_sfmt_pp(struct xal_odf_btree_sfmt *iab3)
 {
 	int wrtn = 0;
