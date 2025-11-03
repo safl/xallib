@@ -277,3 +277,53 @@ xal_inode_is_file(struct xal_inode *inode)
 {
 	return inode->ftype == XAL_ODF_DIR3_FT_REG_FILE;
 }
+
+int
+xal_extent_in_bytes(struct xal *xal, const struct xal_extent *extent, struct xal_extent_converted *output)
+{
+	if (!extent) {
+		XAL_DEBUG("FAILED: no extent given");
+		return -EINVAL;
+	}
+
+	output->start_offset = extent->start_offset * xal->sb.blocksize;
+	output->size = extent->nblocks * xal->sb.blocksize;
+	output->start_block = xal_fsbno_offset(xal, extent->start_block);
+	output->unit = XAL_EXTENT_UNIT_BYTES;
+
+	return 0;
+}
+
+int
+xal_extent_in_lba(struct xal *xal, const struct xal_extent *extent, struct xal_extent_converted *output)
+{
+	const struct xnvme_spec_idfy_ns *ns;
+	uint8_t fidx;
+	uint lba_blksze;
+
+	if (!extent) {
+		XAL_DEBUG("FAILED: no extent given");
+		return -EINVAL;
+	}
+
+	ns = xnvme_dev_get_ns(xal->dev);
+	if (!ns) {
+		XAL_DEBUG("FAILED: xnvme_dev_get_ns(); errno(%d)", errno);
+		return -errno;
+	}
+
+	fidx = ns->flbas.format;
+	if (ns->nlbaf > 16) {
+		fidx += ns->flbas.format_msb << 4;
+	}
+
+	lba_blksze = 1U << ns->lbaf[fidx].ds;
+	XAL_DEBUG("INFO: Found lba block size %d", lba_blksze);
+
+	output->start_offset = extent->start_offset * xal->sb.blocksize / lba_blksze;
+	output->size = extent->nblocks * xal->sb.blocksize / lba_blksze;
+	output->start_block = xal_fsbno_offset(xal, extent->start_block) / lba_blksze;
+	output->unit = XAL_EXTENT_UNIT_LBA;
+
+	return 0;
+}

@@ -66,6 +66,21 @@ struct xal_extent {
 int
 xal_extent_pp(struct xal_extent *extent);
 
+enum xal_extent_unit {
+	XAL_EXTENT_UNIT_BYTES = 0,
+	XAL_EXTENT_UNIT_LBA = 1,
+};
+
+struct xal_extent_converted {
+	uint64_t start_offset;
+	uint64_t start_block;
+	uint64_t size;
+	enum xal_extent_unit unit;
+};
+
+int
+xal_extent_converted_pp(struct xal_extent_converted *extent);
+
 struct xal_inode;
 
 struct xal_dentries {
@@ -107,6 +122,30 @@ xal_inode_pp(struct xal_inode *inode);
  * @struct xal
  */
 struct xal;
+
+/**
+ * Returns the extent information in bytes.
+ *
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param extent A pointer to a `xal_extent`
+ * @param output A pointer to the output of the conversion
+ *
+ * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_extent_in_bytes(struct xal *xal, const struct xal_extent *extent, struct xal_extent_converted *output);
+
+/**
+ * Returns the extent information in blocks using the LBA format on the block device.
+ *
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param extent A pointer to a `xal_extent`
+ * @param output A pointer to the output of the conversion
+ *
+ * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_extent_in_lba(struct xal *xal, const struct xal_extent *extent, struct xal_extent_converted *output);
 
 /**
  * Returns the root of the file-system
