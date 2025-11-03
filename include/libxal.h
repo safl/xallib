@@ -98,14 +98,6 @@ int
 xal_inode_pp(struct xal_inode *inode);
 
 /**
- * An encapsulation of the device handle, this is done preparation for using xNVMe
- */
-union xal_handle {
-	int fd;
-	void *ptr;
-};
-
-/**
  * XAL
  *
  * Opaque struct.
