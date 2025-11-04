@@ -179,6 +179,14 @@ failed:
 }
 
 static int
+compare_inodes_by_name(const void *a, const void *b)
+{
+    const struct xal_inode *ia = a;
+    const struct xal_inode *ib = b;
+    return strncmp(ia->name, ib->name, XAL_INODE_NAME_MAXLEN);
+}
+
+static int
 process_inode_dir_mounted_extents(struct xal *xal, char *path, struct xal_inode *inode)
 {
 	struct dirent *entry;
@@ -244,6 +252,8 @@ process_inode_dir_mounted_extents(struct xal *xal, char *path, struct xal_inode 
 		}
 		entry = readdir(d);
 	}
+
+	qsort(inode->content.dentries.inodes, &inode->content.dentries.count, sizeof(struct xal_inode), compare_inodes_by_name);
 
 	closedir(d);
 
@@ -442,4 +452,134 @@ xal_be_fiemap_index(struct xal *xal)
 	xal->root->content.dentries.count = 0;
 
 	return process_ino_fiemap(xal, be->mountpoint, xal->root);
+}
+
+static int
+compare_name_to_inode(const void *key, const void *elem)
+{
+    const char *name = key;
+    const struct xal_inode *inode = elem;
+	size_t name_len = strlen(name);
+    return strncmp(name, inode->name, name_len);
+}
+
+int
+xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode)
+{
+	struct xal_inode *search, *found = NULL;
+	struct xal_be_fiemap *be;
+	char *search_begin, *search_end;
+	size_t mountpoint_len;
+
+	if (!xal) {
+		XAL_DEBUG("FAILED: no xal given");
+		return -EINVAL;
+	}
+
+	if (!path) {
+		XAL_DEBUG("FAILED: no path given");
+		return -EINVAL;
+	}
+
+	be = (struct xal_be_fiemap *)&xal->be;
+
+	if (be->base.type != XAL_BACKEND_FIEMAP) {
+		XAL_DEBUG("FAILED: xal not opened with backend FIEMAP; be(%d)", be->base.type);
+		return -EINVAL;
+	}
+
+	mountpoint_len = strlen(be->mountpoint);
+
+	if (!xal->root) {
+		XAL_DEBUG("FAILED: no xal->root, call xal_index()");
+		return -EINVAL;
+	}
+
+	if (strlen(path) <= mountpoint_len + 1) {
+		XAL_DEBUG("FAILED: Not a valid path(%s); path too short; must be absolute path to entry in mountpoint(%s)", 
+			path, be->mountpoint);
+		return -EINVAL;
+	}
+
+	if (strncmp(path, be->mountpoint, mountpoint_len) != 0) {
+		XAL_DEBUG("FAILED: Not a valid path(%s); not a subpath; no must be absolute path to entry in mountpoint(%s)", 
+			path, be->mountpoint);
+		return -EINVAL;
+	}
+	
+	search = xal->root;
+	search_begin = path + mountpoint_len + 1;
+	search_end = strchr(search_begin, '/');
+
+	while (!found) {
+		size_t search_len = search_end ? (size_t)(search_end - search_begin) : strlen(search_begin);
+
+		struct xal_inode *child = bsearch(search_begin, search->content.dentries.inodes,
+				search->content.dentries.count, sizeof(struct xal_inode), compare_name_to_inode);
+
+		if (!child) {
+			break;
+		}
+
+		if (!search_end) {
+			found = child;
+		} else {
+			search = child;
+			search_begin = search_end + 1;
+			search_end = strchr(search_begin, '/');
+		}
+	}
+
+	if (!found) {
+		XAL_DEBUG("FAILED: Inode not found");
+		return -ENOENT;
+	}
+
+	*inode = found;
+
+	return 0;
+}
+
+int
+xal_get_extents(struct xal *xal, char *path, struct xal_extents **extents)
+{
+	struct xal_inode *inode;
+	int err;
+
+	err = xal_get_inode(xal, path, &inode);
+	if (err) {
+		XAL_DEBUG("FAILED: xal_get_inode(); err(%d)", err);
+		return err;
+	}
+
+	if (!xal_inode_is_file(inode)) {
+		XAL_DEBUG("FAILED: inode at given path is not a file");
+		return -EINVAL;
+	}
+
+	*extents = &inode->content.extents;
+
+	return 0;
+}
+
+int
+xal_get_dentries(struct xal *xal, char *path, struct xal_dentries **dentries)
+{
+	struct xal_inode *inode;
+	int err;
+
+	err = xal_get_inode(xal, path, &inode);
+	if (err) {
+		XAL_DEBUG("FAILED: xal_get_inode(); err(%d)", err);
+		return err;
+	}
+
+	if (!xal_inode_is_dir(inode)) {
+		XAL_DEBUG("FAILED: inode at given path is not a directory");
+		return -ENOTDIR;
+	}
+
+	*dentries = &inode->content.dentries;
+
+	return 0;
 }
