@@ -85,14 +85,6 @@ int
 xal_inode_pp(struct xal_inode *inode);
 
 /**
- * An encapsulation of the device handle, this is done preparation for using xNVMe
- */
-union xal_handle {
-	int fd;
-	void *ptr;
-};
-
-/**
  * XAL
  *
  * Opaque struct.
@@ -102,6 +94,36 @@ union xal_handle {
  * @struct xal
  */
 struct xal;
+
+/**
+ * Returns the extent information in bytes.
+ * 
+ * Assumes that the extent information has not already been converted using xal_extent_in_bytes()
+ * or xal_extent_in_lba().
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param extent A pointer to a non-converted `xal_extent` 
+ * @param output A pointer to the output of the convertion
+ * 
+ * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_extent_in_bytes(struct xal *xal, const struct xal_extent *extent, struct xal_extent *output);
+
+/**
+ * Returns the extent information in blocks using the LBA format on the block device.
+ * 
+ * Assumes that the extent information has not already been converted using xal_extent_in_bytes()
+ * or xal_extent_in_lba().
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param extent A pointer to a non-converted `xal_extent` 
+ * @param output A pointer to the output of the convertion 
+ * 
+ * @return On success a 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_extent_in_lba(struct xal *xal, const struct xal_extent *extent, struct xal_extent *output);
 
 /**
  * Returns the root of the file-system
@@ -176,6 +198,53 @@ xal_walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb
 
 uint64_t
 xal_fsbno_offset(struct xal *xal, uint64_t fsbno);
+
+/**
+ * Retrieve the inode that represent the file or directory at the given path.
+ * 
+ * This will search through the tree at xal->root to find the inode. 
+ * Note: File system must be mounted and xal opened with backend FIEMAP.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param path Absolute path to the file or directory.
+ * @param inode Pointer for the found inode
+ * 
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode);
+
+/**
+ * Retrieve the extents for the file at the given path.
+ * 
+ * This will search through the tree at xal->root to find the inode. This call fails if the entry
+ * at the given path is not a file.
+ * Note: File system must be mounted and xal opened with backend FIEMAP.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param path Absolute path to the file or directory.
+ * @param extents Pointer for the found xal_extents
+ * 
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_get_extents(struct xal *xal, char *path, struct xal_extents **extents);
+
+/**
+ * Retrieve the directory entries for the directory at the given path.
+ * 
+ * This will search through the tree at xal->root to find the inode. This call fails if the entry
+ * at the given path is not a directory.
+ * Note: File system must be mounted and xal opened with backend FIEMAP.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param path Absolute path to the file or directory.
+ * @param dentries Pointer for the found xal_dentries
+ * 
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_get_dentries(struct xal *xal, char *path, struct xal_dentries **dentries);
 
 int
 xal_inode_path_pp(struct xal_inode *inode);
