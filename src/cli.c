@@ -13,6 +13,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <xal_odf.h>
+#include <ctype.h>
+
 
 #define BUF_NBYTES 4096
 
@@ -23,6 +26,7 @@ struct xal_cli_args {
 	bool stats;
 	char *backend;
 	char *dev_uri;
+	char *file_name;
 };
 
 struct xal_nodeinspector_args {
@@ -30,6 +34,33 @@ struct xal_nodeinspector_args {
 	uint64_t nfiles;
 	struct xal_cli_args *cli_args;
 };
+
+// Function to check if a string is a valid file extension
+bool
+is_valid_extension(const char *filename)
+{
+	const char *dot = strrchr(filename, '.');
+
+	// Check if there's a dot in the filename and it's not the first character
+	if (dot == NULL || dot == filename) {
+		return false;
+	}
+
+	// Get the extension
+	const char *extension = dot + 1;
+
+	// Check for common extensions
+	if (strcmp(extension, "txt") == 0 || strcmp(extension, "jpg") == 0 ||
+	    strcmp(extension, "jpeg") == 0 || strcmp(extension, "png") == 0 ||
+	    strcmp(extension, "gif") == 0 || strcmp(extension, "pdf") == 0 ||
+	    strcmp(extension, "doc") == 0 || strcmp(extension, "docx") == 0 ||
+	    strcmp(extension, "xls") == 0 || strcmp(extension, "xlsx") == 0 ||
+	    strcmp(extension, "csv") == 0) {
+		return true;
+	}
+
+	return false;
+}
 
 int
 parse_args(int argc, char *argv[], struct xal_cli_args *args)
@@ -57,8 +88,17 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 		} else if (args->dev_uri == NULL) {
 			args->dev_uri = argv[i];
 		} else {
-			fprintf(stderr, "Unexpected argument: %s\n", argv[i]);
-			return -EINVAL;
+			//If argc is 4 and argv[3] has a valid extension, set it as file_name
+			if (argc == 4 ) {
+				const char *filename = argv[3];
+
+				if (is_valid_extension(filename)) {
+					args->file_name = argv[3];
+				} else {
+					fprintf(stderr, "Unexpected argument: %s\n", argv[i]);
+					return -EINVAL;
+				}
+			}
 		}
 	}
 
@@ -73,19 +113,23 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 /**
  * Produces output on stdout similar to the output produced by running "find /mount/point"
  */
-int
+void
 node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *cb_args,
 		    int XAL_UNUSED(level))
 {
 	struct xal_nodeinspector_args *args = cb_args;
 
-	if (xal_inode_is_dir(inode)) {
+	switch (inode->ftype) {
+	case XAL_ODF_DIR3_FT_DIR:
 		args->ndirs += 1;
-	} else if (xal_inode_is_file(inode)) {
+		break;
+
+	case XAL_ODF_DIR3_FT_REG_FILE:
 		args->nfiles += 1;
-	} else {
+		break;
+	default:
 		printf("# UNKNOWN(%.*s)", inode->namelen, inode->name);
-		return 0;
+		return;
 	}
 
 	printf("%s", args->cli_args->dev_uri);
@@ -95,23 +139,25 @@ node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *
 	}
 	xal_inode_path_pp(inode);
 	printf("\n");
-	return 0;
 }
 
-int
+void
 node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int XAL_UNUSED(level))
 {
 	struct xal_nodeinspector_args *args = cb_args;
 	uint32_t blocksize = xal_get_sb_blocksize(xal);
 
-	if (xal_inode_is_dir(inode)) {
+	switch (inode->ftype) {
+	case XAL_ODF_DIR3_FT_DIR:
 		args->ndirs += 1;
-		return 0;
-	} else if (xal_inode_is_file(inode)) {
+		return;
+
+	case XAL_ODF_DIR3_FT_REG_FILE:
 		args->nfiles += 1;
-	} else {
+		break;
+	default:
 		printf("# UNKNOWN(%.*s)", inode->namelen, inode->name);
-		return 0;
+		return;
 	}
 
 	printf("'%s", args->cli_args->dev_uri);
@@ -124,10 +170,12 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 
 	if (!inode->content.extents.count) {
 		printf(" ~\n");
-		return 0;
+		return;
 	}
 
 	printf("\n");
+
+	inode->content.extents.filemetadata = malloc(inode->content.extents.count * sizeof(struct xal_file_metadata));
 
 	for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
 		struct xal_extent *extent = &inode->content.extents.extent[i];
@@ -140,8 +188,14 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 
 		printf("- [%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]\n", fofz_begin,
 		       fofz_end, bofz_begin, bofz_end);
+
+		inode->content.extents.filemetadata[i].bofz_begin = bofz_begin;
+		inode->content.extents.filemetadata[i].bofz_end = bofz_end;
+		inode->content.extents.filemetadata[i].fofz_begin = fofz_begin;
+		inode->content.extents.filemetadata[i].fofz_end = fofz_end;
 	}
-	return 0;
+
+	hash_table_insert(xal, inode->name, inode->content.extents);
 }
 
 int
@@ -185,6 +239,9 @@ main(int argc, char *argv[])
 		return -err;
 	}
 
+	// Create new hash map
+	create_hash_map(xal);
+
 	if (args.meta) {
 		xal_pp(xal);
 	}
@@ -227,6 +284,10 @@ main(int argc, char *argv[])
 		}
 	}
 
+	if (args.file_name != NULL) {
+		hash_table_search(xal, args.file_name);
+	}
+
 	if (args.stats) {
 		printf("ndirs(%" PRIu64 "); nfiles(%" PRIu64 ")\n", cb_args.ndirs, cb_args.nfiles);
 	}
@@ -237,3 +298,4 @@ exit:
 
 	return -err;
 }
+
