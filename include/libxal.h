@@ -50,6 +50,13 @@ struct xal_extent {
 	uint8_t flag;
 } __attribute__((packed));
 
+struct xal_file_metadata {
+	size_t fofz_begin;
+	size_t fofz_end;
+	size_t bofz_begin;
+	size_t bofz_end;
+};
+
 int
 xal_extent_pp(struct xal_extent *extent);
 
@@ -62,6 +69,7 @@ struct xal_dentries {
 
 struct xal_extents {
 	struct xal_extent *extent; ///< Pointer to array of 'struct xal_extent'
+	struct xal_file_metadata *filemetadata; ///< on-disk offset and filesystem block number
 	uint32_t count;		   ///< Number of extents
 };
 
@@ -116,7 +124,7 @@ xal_get_root(struct xal *xal);
 uint32_t
 xal_get_sb_blocksize(struct xal *xal);
 
-typedef int (*xal_walk_cb)(struct xal *xal, struct xal_inode *inode, void *cb_args, int level);
+typedef void (*xal_walk_cb)(struct xal *xal, struct xal_inode *inode, void *cb_args, int level);
 
 int
 xal_pp(struct xal *xal);
@@ -199,3 +207,13 @@ xal_inode_is_dir(struct xal_inode *inode);
  */
 bool
 xal_inode_is_file(struct xal_inode *inode);
+
+int
+hash_table_insert(struct xal *xal, const char *key, struct xal_extents value);
+
+void
+hash_table_search(struct xal *xal, const char *key);
+
+void
+create_hash_map(struct xal *xal);
+

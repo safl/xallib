@@ -1691,3 +1691,4 @@ xal_be_xfs_index(struct xal *xal)
 
 	return process_ino(xal, xal->root->ino, xal->root);
 }
+

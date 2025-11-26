@@ -39,9 +39,11 @@ struct xal_sb {
  * @struct xal
  */
 struct xal {
+	void *filemetadata_map;	 ///< Map of Filename with its metadata for O(1) ~ avg. lookup
 	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
 	struct xal_pool extents; ///< Pool of extents in host-native format
 	struct xal_inode *root;	 ///< Root of the file-system
 	struct xal_sb sb;
 	uint8_t be[XAL_BACKEND_SIZE];
 };
+
