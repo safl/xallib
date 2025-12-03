@@ -57,6 +57,13 @@ struct xal_extent {
 	uint8_t flag;
 } __attribute__((packed));
 
+struct xal_file_metadata {
+	size_t fofz_begin;
+	size_t fofz_end;
+	size_t bofz_begin;
+	size_t bofz_end;
+};
+
 int
 xal_extent_pp(struct xal_extent *extent);
 
@@ -249,6 +256,9 @@ xal_fsbno_offset(struct xal *xal, uint64_t fsbno);
 int
 xal_inode_path_pp(struct xal_inode *inode);
 
+int
+build_inode_path(struct xal_inode *inode, char *buffer);
+
 /**
  * Determine if the given inode is a directory
  *
@@ -268,3 +278,13 @@ xal_inode_is_dir(struct xal_inode *inode);
  */
 bool
 xal_inode_is_file(struct xal_inode *inode);
+
+int
+set_file_extent_info(struct xal *xal, const char *key, struct xal_extents value);
+
+void
+get_file_extent_info(struct xal *xal, const char *key, struct xal_extents **extents);
+
+void
+create_file_extent_hash_map(struct xal *xal);
+
