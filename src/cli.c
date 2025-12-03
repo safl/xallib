@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <xal_odf.h>
 
 #define BUF_NBYTES 4096
 
@@ -23,6 +24,8 @@ struct xal_cli_args {
 	bool stats;
 	char *backend;
 	char *dev_uri;
+	bool filemap;
+	char *file_name;
 };
 
 struct xal_nodeinspector_args {
@@ -54,6 +57,17 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 				return -EINVAL;
 			}
 			args->backend = argv[++i];
+		} else if (strcmp(argv[i], "--filename") == 0) {
+			if (i + 2 >= argc) {
+				fprintf(stderr, "Error: Filename argument must define a valid "
+						"choice: --filename device filename\n");
+				return -EINVAL;
+			}
+			args->dev_uri = argv[i + 1];   // Set dev_uri
+			args->file_name = argv[i + 2]; // Set file_name to the actual filename
+			args->bmap = 1;
+			printf("Device: %s, Filename: %s\n", args->dev_uri, args->file_name);
+			i += 2; // Skip both arguments in the next iteration
 		} else if (args->dev_uri == NULL) {
 			args->dev_uri = argv[i];
 		} else {
@@ -103,7 +117,6 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 {
 	struct xal_nodeinspector_args *args = cb_args;
 	uint32_t blocksize = xal_get_sb_blocksize(xal);
-
 	if (xal_inode_is_dir(inode)) {
 		args->ndirs += 1;
 		return 0;
@@ -119,6 +132,7 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 	    (args->cli_args->dev_uri[strlen(args->cli_args->dev_uri) - 1] == '/')) {
 		printf("/");
 	}
+
 	xal_inode_path_pp(inode);
 	printf("':");
 
@@ -141,8 +155,77 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 		printf("- [%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %" PRIu64 "]\n", fofz_begin,
 		       fofz_end, bofz_begin, bofz_end);
 	}
+
+	set_file_extent_info(xal, inode->name, inode->content.extents);
+
+	//This code will calculate full file path and store in Hash, but currently not supported by khash.h
+	/*
+	char path[56] = {0};
+	char final_path[56];
+
+	if (build_inode_path(inode, path) == 0) {
+
+		memset(final_path, 0, sizeof(final_path));
+
+		// Add the device URI
+		size_t dev_uri_len = strlen(args->cli_args->dev_uri);
+		if (dev_uri_len >= sizeof(final_path)) {
+			printf("Device URI is too long for the buffer\n");
+			return 0; // or handle error appropriately
+		}
+		strncat(final_path, args->cli_args->dev_uri, sizeof(final_path) - 1);
+
+		// Add a slash if needed
+		if (dev_uri_len > 0 && final_path[dev_uri_len - 1] != '/') {
+			strncat(final_path, "/", sizeof(final_path) - strlen(final_path) - 1);
+		}
+
+		// Add the path
+		size_t remaining_space = sizeof(final_path) - strlen(final_path) - 1;
+		if (remaining_space > 0) {
+			strncat(final_path, path, remaining_space);
+		} else {
+			printf("Not enough space to add path to final_path\n");
+			return 0; // or handle error appropriately
+		}
+
+		set_file_extent_info(xal, final_path, inode->content.extents);
+	} else {
+		printf("Failed to generate path\n");
+	}
+	*/
 	return 0;
 }
+
+void 
+print_file_extents(struct xal *xal, struct xal_extents *extents)
+{
+	uint64_t start_offset, start_block, nblocks;
+	uint8_t flag;
+	size_t fofz_begin, fofz_end, bofz_begin, bofz_end;
+	uint32_t blocksize = xal_get_sb_blocksize(xal);
+
+	if (extents != NULL) {
+		start_offset = extents->extent->start_offset;
+		start_block = extents->extent->start_block;
+		nblocks = extents->extent->nblocks;
+		flag = extents->extent->flag;
+
+		fofz_begin = (extents->extent->start_offset * blocksize) / 512;
+		fofz_end = fofz_begin + (extents->extent->nblocks * blocksize) / 512 - 1;
+		bofz_begin = xal_fsbno_offset(xal, extents->extent->start_block) / 512;
+		bofz_end = bofz_begin + (extents->extent->nblocks * blocksize) / 512 - 1;
+
+		printf("fofz_begin = %lu, fofz_end = %lu, bofz_begin = %lu, bofz_end = %lu\n",
+		       fofz_begin, fofz_end, bofz_begin, bofz_end);
+		printf("start_offset = %lu, start_block = %lu, nblocks = %lu, flag = %hhu\n",
+		       start_offset, start_block, nblocks, flag);
+	} else {
+		printf("Key not found.\n");
+	}
+
+}
+
 
 int
 main(int argc, char *argv[])
@@ -184,6 +267,9 @@ main(int argc, char *argv[])
 		printf("xal_open(...); err(%d)\n", err);
 		return -err;
 	}
+
+	// Create new hash map
+	create_file_extent_hash_map(xal);
 
 	if (args.meta) {
 		xal_pp(xal);
@@ -227,6 +313,12 @@ main(int argc, char *argv[])
 		}
 	}
 
+	if (args.file_name != NULL) {
+		struct xal_extents *file_extents;
+		get_file_extent_info(xal, args.file_name, &file_extents);
+		print_file_extents(xal, file_extents);
+	}
+
 	if (args.stats) {
 		printf("ndirs(%" PRIu64 "); nfiles(%" PRIu64 ")\n", cb_args.ndirs, cb_args.nfiles);
 	}
@@ -237,3 +329,4 @@ exit:
 
 	return -err;
 }
+

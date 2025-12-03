@@ -40,6 +40,7 @@ struct xal_sb {
  * @struct xal
  */
 struct xal {
+	void *file_extent_map;	 ///< Map of Filename with its extents
 	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
 	struct xal_pool extents; ///< Pool of extents in host-native format
 	struct xal_inode *root;	 ///< Root of the file-system
@@ -48,3 +49,4 @@ struct xal {
 	atomic_bool dirty;       ///< Whether the file system has changed since last index
 	atomic_int seq_lock;     ///< An uneven number indicates the struct is being modified and is not safe to read
 };
+
