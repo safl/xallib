@@ -64,7 +64,7 @@ xal_close(struct xal *xal)
 	xal_pool_unmap(&xal->extents);
 
 	be = (struct xal_backend_base *)&xal->be;
-	be->close(be);
+	be->close(xal);
 
 	free(xal);
 }
@@ -136,7 +136,13 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 
 	switch (opts->be) {
 		case XAL_BACKEND_XFS:
-			return xal_be_xfs_open(dev, xal);
+			err = xal_be_xfs_open(dev, xal);
+			if (err) {
+				XAL_DEBUG("FAILED: xal_be_xfs_open(); err(%d)", err);
+				return err;
+			}
+
+			break;
 
 		case XAL_BACKEND_FIEMAP:
 			if (strlen(mountpoint) == 0) {
@@ -147,12 +153,22 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 				}
 			}
 
-			return xal_be_fiemap_open(xal, mountpoint, opts);
+			err = xal_be_fiemap_open(xal, mountpoint, opts);
+			if (err) {
+				XAL_DEBUG("FAILED: xal_be_fiemap_open(); err(%d)", err);
+				return err;
+			}
+
+			break;
 
 		default:
 			XAL_DEBUG("FAILED: Unexpected backend(%d)", opts->be);
 			return -EINVAL;
 	}
+
+	(*xal)->dev = dev;
+
+	return 0;
 }
 
 int
@@ -261,4 +277,52 @@ bool
 xal_inode_is_file(struct xal_inode *inode)
 {
 	return inode->ftype == XAL_ODF_DIR3_FT_REG_FILE;
+}
+
+int
+xal_extent_in_bytes(struct xal *xal, const struct xal_extent *extent, struct xal_extent *output)
+{
+	if (!extent) {
+		XAL_DEBUG("FAILED: no extent given");
+		return -EINVAL;
+	}
+
+	output->start_offset *= xal->sb.blocksize;
+	output->nblocks *= xal->sb.blocksize;
+	output->start_block = xal_fsbno_offset(xal, extent->start_block);
+
+	return 0;
+}
+
+int
+xal_extent_in_lba(struct xal *xal, const struct xal_extent *extent, struct xal_extent *output)
+{
+	const struct xnvme_spec_idfy_ns *ns;
+	uint8_t fidx;
+	uint lba_blksze;
+
+	if (!extent) {
+		XAL_DEBUG("FAILED: no extent given");
+		return -EINVAL;
+	}
+
+	ns = xnvme_dev_get_ns(xal->dev);
+	if (!ns) {
+		XAL_DEBUG("FAILED: xnvme_dev_get_ns(); errno(%d)", errno);
+		return -errno;
+	}
+
+	fidx = ns->flbas.format;
+	if (ns->nlbaf > 16) {
+		fidx += ns->flbas.format_msb << 4;
+	}
+
+	lba_blksze = 1U << ns->lbaf[fidx].ds;
+	XAL_DEBUG("INFO: Found lba block size %d", lba_blksze);
+
+	output->start_offset *= xal->sb.blocksize / lba_blksze;
+	output->nblocks *= xal->sb.blocksize / lba_blksze;
+	output->start_block = xal_fsbno_offset(xal, extent->start_block) / lba_blksze;
+
+	return 0;
 }
