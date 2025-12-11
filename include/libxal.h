@@ -282,7 +282,8 @@ xal_inode_is_file(struct xal_inode *inode);
  * Retrieve the inode that represent the file or directory at the given path.
  * 
  * If xal is opened with XAL_FILE_LOOKUPMODE_HASHMAP, this will be a constant
- * time lookup.
+ * time lookup. Else, it will search through the tree at xal->root to find the
+ * inode.
  * 
  * Note: File system must be mounted and xal opened with backend FIEMAP.
  * 
