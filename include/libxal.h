@@ -295,3 +295,35 @@ xal_inode_is_file(struct xal_inode *inode);
  */
 int
 xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode);
+
+/**
+ * Retrieve the extents for the file at the given path.
+ * 
+ * This will search through the tree at xal->root to find the inode. This call fails if the entry
+ * at the given path is not a file.
+ * Note: File system must be mounted and xal opened with backend FIEMAP.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param path Absolute path to the file or directory.
+ * @param extents Pointer for the found xal_extents
+ * 
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_get_extents(struct xal *xal, char *path, struct xal_extents **extents);
+
+/**
+ * Retrieve the directory entries for the directory at the given path.
+ * 
+ * This will search through the tree at xal->root to find the inode. This call fails if the entry
+ * at the given path is not a directory.
+ * Note: File system must be mounted and xal opened with backend FIEMAP.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param path Absolute path to the file or directory.
+ * @param dentries Pointer for the found xal_dentries
+ * 
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_get_dentries(struct xal *xal, char *path, struct xal_dentries **dentries);

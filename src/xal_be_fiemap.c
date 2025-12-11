@@ -685,3 +685,47 @@ xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode)
 
 	return 0;
 }
+
+int
+xal_get_extents(struct xal *xal, char *path, struct xal_extents **extents)
+{
+	struct xal_inode *inode;
+	int err;
+
+	err = xal_get_inode(xal, path, &inode);
+	if (err) {
+		XAL_DEBUG("FAILED: xal_get_inode(); err(%d)", err);
+		return err;
+	}
+
+	if (!xal_inode_is_file(inode)) {
+		XAL_DEBUG("FAILED: inode at given path is not a file");
+		return -EINVAL;
+	}
+
+	*extents = &inode->content.extents;
+
+	return 0;
+}
+
+int
+xal_get_dentries(struct xal *xal, char *path, struct xal_dentries **dentries)
+{
+	struct xal_inode *inode;
+	int err;
+
+	err = xal_get_inode(xal, path, &inode);
+	if (err) {
+		XAL_DEBUG("FAILED: xal_get_inode(); err(%d)", err);
+		return err;
+	}
+
+	if (!xal_inode_is_dir(inode)) {
+		XAL_DEBUG("FAILED: inode at given path is not a directory");
+		return -ENOTDIR;
+	}
+
+	*dentries = &inode->content.dentries;
+
+	return 0;
+}
