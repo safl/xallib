@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <khash.h>
 #include <libxal.h>
 #include <linux/fiemap.h>
 #include <linux/fs.h>
@@ -21,6 +22,8 @@
 #include <xal_be_fiemap_inotify.h>
 #include <xal_odf.h>
 
+KHASH_MAP_INIT_STR(path_to_inode, struct xal_inode *)
+
 static int
 process_ino_fiemap(struct xal *xal, char *path, struct xal_inode *self);
 
@@ -31,11 +34,18 @@ void
 xal_be_fiemap_close(void *be_ptr)
 {
 	struct xal_be_fiemap *be = (struct xal_be_fiemap *)be_ptr; 
+	kh_path_to_inode_t *inode_map;
 
 	free(be->mountpoint);
 
 	if (be->inotify) {
 		xal_be_fiemap_inotify_close(be->inotify);
+	}
+
+	inode_map = be->path_inode_map;
+
+	if (be->path_inode_map) {
+		kh_destroy(path_to_inode, inode_map);
 	}
 
 	return;
@@ -187,6 +197,13 @@ xal_be_fiemap_open(struct xal **xal, char *mountpoint, struct xal_opts *opts)
 		goto failed;
 	}
 
+	be->path_inode_map = kh_init(path_to_inode);
+	if (!be->path_inode_map) {
+		XAL_DEBUG("FAILED: kh_init()");
+		err = -EINVAL;
+		goto failed;
+	}
+
 	*xal = cand; // All is good; promote the candidate
 
 	return 0;
@@ -260,15 +277,15 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 		}
 
 		struct xal_inode *dentry = &inode->content.dentries.inodes[inode->content.dentries.count];
-
-		strcpy(dentry->name, entry->d_name);
+		
+		char dentry_path[strlen(path) + 1 + strlen(entry->d_name) + 1];
+		snprintf(dentry_path, sizeof(dentry_path), "%s/%s", path, entry->d_name);
+		
+		strcpy(dentry->name, dentry_path);
 		dentry->namelen = strlen(dentry->name);
 		dentry->parent = inode;
 
 		inode->content.dentries.count += 1;
-
-		char dentry_path[strlen(path) + 1 + strlen(dentry->name) + 1];
-		snprintf(dentry_path, sizeof(dentry_path), "%s/%s", path, dentry->name);
 
 		err = process_ino_fiemap(xal, dentry_path, dentry);
 		if (err) {
@@ -279,6 +296,18 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 	}
 
 	closedir(d);
+
+	if (be->path_inode_map) {
+		khash_t(path_to_inode) *map = be->path_inode_map;
+		khiter_t iter;
+
+		iter = kh_put(path_to_inode, map, inode->name, &err);
+		if (err < 0) {
+			XAL_DEBUG("FAILED: kh_put(); err(%d)", err);
+			return -EIO;
+		}
+		kh_value(map, iter) = inode;
+	}
 
 	return 0;
 
@@ -340,6 +369,7 @@ read_fiemap(int fd, struct fiemap **fiemap_ptr)
 int
 xal_be_fiemap_process_inode_file(struct xal *xal, char *path, struct xal_inode *inode)
 {
+	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
 	struct fiemap *fiemap;
 	int fd, err = 0;
 
@@ -391,6 +421,18 @@ xal_be_fiemap_process_inode_file(struct xal *xal, char *path, struct xal_inode *
 
 	free(fiemap);
 	close(fd);
+
+	if (be->path_inode_map) {
+		khash_t(path_to_inode) *map = be->path_inode_map;
+		khiter_t iter;
+
+		iter = kh_put(path_to_inode, map, inode->name, &err);
+		if (err < 0) {
+			XAL_DEBUG("FAILED: kh_put(); err(%d)", err);
+			return -EIO;
+		}
+		kh_value(map, iter) = inode;
+	}
 
 	return 0;
 
@@ -509,4 +551,48 @@ exit:
 	atomic_fetch_add(&xal->seq_lock, 1);
 
 	return err;
+}
+
+int
+xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode)
+{
+	struct xal_be_fiemap *be; 
+	struct xal_inode *found;
+	kh_path_to_inode_t *map;
+	khiter_t iter;
+
+	if (!xal) {
+		XAL_DEBUG("FAILED: no xal given");
+		return -EINVAL;
+	}
+
+	if (!path) {
+		XAL_DEBUG("FAILED: no path given");
+		return -EINVAL;
+	}
+
+	be = (struct xal_be_fiemap *)&xal->be;
+
+	if (be->base.type != XAL_BACKEND_FIEMAP) {
+		XAL_DEBUG("FAILED: xal not opened with backend FIEMAP; be(%d)", be->base.type);
+		return -EINVAL;
+	}
+
+	if (!be->path_inode_map) {
+		XAL_DEBUG("FAILED: path_inode_map not found");
+		return -EINVAL;
+	}
+
+	map = be->path_inode_map;
+
+	iter = kh_get(path_to_inode, map, path);
+	if (iter == kh_end(map)) {
+		XAL_DEBUG("FAILED: kh_get(%s)", path);
+		return -EINVAL;
+	}
+
+	found = kh_val(map, iter);
+	*inode = found;
+
+	return 0;
 }

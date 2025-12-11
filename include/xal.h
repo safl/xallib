@@ -40,7 +40,6 @@ struct xal_sb {
  * @struct xal
  */
 struct xal {
-	void *file_extent_map;	 ///< Map of Filename with its extents
 	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
 	struct xal_pool extents; ///< Pool of extents in host-native format
 	struct xal_inode *root;	 ///< Root of the file-system

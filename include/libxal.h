@@ -272,12 +272,16 @@ xal_inode_is_dir(struct xal_inode *inode);
 bool
 xal_inode_is_file(struct xal_inode *inode);
 
+/**
+ * Retrieve the inode that represent the file or directory at the given path.
+ *
+ * Note: File system must be mounted and xal opened with backend FIEMAP.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param path Absolute path to the file or directory.
+ * @param inode Pointer for the found inode
+ *
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
 int
-set_file_extent_info(struct xal *xal, const char *key, struct xal_extents value);
-
-void
-get_file_extent_info(struct xal *xal, const char *key, struct xal_extents **extents);
-
-void
-create_file_extent_hash_map(struct xal *xal);
-
+xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode);
