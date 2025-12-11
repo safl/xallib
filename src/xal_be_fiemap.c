@@ -197,11 +197,13 @@ xal_be_fiemap_open(struct xal **xal, char *mountpoint, struct xal_opts *opts)
 		goto failed;
 	}
 
-	be->path_inode_map = kh_init(path_to_inode);
-	if (!be->path_inode_map) {
-		XAL_DEBUG("FAILED: kh_init()");
-		err = -EINVAL;
-		goto failed;
+	if (opts->file_lookupmode == XAL_FILE_LOOKUPMODE_HASHMAP) {
+		be->path_inode_map = kh_init(path_to_inode);
+		if (!be->path_inode_map) {
+			XAL_DEBUG("FAILED: kh_init()");
+			err = -EINVAL;
+			goto failed;
+		}
 	}
 
 	*xal = cand; // All is good; promote the candidate
@@ -556,10 +558,7 @@ exit:
 int
 xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode)
 {
-	struct xal_be_fiemap *be; 
-	struct xal_inode *found;
-	kh_path_to_inode_t *map;
-	khiter_t iter;
+	struct xal_be_fiemap *be;
 
 	if (!xal) {
 		XAL_DEBUG("FAILED: no xal given");
@@ -578,21 +577,21 @@ xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode)
 		return -EINVAL;
 	}
 
-	if (!be->path_inode_map) {
+	if (be->path_inode_map) {
+		kh_path_to_inode_t *map = be->path_inode_map;
+		khiter_t iter = kh_get(path_to_inode, map, path);
+
+		if (iter == kh_end(map)) {
+			XAL_DEBUG("FAILED: kh_get(%s)", path);
+			return -EINVAL;
+		}
+
+		*inode = kh_val(map, iter);
+
+	} else {
 		XAL_DEBUG("FAILED: path_inode_map not found");
-		return -EINVAL;
+		return -ENOSYS;
 	}
-
-	map = be->path_inode_map;
-
-	iter = kh_get(path_to_inode, map, path);
-	if (iter == kh_end(map)) {
-		XAL_DEBUG("FAILED: kh_get(%s)", path);
-		return -EINVAL;
-	}
-
-	found = kh_val(map, iter);
-	*inode = found;
 
 	return 0;
 }
