@@ -24,8 +24,7 @@ struct xal_cli_args {
 	bool stats;
 	char *backend;
 	char *dev_uri;
-	bool filemap;
-	char *file_name;
+	char *filename;
 };
 
 struct xal_nodeinspector_args {
@@ -58,16 +57,11 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 			}
 			args->backend = argv[++i];
 		} else if (strcmp(argv[i], "--filename") == 0) {
-			if (i + 2 >= argc) {
-				fprintf(stderr, "Error: Filename argument must define a valid "
-						"choice: --filename device filename\n");
+			if (i+1 >= argc) {
+				fprintf(stderr, "Error: Filename argument must define a valid path: --filename <filename>\n");
 				return -EINVAL;
 			}
-			args->dev_uri = argv[i + 1];   // Set dev_uri
-			args->file_name = argv[i + 2]; // Set file_name to the actual filename
-			args->bmap = 1;
-			printf("Device: %s, Filename: %s\n", args->dev_uri, args->file_name);
-			i += 2; // Skip both arguments in the next iteration
+			args->filename = argv[++i];
 		} else if (args->dev_uri == NULL) {
 			args->dev_uri = argv[i];
 		} else {
@@ -200,6 +194,8 @@ main(int argc, char *argv[])
 			printf("Invalid backend: %s; Valid choices: xfs, fiemap\n", args.backend);
 			return -EINVAL;
 		}
+	} else if (args.filename) {
+		opts.be = XAL_BACKEND_FIEMAP;
 	}
 
 	err = xal_open(dev, &xal, &opts);
@@ -250,10 +246,10 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (args.file_name != NULL) {
+	if (args.filename != NULL) {
 		struct xal_inode *inode;
 
-		err = xal_get_inode(xal, args.file_name, &inode);
+		err = xal_get_inode(xal, args.filename, &inode);
 		if (err) {
 			printf("FAILED: xal_get_inode(); err(%d)\n", err);
 			goto exit;
