@@ -57,13 +57,6 @@ struct xal_extent {
 	uint8_t flag;
 } __attribute__((packed));
 
-struct xal_file_metadata {
-	size_t fofz_begin;
-	size_t fofz_end;
-	size_t bofz_begin;
-	size_t bofz_end;
-};
-
 int
 xal_extent_pp(struct xal_extent *extent);
 
