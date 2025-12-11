@@ -21,6 +21,7 @@ struct xal_cli_args {
 	bool find;
 	bool meta;
 	bool stats;
+	bool file_lookup_map;
 	char *backend;
 	char *dev_uri;
 	char *filename;
@@ -49,6 +50,8 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
 			args->meta = 1;
 		} else if (strcmp(argv[i], "--stats") == 0) {
 			args->stats = 1;
+		} else if (strcmp(argv[i], "--file_lookup_map") == 0) {
+			args->file_lookup_map = 1;
 		} else if (strcmp(argv[i], "--backend") == 0) {
 			if (i+1 >= argc) {
 				fprintf(stderr, "Error: Backend argument must define a valid backend (choices: xfs, fiemap)\n");
@@ -196,7 +199,10 @@ main(int argc, char *argv[])
 	} else if (args.filename) {
 		opts.be = XAL_BACKEND_FIEMAP;
 	}
-	opts.file_lookupmode = XAL_FILE_LOOKUPMODE_HASHMAP;
+
+	if (args.file_lookup_map) {
+		opts.file_lookupmode = XAL_FILE_LOOKUPMODE_HASHMAP;
+	}
 
 	err = xal_open(dev, &xal, &opts);
 	if (err < 0) {

@@ -217,12 +217,22 @@ failed:
 }
 
 static int
+compare_dirent(const void *a, const void *b)
+{
+	const struct dirent *da = *(const struct dirent **)a;
+	const struct dirent *db = *(const struct dirent **)b;
+	return strcmp(da->d_name, db->d_name);
+}
+
+static int
 xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *inode)
 {
 	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
+	struct dirent **entries = NULL;
 	struct dirent *entry;
 	DIR *d;
-	int count, err;
+	size_t n_entries = 0, capacity = 0;
+	int err;
 
 	if (!xal_inode_is_dir(inode)) {
 		XAL_DEBUG("FAILED: cannot process directory at path(%s) - not a directory", path);
@@ -244,7 +254,6 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 		return -errno;
 	}
 
-	count = 0;
 	entry = readdir(d);
 	while (entry) {
 		if (!_is_directory_member(entry->d_name)) {
@@ -252,12 +261,18 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 			continue;
 		}
 
-		count += 1;
+		if (n_entries == capacity) {
+			capacity = capacity ? capacity * 2 : 64;
+			entries = realloc(entries, capacity * sizeof(*entries));
+		}
+
+		entries[n_entries++] = entry;
 		entry = readdir(d);
 	}
-	closedir(d);
 
-	err = xal_pool_claim_inodes(&xal->inodes, count, &inode->content.dentries.inodes);
+	qsort(entries, n_entries, sizeof(*entries), compare_dirent);
+
+	err = xal_pool_claim_inodes(&xal->inodes, n_entries, &inode->content.dentries.inodes);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); err(%d)", err);
 		goto failed;
@@ -265,18 +280,8 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 	inode->content.dentries.count = 0;
 
 	/* Actually process directory entries */
-	d = opendir(path);
-	if (!d) {
-		XAL_DEBUG("FAILED: opendir(); errno(%d)", errno);
-		return -errno;
-	}
-
-	entry = readdir(d);
-	while (entry) {
-		if (!_is_directory_member(entry->d_name)) {
-			entry = readdir(d);
-			continue;
-		}
+	for (size_t i = 0; i < n_entries; i++) {
+		entry = entries[i];
 
 		struct xal_inode *dentry = &inode->content.dentries.inodes[inode->content.dentries.count];
 		
@@ -294,10 +299,7 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 			XAL_DEBUG("FAILED: process_ino_fiemap(); with path(%s)", dentry_path);
 			goto failed;
 		}
-		entry = readdir(d);
 	}
-
-	closedir(d);
 
 	if (be->path_inode_map) {
 		khash_t(path_to_inode) *map = be->path_inode_map;
@@ -311,12 +313,16 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 		kh_value(map, iter) = inode;
 	}
 
+	closedir(d);
+	free(entries);
+
 	return 0;
 
 failed:
 	if (d) {
 		closedir(d);
 	}
+	free(entries);
 
 	return err;
 }
@@ -555,10 +561,91 @@ exit:
 	return err;
 }
 
+static int
+compare_name_to_inode(const void *key, const void *elem)
+{
+	const char *component = key;
+	const struct xal_inode *inode = elem;
+
+	const char *basename = strrchr(inode->name, '/');
+	if (basename) {
+		basename++;
+	} else {
+		basename = inode->name;
+	}
+
+	return strcmp(component, basename);
+}
+
+static int
+search_by_traversal(struct xal_be_fiemap *be, struct xal_inode *root, char *path, struct xal_inode **inode)
+{
+	struct xal_inode *search, *found = NULL;
+	char *search_begin, *search_end;
+	size_t mountpoint_len;
+
+	mountpoint_len = strlen(be->mountpoint);
+
+	if (!root) {
+		XAL_DEBUG("FAILED: no xal->root, call xal_index()");
+		return -EINVAL;
+	}
+
+	if (strlen(path) <= mountpoint_len + 1) {
+		XAL_DEBUG("FAILED: Not a valid path(%s); path too short; must be absolute path to entry in mountpoint(%s)", 
+			path, be->mountpoint);
+		return -EINVAL;
+	}
+
+	if (strncmp(path, be->mountpoint, mountpoint_len) != 0) {
+		XAL_DEBUG("FAILED: Not a valid path(%s); not a subpath; must be absolute path to entry in mountpoint(%s)", 
+			path, be->mountpoint);
+		return -EINVAL;
+	}
+	
+	search = root;
+	search_begin = path + mountpoint_len + 1;
+	search_end = strchr(search_begin, '/');
+
+	while (!found) {
+		struct xal_inode *child;
+		size_t search_len = search_end ? (size_t)(search_end - search_begin) : strlen(search_begin);
+		char component[search_len + 1];
+
+		memcpy(component, search_begin, search_len);
+		component[search_len] = '\0';
+		
+		child = bsearch(component, search->content.dentries.inodes,
+				search->content.dentries.count, sizeof(struct xal_inode), compare_name_to_inode);
+
+		if (!child) {
+			break;
+		}
+
+		if (!search_end) {
+			found = child;
+		} else {
+			search = child;
+			search_begin = search_end + 1;
+			search_end = strchr(search_begin, '/');
+		}
+	}
+
+	if (!found) {
+		XAL_DEBUG("FAILED: Inode not found");
+		return -ENOENT;
+	}
+
+	*inode = found;
+
+	return 0;
+}
+
 int
 xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode)
 {
 	struct xal_be_fiemap *be;
+	int err;
 
 	if (!xal) {
 		XAL_DEBUG("FAILED: no xal given");
@@ -589,8 +676,11 @@ xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode)
 		*inode = kh_val(map, iter);
 
 	} else {
-		XAL_DEBUG("FAILED: path_inode_map not found");
-		return -ENOSYS;
+		err = search_by_traversal(be, xal->root, path, inode);
+		if (err) {
+			XAL_DEBUG("FAILED: search_by_traversal(%s); err(%d)", path, err);
+			return err;
+		}
 	}
 
 	return 0;
