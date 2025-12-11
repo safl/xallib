@@ -197,6 +197,7 @@ main(int argc, char *argv[])
 	} else if (args.filename) {
 		opts.be = XAL_BACKEND_FIEMAP;
 	}
+	opts.file_lookupmode = XAL_FILE_LOOKUPMODE_HASHMAP;
 
 	err = xal_open(dev, &xal, &opts);
 	if (err < 0) {

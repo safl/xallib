@@ -45,9 +45,15 @@ enum xal_watchmode {
 	XAL_WATCHMODE_EXTENT_UPDATE    = 2,  ///< When other changes to the file system occurs, the xal struct will be automatically updated if the extent information is the only subject to change, otherwise the xal struct will become "dirty" indicating that the representation of the file system is stale.
 };
 
+enum xal_file_lookupmode {
+	XAL_FILE_LOOKUPMODE_TRAVERSE = 0,  ///< Traverses the file tree from xal->root using binary search at each level to find the inode.
+	XAL_FILE_LOOKUPMODE_HASHMAP = 1,   ///< Uses a hash map for constant-time inode lookup in xal_get_inode(), with higher memory usage.
+};
+
 struct xal_opts {
 	enum xal_backend be;
 	enum xal_watchmode watch_mode;
+	enum xal_file_lookupmode file_lookupmode;
 };
 
 struct xal_extent {
@@ -274,7 +280,10 @@ xal_inode_is_file(struct xal_inode *inode);
 
 /**
  * Retrieve the inode that represent the file or directory at the given path.
- *
+ * 
+ * If xal is opened with XAL_FILE_LOOKUPMODE_HASHMAP, this will be a constant
+ * time lookup.
+ * 
  * Note: File system must be mounted and xal opened with backend FIEMAP.
  * 
  * @param xal The xal struct obtained when opened with xal_open()
