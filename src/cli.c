@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <xal_odf.h>
 
 #define BUF_NBYTES 4096
 
