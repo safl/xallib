@@ -45,9 +45,15 @@ enum xal_watchmode {
 	XAL_WATCHMODE_EXTENT_UPDATE    = 2,  ///< When other changes to the file system occurs, the xal struct will be automatically updated if the extent information is the only subject to change, otherwise the xal struct will become "dirty" indicating that the representation of the file system is stale.
 };
 
+enum xal_file_lookupmode {
+	XAL_FILE_LOOKUPMODE_TRAVERSE = 0,  ///< Traverses the file tree from xal->root using binary search at each level to find the inode.
+	XAL_FILE_LOOKUPMODE_HASHMAP = 1,   ///< Uses a hash map for constant-time inode lookup in xal_get_inode(), with higher memory usage.
+};
+
 struct xal_opts {
 	enum xal_backend be;
 	enum xal_watchmode watch_mode;
+	enum xal_file_lookupmode file_lookupmode;
 };
 
 struct xal_extent {
@@ -56,13 +62,6 @@ struct xal_extent {
 	uint64_t nblocks;
 	uint8_t flag;
 } __attribute__((packed));
-
-struct xal_file_metadata {
-	size_t fofz_begin;
-	size_t fofz_end;
-	size_t bofz_begin;
-	size_t bofz_end;
-};
 
 int
 xal_extent_pp(struct xal_extent *extent);
@@ -279,12 +278,52 @@ xal_inode_is_dir(struct xal_inode *inode);
 bool
 xal_inode_is_file(struct xal_inode *inode);
 
+/**
+ * Retrieve the inode that represent the file or directory at the given path.
+ * 
+ * If xal is opened with XAL_FILE_LOOKUPMODE_HASHMAP, this will be a constant
+ * time lookup. Else, it will search through the tree at xal->root to find the
+ * inode.
+ * 
+ * Note: File system must be mounted and xal opened with backend FIEMAP.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param path Absolute path to the file or directory.
+ * @param inode Pointer for the found inode
+ *
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
 int
-set_file_extent_info(struct xal *xal, const char *key, struct xal_extents value);
+xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode);
 
-void
-get_file_extent_info(struct xal *xal, const char *key, struct xal_extents **extents);
+/**
+ * Retrieve the extents for the file at the given path.
+ * 
+ * This will search through the tree at xal->root to find the inode. This call fails if the entry
+ * at the given path is not a file.
+ * Note: File system must be mounted and xal opened with backend FIEMAP.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param path Absolute path to the file or directory.
+ * @param extents Pointer for the found xal_extents
+ * 
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_get_extents(struct xal *xal, char *path, struct xal_extents **extents);
 
-void
-create_file_extent_hash_map(struct xal *xal);
-
+/**
+ * Retrieve the directory entries for the directory at the given path.
+ * 
+ * This will search through the tree at xal->root to find the inode. This call fails if the entry
+ * at the given path is not a directory.
+ * Note: File system must be mounted and xal opened with backend FIEMAP.
+ * 
+ * @param xal The xal struct obtained when opened with xal_open()
+ * @param path Absolute path to the file or directory.
+ * @param dentries Pointer for the found xal_dentries
+ * 
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_get_dentries(struct xal *xal, char *path, struct xal_dentries **dentries);

@@ -179,7 +179,7 @@ get_inode_path(struct xal *xal, struct xal_inode *inode, char *path)
 	return err;
 }
 
-static int
+static __attribute__((unused)) int
 inotify_event_mask_pp(uint32_t mask, char *str, int str_sz) {
 	int wrtn, idx = 0;
 
@@ -239,7 +239,7 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 
 		while (i < len) {
 			struct inotify_event *event = (struct inotify_event *)&buf[i];
-			char mask_pp[128];
+			__attribute__((unused)) char mask_pp[128];
 
 			inode = NULL;  // reset the pointer to the inode
 			wd = event->wd;
