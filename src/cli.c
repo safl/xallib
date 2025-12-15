@@ -109,7 +109,7 @@ node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *
 }
 
 static int
-pp_inode_extents(struct xal *xal, struct xal_inode *inode) 
+pp_inode_extents(struct xal *xal, struct xal_inode *inode)
 {
 	uint32_t blocksize = xal_get_sb_blocksize(xal);
 

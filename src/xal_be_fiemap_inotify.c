@@ -306,7 +306,7 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 
 				XAL_DEBUG("INFO: finished reprocessing inode:");
 				XAL_DEBUG_FCALL(xal_inode_pp(inode));
-				
+
 				atomic_fetch_add(&xal->seq_lock, 1);
 
 			} else if (event->mask & (IN_CREATE | IN_DELETE | IN_MOVE)) {
