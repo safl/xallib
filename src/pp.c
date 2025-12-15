@@ -325,7 +325,7 @@ xal_be_xfs_pp(struct xal *xal, struct xal_be_xfs *be)
 		wrtn += printf("xal_be_xfs: ~\n");
 		return wrtn;
 	}
-	
+
 	for (uint32_t i = 0; i < xal->sb.agcount; ++i) {
 		wrtn += xal_ag_pp(&be->ags[i]);
 	}

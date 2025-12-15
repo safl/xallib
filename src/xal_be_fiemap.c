@@ -290,10 +290,10 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 		entry = entries[i];
 
 		struct xal_inode *dentry = &inode->content.dentries.inodes[inode->content.dentries.count];
-		
+
 		char dentry_path[strlen(path) + 1 + strlen(entry->d_name) + 1];
 		snprintf(dentry_path, sizeof(dentry_path), "%s/%s", path, entry->d_name);
-		
+
 		strcpy(dentry->name, dentry_path);
 		dentry->namelen = strlen(dentry->name);
 		dentry->parent = inode;
@@ -598,17 +598,17 @@ search_by_traversal(struct xal_be_fiemap *be, struct xal_inode *root, char *path
 	}
 
 	if (strlen(path) <= mountpoint_len + 1) {
-		XAL_DEBUG("FAILED: Not a valid path(%s); path too short; must be absolute path to entry in mountpoint(%s)", 
+		XAL_DEBUG("FAILED: Not a valid path(%s); path too short; must be absolute path to entry in mountpoint(%s)",
 			path, be->mountpoint);
 		return -EINVAL;
 	}
 
 	if (strncmp(path, be->mountpoint, mountpoint_len) != 0) {
-		XAL_DEBUG("FAILED: Not a valid path(%s); not a subpath; must be absolute path to entry in mountpoint(%s)", 
+		XAL_DEBUG("FAILED: Not a valid path(%s); not a subpath; must be absolute path to entry in mountpoint(%s)",
 			path, be->mountpoint);
 		return -EINVAL;
 	}
-	
+
 	search = root;
 	search_begin = path + mountpoint_len + 1;
 	search_end = strchr(search_begin, '/');
@@ -620,7 +620,7 @@ search_by_traversal(struct xal_be_fiemap *be, struct xal_inode *root, char *path
 
 		memcpy(component, search_begin, search_len);
 		component[search_len] = '\0';
-		
+
 		child = bsearch(component, search->content.dentries.inodes,
 				search->content.dentries.count, sizeof(struct xal_inode), compare_name_to_inode);
 

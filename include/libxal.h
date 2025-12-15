@@ -152,14 +152,14 @@ xal_extent_in_lba(struct xal *xal, const struct xal_extent *extent, struct xal_e
  * 
  * @param xal The xal struct obtained when opened with xal_open()
  * 
- * @return On success, the inode at the root of the file-system is retuned 
+ * @return On success, the inode at the root of the file-system is retuned
  */
 struct xal_inode *
 xal_get_root(struct xal *xal);
 
 /**
  * Returns true if breaking changes to the mounted file-system have been found, which
- * invalidates the representation of the file-system in the xal->root field. 
+ * invalidates the representation of the file-system in the xal->root field.
  * 
  * @note If the xal struct was not opened with backend "fiemap", this will always
  * return false.
@@ -173,7 +173,7 @@ bool
 xal_is_dirty(struct xal *xal);
 
 /**
- * Returns the current value of the sequence lock. 
+ * Returns the current value of the sequence lock.
  * 
  * An uneven number indicates the struct is being modified and is not safe to read. An even number
  * indicates that the struct is safe to read.
@@ -236,11 +236,11 @@ int
 xal_index(struct xal *xal);
 
 /**
- * Start a background thread listening to inotify events of changes to the file system on the 
+ * Start a background thread listening to inotify events of changes to the file system on the
  * block device.
  * 
  * Assumes that
- *  - the file system is mounted, 
+ *  - the file system is mounted,
  *  - you have run xal_open() with backend FIEMAP and a watch_mode other than XAL_WATCHMODE_NONE,
  *  - you have indexed the file system with xal_index().
  * 
@@ -252,7 +252,7 @@ int
 xal_watch_filesystem(struct xal *xal);
 
 /**
- * Stop the background thread listening to inotify events of changes to the file system on the 
+ * Stop the background thread listening to inotify events of changes to the file system on the
  * block device.
  * 
  * Assumes that
