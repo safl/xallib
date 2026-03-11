@@ -148,7 +148,7 @@ xal_be_fiemap_open(struct xal **xal, char *mountpoint, struct xal_opts *opts)
 	be->base.close = xal_be_fiemap_close;
 	be->base.index = xal_be_fiemap_index;
 
-	be->mountpoint = calloc(strlen(mountpoint), sizeof(char));
+	be->mountpoint = calloc(strlen(mountpoint) + 1, sizeof(char));
 	if (!be->mountpoint) {
 		XAL_DEBUG("FAILED: calloc(); errno(%d)", errno);
 		err = -errno;
