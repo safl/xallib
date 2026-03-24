@@ -10,7 +10,7 @@
 int
 xal_pool_unmap(struct xal_pool *pool)
 {
-	return munmap(pool, pool->reserved);
+	return munmap(pool->memory, pool->reserved * pool->element_size);
 }
 
 int
@@ -141,11 +141,11 @@ xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **
 int
 xal_pool_clear(struct xal_pool *pool)
 {
-	if (mprotect(pool->memory, pool->reserved, PROT_READ | PROT_WRITE)) {
+	if (mprotect(pool->memory, pool->reserved * pool->element_size, PROT_READ | PROT_WRITE)) {
 		XAL_DEBUG("FAILED: mprotect(...); errno(%d)", errno);
 		return -errno;
 	}
-	memset(pool->memory, 0, pool->reserved);
+	memset(pool->memory, 0, pool->reserved * pool->element_size);
 
 	pool->free = 0;
 	pool->allocated = 0;
