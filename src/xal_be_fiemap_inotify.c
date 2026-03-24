@@ -133,52 +133,6 @@ xal_be_fiemap_inotify_add_watcher(struct xal_inotify *inotify, char *path, struc
 	return 0;
 }
 
-static int
-_inode_path(struct xal *xal, struct xal_inode *inode, char *path, int *idx)
-{
-	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
-	int wrtn, err;
-
-	if (!inode) {
-		return -1;
-	}
-	if (inode->parent_idx == XAL_POOL_IDX_NONE) {
-		wrtn = snprintf(path + *idx, XAL_PATH_MAXLEN - *idx, "%s", be->mountpoint);
-		*idx += wrtn;
-		return 0;
-	}
-
-	err = _inode_path(xal, xal_inode_at(xal, inode->parent_idx), path, idx);
-	if (err) {
-		XAL_DEBUG("FAILED: _inode_path()");
-		return err;
-	}
-
-	if (path[*idx - 1] != '/')
-		path[(*idx)++] = '/';
-
-	wrtn = snprintf(path + *idx, XAL_PATH_MAXLEN - *idx, "%s", inode->name);
-	*idx += wrtn;
-
-	return 0;
-}
-
-static int
-get_inode_path(struct xal *xal, struct xal_inode *inode, char *path)
-{
-	int err, idx = 0;
-
-	err = _inode_path(xal, inode, path, &idx);
-	if (err) {
-		XAL_DEBUG("FAILED: _inode_path()");
-		return err;
-	}
-
-	path[idx] = '\0';
-
-	return err;
-}
-
 static __attribute__((unused)) int
 inotify_event_mask_pp(uint32_t mask, char *str, int str_sz) {
 	int wrtn, idx = 0;
@@ -272,12 +226,23 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 					return -EINVAL;
 				}
 
+				if (dir_inode->namelen + 1 + strlen(event->name) + 1 > sizeof(path)) {
+					XAL_DEBUG("FAILED: event(%s) full path too long(%zu)",
+							event->name, dir_inode->namelen + 1 + strlen(event->name) + 1);
+					return -EINVAL;
+				}
+				memcpy(path, dir_inode->name, dir_inode->namelen);
+				path[dir_inode->namelen] = '/';
+				memcpy(path + dir_inode->namelen + 1, event->name, strlen(event->name));
+				path[dir_inode->namelen + 1 + strlen(event->name)] = '\0';
+
+				XAL_DEBUG("INFO: got full path of event: %s", path);
 				atomic_fetch_add(&xal->seq_lock, 1);
 
 				for (uint32_t j = 0; j < dir_inode->content.dentries.count; ++j) {
 					struct xal_inode *child = xal_inode_at(xal, dir_inode->content.dentries.inodes_idx + j);
 
-					if (strcmp(child->name, event->name) == 0) {
+					if (strcmp(child->name, path) == 0) {
 						inode = child;
 						break;
 					}
@@ -286,12 +251,6 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 				if (!inode) {
 					XAL_DEBUG("FAILED: could not find child with name(%s)", event->name);
 					err = -EINVAL;
-					goto failed_with_lock;
-				}
-
-				err = get_inode_path(xal, inode, path);
-				if (err) {
-					XAL_DEBUG("FAILED: get_inode_path(); err(%d)", err);
 					goto failed_with_lock;
 				}
 
