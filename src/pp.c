@@ -11,6 +11,8 @@
 #include <xal_be_xfs.h>
 #include <xal_odf.h>
 
+#define BMAP_BLOCK_SIZE	512
+
 static int
 xal_be_xfs_pp(struct xal *xal, struct xal_be_xfs *be);
 
@@ -171,6 +173,7 @@ xal_inode_pp(struct xal *xal, struct xal_inode *inode)
 
 	wrtn += printf("xal_inode:\n");
 	wrtn += printf("  ino: 0x%08" PRIX64 "\n", inode->ino);
+	wrtn += printf("  size: %" PRIu64 "\n", inode->size);
 	wrtn += printf("  namelen: %" PRIu8 "\n", inode->namelen);
 	wrtn += printf("  name: '%.256s'\n", inode->name);
 	wrtn += printf("  ftype: %" PRIu8 "\n", inode->ftype);
@@ -188,10 +191,23 @@ xal_inode_pp(struct xal *xal, struct xal_inode *inode)
 		break;
 
 	case XAL_ODF_DIR3_FT_REG_FILE:
+		uint32_t blocksize = xal_get_sb_blocksize(xal);
 		wrtn += printf("  extents.count: %u\n", inode->content.extents.count);
+		for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
+			struct xal_extent *extent = xal_extent_at(xal, inode->content.extents.extent_idx + i);
+	        size_t fofz_begin, fofz_end, bofz_begin, bofz_end;
+
+	        fofz_begin = (extent->start_offset * blocksize) / BMAP_BLOCK_SIZE;
+	        fofz_end = fofz_begin + (extent->nblocks * blocksize) / BMAP_BLOCK_SIZE - 1;
+	        bofz_begin = xal_fsbno_offset(xal, extent->start_block) / BMAP_BLOCK_SIZE;
+	        bofz_end = bofz_begin + (extent->nblocks * blocksize) / BMAP_BLOCK_SIZE - 1;
+			wrtn += printf("- [%" PRIu64 ", %" PRIu64 ", %" PRIu64 ", %"
+				    PRIu64 "]\n", fofz_begin, fofz_end, bofz_begin, bofz_end);
+		}
 		break;
 	}
 
+	fflush(stdout);
 	return wrtn;
 }
 

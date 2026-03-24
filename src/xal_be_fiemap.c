@@ -389,6 +389,8 @@ read_fiemap(int fd, struct fiemap **fiemap_ptr)
 	fiemap->fm_extent_count = fiemap->fm_mapped_extents;
 	fiemap->fm_mapped_extents = 0;
 
+	// TODO: writeback could happen between the first and second ioctl.
+	// check that fm_extent_count == fm_mapped_extents. retry if otherwise.
 	if (ioctl(fd, FS_IOC_FIEMAP, fiemap) < 0) {
 		XAL_DEBUG("FAILED: fiemap ioctl(); errno(%d)", errno);
 		return -errno;
