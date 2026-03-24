@@ -1,6 +1,6 @@
 #ifdef XAL_DEBUG_ENABLED
 
-#define XAL_DEBUG_FCALL(x) x
+#define XAL_DEBUG_FCALL(fn, ...) fn(__VA_ARGS__)
 
 #define __FILENAME__ strrchr("/" __FILE__, '/') + 1
 
@@ -24,7 +24,7 @@
 
 #else
 #define XAL_DEBUG(...)
-#define XAL_DEBUG_FCALL(x)
+#define XAL_DEBUG_FCALL(fn, ...) do {} while (0)
 #endif
 
 #ifdef static_assert

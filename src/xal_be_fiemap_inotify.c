@@ -198,7 +198,7 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 			inode = NULL;  // reset the pointer to the inode
 			wd = event->wd;
 
-			XAL_DEBUG_FCALL(inotify_event_mask_pp(event->mask, mask_pp, 128));
+			XAL_DEBUG_FCALL(inotify_event_mask_pp, event->mask, mask_pp, 128);
 			XAL_DEBUG("INFO: mask(%s) for event with wd(%d) and name(%s)", &mask_pp[1], wd, event->name)
 
 			if (inotify->watch_mode == XAL_WATCHMODE_DIRTY_DETECTION) {
@@ -255,7 +255,7 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 				}
 
 				XAL_DEBUG("INFO: reprocessing inode:");
-				XAL_DEBUG_FCALL(xal_inode_pp(xal, inode));
+				XAL_DEBUG_FCALL(xal_inode_pp, xal, inode);
 
 				err = xal_be_fiemap_process_inode_file(xal, path, inode);
 				if (err) {
@@ -264,7 +264,7 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 				}
 
 				XAL_DEBUG("INFO: finished reprocessing inode:");
-				XAL_DEBUG_FCALL(xal_inode_pp(xal, inode));
+				XAL_DEBUG_FCALL(xal_inode_pp, xal, inode);
 
 				atomic_fetch_add(&xal->seq_lock, 1);
 
