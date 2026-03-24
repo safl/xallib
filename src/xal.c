@@ -68,6 +68,43 @@ xal_inode_idx(struct xal *xal, struct xal_inode *inode)
 	return (uint32_t)(inode - (struct xal_inode *)xal->inodes.memory);
 }
 
+int
+xal_from_pools(const struct xal_sb *sb, const char *mountpoint, void *inodes_mem,
+	void *extents_mem, struct xal **out)
+{
+	struct xal *xal;
+
+	xal = calloc(1, sizeof(*xal));
+	if (!xal) {
+		return -ENOMEM;
+	}
+
+	xal->sb = *sb;
+	xal->root_idx = 0;
+	xal->shared_view = true;
+
+	if (mountpoint) {
+		struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
+		be->base.type = XAL_BACKEND_FIEMAP;
+		be->base.close = xal_be_fiemap_close;
+		be->mountpoint = strdup(mountpoint);
+		if (!be->mountpoint) {
+			free(xal);
+			return -ENOMEM;
+		}
+	}
+
+	xal->inodes.memory = inodes_mem;
+	xal->inodes.element_size = sizeof(struct xal_inode);
+
+	xal->extents.memory = extents_mem;
+	xal->extents.element_size = sizeof(struct xal_extent);
+
+	*out = xal;
+
+	return 0;
+}
+
 void
 xal_close(struct xal *xal)
 {
@@ -77,11 +114,22 @@ xal_close(struct xal *xal)
 		return;
 	}
 
+	if (xal->shared_view) {
+		be = (struct xal_backend_base *)&xal->be;
+		if (be->close) {
+			be->close(xal);
+		}
+		free(xal);
+		return;
+	}
+
 	xal_pool_unmap(&xal->inodes);
 	xal_pool_unmap(&xal->extents);
 
 	be = (struct xal_backend_base *)&xal->be;
-	be->close(xal);
+	if (be->close) {
+		be->close(xal);
+	}
 
 	free(xal);
 }
@@ -208,6 +256,10 @@ int
 xal_index(struct xal *xal)
 {
 	struct xal_backend_base *be = (struct xal_backend_base *)&xal->be;
+
+	if (xal->shared_view) {
+		return -EINVAL;
+	}
 
 	return be->index(xal);
 }

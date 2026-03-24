@@ -8,5 +8,8 @@ struct xal_be_fiemap {
 };
 XAL_STATIC_ASSERT(sizeof(struct xal_be_fiemap) == XAL_BACKEND_SIZE, "Incorrect size");
 
+void
+xal_be_fiemap_close(struct xal *xal);
+
 int
 xal_be_fiemap_open(struct xal **xal, char *mountpoint, struct xal_opts *opts);

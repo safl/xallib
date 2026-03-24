@@ -58,7 +58,7 @@ struct xal_opts {
 	enum xal_backend be;
 	enum xal_watchmode watch_mode;
 	enum xal_file_lookupmode file_lookupmode;
-	const char *shm_name; ///< If set, pool memory is backed by POSIX shared memory with this base name
+	const char *shm_name; ///< If set, pool memory is backed by POSIX shared memory with this base name, see @xal_from_pools() for sharing the pools across processes
 };
 
 struct xal_extent {
@@ -124,6 +124,22 @@ struct xal_inode {
  * @struct xal
  */
 struct xal;
+
+struct xal_sb {
+	uint32_t blocksize;    ///< Size of a block, in bytes
+	uint16_t sectsize;     ///< Size of a sector, in bytes
+	uint16_t inodesize;    ///< inode size, in bytes
+	uint16_t inopblock;    ///< inodes per block
+	uint8_t inopblog;      ///< log2 of inopblock
+	uint64_t icount;       ///< allocated inodes
+	uint64_t nallocated;   ///< Allocated inodes - sum of agi_count
+	uint64_t rootino;      ///< root inode number, in global-address format
+	uint32_t agblocks;     ///< Size of an allocation group, in blocks
+	uint8_t agblklog;      ///< log2 of 'agblocks' (rounded up)
+	uint32_t agcount;      ///< Number of allocation groups
+	uint32_t dirblocksize; ///< Size of a directory block, in bytes
+	uint32_t lba_blksze;   ///< LBA block size
+};
 
 struct xal_inode *
 xal_inode_at(struct xal *xal, uint32_t idx);
@@ -225,6 +241,27 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts);
 
 void
 xal_close(struct xal *xal);
+
+/**
+ * Construct a read-only xal from externally provided pool memory.
+ *
+ * Intended for processes that receive pool memory via POSIX shared memory from elsewhere.
+ * The caller is responsible for mapping the shared memory regions before calling this with the
+ * shm_name given in the xal_opts.
+ * The resulting xal can be closed with xal_close(), which will free the struct xal allocation but
+ * will not munmap or unlink the pool memory regions — that remains the caller's responsibility.
+ *
+ * @param sb           Superblock metadata
+ * @param mountpoint   Mountpoint of the file system
+ * @param inodes_mem   Pointer to the mapped inode pool memory; the root inode must be at index 0
+ * @param extents_mem  Pointer to the mapped extent pool memory
+ * @param out          Output pointer for the constructed xal
+ *
+ * @return On success, 0. On error, negative errno.
+ */
+int
+xal_from_pools(const struct xal_sb *sb, const char *mountpoint, void *inodes_mem,
+	void *extents_mem, struct xal **out);
 
 /**
  * Retrieve inodes from disk and decode the on-disk-format of the retrieved data
