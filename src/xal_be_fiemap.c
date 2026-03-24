@@ -142,6 +142,8 @@ xal_be_fiemap_open(struct xal **xal, char *mountpoint, struct xal_opts *opts)
 		return -errno;
 	}
 
+	cand->root_idx = XAL_POOL_IDX_NONE;
+
 	be = (struct xal_be_fiemap *)&cand->be;
 
 	be->base.type = XAL_BACKEND_FIEMAP;
@@ -278,7 +280,7 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 
 	qsort(entries, n_entries, sizeof(*entries), compare_dirent);
 
-	err = xal_pool_claim_inodes(&xal->inodes, n_entries, &inode->content.dentries.inodes);
+	err = xal_pool_claim_inodes(&xal->inodes, n_entries, &inode->content.dentries.inodes_idx);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); err(%d)", err);
 		goto failed;
@@ -289,14 +291,14 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 	for (size_t i = 0; i < n_entries; i++) {
 		entry = entries[i];
 
-		struct xal_inode *dentry = &inode->content.dentries.inodes[inode->content.dentries.count];
+		struct xal_inode *dentry = xal_inode_at(xal, inode->content.dentries.inodes_idx + inode->content.dentries.count);
 
 		char dentry_path[strlen(path) + 1 + strlen(entry->d_name) + 1];
 		snprintf(dentry_path, sizeof(dentry_path), "%s/%s", path, entry->d_name);
 
 		strcpy(dentry->name, dentry_path);
 		dentry->namelen = strlen(dentry->name);
-		dentry->parent = inode;
+		dentry->parent_idx = xal_inode_idx(xal, inode);
 
 		inode->content.dentries.count += 1;
 
@@ -414,7 +416,7 @@ xal_be_fiemap_process_inode_file(struct xal *xal, char *path, struct xal_inode *
 	if (fiemap->fm_mapped_extents > 0) {
 		struct xal_extents *extents;
 
-		err = xal_pool_claim_extents(&xal->extents, fiemap->fm_mapped_extents, &inode->content.extents.extent);
+		err = xal_pool_claim_extents(&xal->extents, fiemap->fm_mapped_extents, &inode->content.extents.extent_idx);
 		if (err) {
 			XAL_DEBUG("FAILED: xal_pool_claim_extents(); err(%d)", err);
 			goto failed;
@@ -424,7 +426,7 @@ xal_be_fiemap_process_inode_file(struct xal *xal, char *path, struct xal_inode *
 		extents->count = fiemap->fm_mapped_extents;
 
 		for (uint32_t i = 0; i < extents->count; i++) {
-			struct xal_extent *extent = &extents->extent[i];
+			struct xal_extent *extent = xal_extent_at(xal, extents->extent_idx + i);
 
 			extent->start_offset = fiemap->fm_extents[i].fe_logical / xal->sb.blocksize;
 			extent->start_block  = fiemap->fm_extents[i].fe_physical / xal->sb.blocksize;
@@ -520,6 +522,7 @@ int
 xal_be_fiemap_index(struct xal *xal)
 {
 	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
+	struct xal_inode *root;
 	int err;
 
 	if (!strlen(be->mountpoint)) {
@@ -541,19 +544,21 @@ xal_be_fiemap_index(struct xal *xal)
 		}
 	}
 
-	err = xal_pool_claim_inodes(&xal->inodes, 1, &xal->root);
+	err = xal_pool_claim_inodes(&xal->inodes, 1, &xal->root_idx);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); err(%d)", err);
 		goto exit;
 	}
 
-	xal->root->ino = xal->sb.rootino;
-	xal->root->ftype = XAL_ODF_DIR3_FT_DIR;
-	xal->root->namelen = 0;
-	xal->root->content.extents.count = 0;
-	xal->root->content.dentries.count = 0;
+	root = xal_inode_at(xal, xal->root_idx);
+	root->ino = xal->sb.rootino;
+	root->ftype = XAL_ODF_DIR3_FT_DIR;
+	root->namelen = 0;
+	root->parent_idx = XAL_POOL_IDX_NONE;
+	root->content.extents.count = 0;
+	root->content.dentries.count = 0;
 
-	err = process_ino_fiemap(xal, be->mountpoint, xal->root);
+	err = process_ino_fiemap(xal, be->mountpoint, root);
 	if (err) {
 		XAL_DEBUG("FAILED: process_ino_fiemap(); err(%d)", err);
 		goto exit;
@@ -584,8 +589,9 @@ compare_name_to_inode(const void *key, const void *elem)
 }
 
 static int
-search_by_traversal(struct xal_be_fiemap *be, struct xal_inode *root, char *path, struct xal_inode **inode)
+search_by_traversal(struct xal *xal, struct xal_inode *root, char *path, struct xal_inode **inode)
 {
+	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
 	struct xal_inode *search, *found = NULL;
 	char *search_begin, *search_end;
 	size_t mountpoint_len;
@@ -621,7 +627,7 @@ search_by_traversal(struct xal_be_fiemap *be, struct xal_inode *root, char *path
 		memcpy(component, search_begin, search_len);
 		component[search_len] = '\0';
 
-		child = bsearch(component, search->content.dentries.inodes,
+		child = bsearch(component, xal_inode_at(xal, search->content.dentries.inodes_idx),
 				search->content.dentries.count, sizeof(struct xal_inode), compare_name_to_inode);
 
 		if (!child) {
@@ -682,7 +688,7 @@ xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode)
 		*inode = kh_val(map, iter);
 
 	} else {
-		err = search_by_traversal(be, xal->root, path, inode);
+		err = search_by_traversal(xal, xal_inode_at(xal, xal->root_idx), path, inode);
 		if (err) {
 			XAL_DEBUG("FAILED: search_by_traversal(%s); err(%d)", path, err);
 			return err;

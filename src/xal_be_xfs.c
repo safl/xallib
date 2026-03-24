@@ -650,6 +650,8 @@ retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct 
 		return -errno;
 	}
 
+	cand->root_idx = XAL_POOL_IDX_NONE;
+
 	be = (struct xal_be_xfs *)&cand->be;
 
 	agcount = be32toh(psb->agcount);
@@ -849,6 +851,7 @@ btree_lblock_decode_leaf_records(struct xal *xal, void *buf, struct xal_inode *s
 			for (uint64_t ofz = 64; ofz < xal->sb.dirblocksize;) {
 				uint8_t *dentry_cursor = dblock + ofz;
 				struct xal_inode dentry = {0};
+				uint32_t slot;
 
 				ofz += decode_dentry(dentry_cursor, &dentry);
 
@@ -873,17 +876,15 @@ btree_lblock_decode_leaf_records(struct xal *xal, void *buf, struct xal_inode *s
 					continue;
 				}
 
-				dentry.parent = self;
-				self->content.dentries.inodes[self->content.dentries.count] =
-				    dentry;
-
-				self->content.dentries.count += 1;
-
-				err = xal_pool_claim_inodes(&xal->inodes, 1, NULL);
+				err = xal_pool_claim_inodes(&xal->inodes, 1, &slot);
 				if (err) {
 					XAL_DEBUG("FAILED: xal_pool_claim_inodes(...)");
 					return err;
 				}
+
+				dentry.parent_idx = xal_inode_idx(xal, self);
+				*xal_inode_at(xal, slot) = dentry;
+				self->content.dentries.count += 1;
 			}
 		}
 	}
@@ -975,7 +976,7 @@ process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 		XAL_DEBUG("INFO: dentries.count(%" PRIu32 ")", self->content.dentries.count);
 		return -EINVAL;
 	}
-	xal_pool_current_inode(&xal->inodes, &self->content.dentries.inodes);
+	self->content.dentries.inodes_idx = xal->inodes.free;
 
 	XAL_DEBUG("=### Processing: File-System Block Pointers ###=");
 	XAL_DEBUG("INFO: pos.numrecs(%" PRIu16 ")", pos.numrecs);
@@ -992,7 +993,7 @@ process_dinode_dir_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 	XAL_DEBUG("=### Processing: inodes constructed when chasing File-System Block Pointers")
 	XAL_DEBUG("INFO: dentries.count(%" PRIu32 ")", self->content.dentries.count);
 	for (uint32_t i = 0; i < self->content.dentries.count; ++i) {
-		struct xal_inode *inode = &self->content.dentries.inodes[i];
+		struct xal_inode *inode = xal_inode_at(xal, self->content.dentries.inodes_idx + i);
 
 		XAL_DEBUG("INFO: inode->name(%.*s)", inode->namelen, inode->name);
 		err = process_ino(xal, inode->ino, inode);
@@ -1014,6 +1015,7 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	uint64_t ofz = xal_fsbno_offset(xal, fsbno);
 	struct xal_odf_btree_lfmt leaf = {0};
 	struct xal_extent *extents;
+	uint32_t extent_start;
 	int err;
 
 	XAL_DEBUG("ENTER: File Extents -- B+Tree -- Leaf Node");
@@ -1049,12 +1051,12 @@ process_file_btree_leaf(struct xal *xal, uint64_t fsbno, struct xal_inode *self)
 	XAL_DEBUG("INFO: rightsib(0x%016" PRIx64 " @ %" PRIu64 ")", leaf.siblings.right,
 		  xal_fsbno_offset(xal, leaf.siblings.right));
 
-	extents = &self->content.extents.extent[self->content.extents.count];
-	err = xal_pool_claim_extents(&xal->extents, leaf.pos.numrecs, NULL);
+	err = xal_pool_claim_extents(&xal->extents, leaf.pos.numrecs, &extent_start);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim_extents(); err(%d)", err);
 		return err;
 	}
+	extents = xal_extent_at(xal, extent_start);
 	self->content.extents.count += leaf.pos.numrecs;
 
 	for (uint16_t rec = 0; rec < leaf.pos.numrecs; ++rec) {
@@ -1201,7 +1203,7 @@ process_dinode_file_btree_root(struct xal *xal, struct xal_odf_dinode *dinode,
 			  self->content.extents.count);
 		return -EINVAL;
 	}
-	xal_pool_current_extent(&xal->extents, &self->content.extents.extent);
+	self->content.extents.extent_idx = xal->extents.free;
 
 	XAL_DEBUG("#### Processing Pointers ###");
 	for (uint16_t rec = 0; rec < numrecs; ++rec) {
@@ -1251,7 +1253,7 @@ process_dinode_dir_local(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 
 	self->content.dentries.count = count;
 
-	err = xal_pool_claim_inodes(&xal->inodes, count, &self->content.dentries.inodes);
+	err = xal_pool_claim_inodes(&xal->inodes, count, &self->content.dentries.inodes_idx);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); err(%d)", err);
 		return err;
@@ -1259,7 +1261,7 @@ process_dinode_dir_local(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 
 	/** DECODE: namelen[1], offset[2], name[namelen], ftype[1], ino[4] | ino[8] */
 	for (int i = 0; i < count; ++i) {
-		struct xal_inode *dentry = &self->content.dentries.inodes[i];
+		struct xal_inode *dentry = xal_inode_at(xal, self->content.dentries.inodes_idx + i);
 
 		dentry->namelen = *cursor;
 		cursor += 1 + 2; ///< Advance past 'namelen' and 'offset[2]'
@@ -1281,9 +1283,9 @@ process_dinode_dir_local(struct xal *xal, struct xal_odf_dinode *dinode, struct 
 	}
 
 	for (int i = 0; i < count; ++i) {
-		struct xal_inode *dentry = &self->content.dentries.inodes[i];
+		struct xal_inode *dentry = xal_inode_at(xal, self->content.dentries.inodes_idx + i);
 
-		dentry->parent = self;
+		dentry->parent_idx = xal_inode_idx(xal, self);
 		err = process_ino(xal, dentry->ino, dentry);
 		if (err) {
 			XAL_DEBUG("FAILED: process_ino()");
@@ -1315,14 +1317,14 @@ process_dinode_file_extents(struct xal *xal, struct xal_odf_dinode *dinode, stru
 	XAL_DEBUG("INFO: name(%.*s)", self->namelen, self->name);
 	XAL_DEBUG("INFO: nextents(%" PRIu64 ")", nextents);
 
-	err = xal_pool_claim_extents(&xal->extents, nextents, &self->content.extents.extent);
+	err = xal_pool_claim_extents(&xal->extents, nextents, &self->content.extents.extent_idx);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim()...");
 		return err;
 	}
 	self->content.extents.count = nextents;
 
-	extents = self->content.extents.extent;
+	extents = xal_extent_at(xal, self->content.extents.extent_idx);
 	for (uint64_t rec = 0; rec < nextents; ++rec) {
 		XAL_DEBUG("INFO: i(%" PRIu64 ")", rec);
 
@@ -1407,7 +1409,8 @@ process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_in
 
 	for (uint64_t ofz = 64; ofz < xal->sb.dirblocksize;) {
 		uint8_t *dentry_cursor = dblock + ofz;
-		struct xal_inode dentry = {.parent = self};
+		struct xal_inode dentry = {0};
+		uint32_t slot;
 
 		ofz += decode_dentry(dentry_cursor, &dentry);
 
@@ -1431,13 +1434,14 @@ process_dinode_dir_extents_dblock(struct xal *xal, uint64_t fsbno, struct xal_in
 			continue;
 		}
 
-		err = xal_pool_claim_inodes(&xal->inodes, 1, NULL);
+		err = xal_pool_claim_inodes(&xal->inodes, 1, &slot);
 		if (err) {
 			XAL_DEBUG("FAILED: xal_pool_claim_inodes(...)");
 			return err;
 		}
 
-		self->content.dentries.inodes[self->content.dentries.count] = dentry;
+		dentry.parent_idx = xal_inode_idx(xal, self);
+		*xal_inode_at(xal, slot) = dentry;
 		self->content.dentries.count += 1;
 	}
 
@@ -1502,7 +1506,7 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 	XAL_DEBUG("INFO: fsblk_per_dblk(%" PRIu32 ")", fsblk_per_dblk);
 	XAL_DEBUG("INFO:         nbytes(%" PRIu64 ")", nbytes);
 
-	xal_pool_current_inode(&xal->inodes, &self->content.dentries.inodes);
+	self->content.dentries.inodes_idx = xal->inodes.free;
 
 	/**
 	 * Decode the extents and process each block
@@ -1537,7 +1541,7 @@ process_dinode_dir_extents(struct xal *xal, struct xal_odf_dinode *dinode, struc
 
 	XAL_DEBUG("=### Processing: inodes constructed when decoding dir(FMT_EXTENTS)")
 	for (uint32_t i = 0; i < self->content.dentries.count; ++i) {
-		struct xal_inode *inode = &self->content.dentries.inodes[i];
+		struct xal_inode *inode = xal_inode_at(xal, self->content.dentries.inodes_idx + i);
 
 		err = process_ino(xal, inode->ino, inode);
 		if (err) {
@@ -1591,7 +1595,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 	case XAL_DINODE_FMT_BTREE:
 		switch (self->ftype) {
 		case XAL_ODF_DIR3_FT_DIR:
-			xal_pool_current_inode(&xal->inodes, &self->content.dentries.inodes);
+			self->content.dentries.inodes_idx = xal->inodes.free;
 
 			err = process_dinode_dir_btree_root(xal, dinode, self);
 			if (err) {
@@ -1672,6 +1676,7 @@ process_ino(struct xal *xal, uint64_t ino, struct xal_inode *self)
 int
 xal_be_xfs_index(struct xal *xal)
 {
+	struct xal_inode *root;
 	struct xal_be_xfs *be = (struct xal_be_xfs *)&xal->be;
 	int err;
 
@@ -1682,18 +1687,20 @@ xal_be_xfs_index(struct xal *xal)
 	xal_pool_clear(&xal->inodes);
 	xal_pool_clear(&xal->extents);
 
-	err = xal_pool_claim_inodes(&xal->inodes, 1, &xal->root);
+	err = xal_pool_claim_inodes(&xal->inodes, 1, &xal->root_idx);
 	if (err) {
 		return err;
 	}
 
-	xal->root->ino = xal->sb.rootino;
-	xal->root->ftype = XAL_ODF_DIR3_FT_DIR;
-	xal->root->namelen = 0;
-	xal->root->content.extents.count = 0;
-	xal->root->content.dentries.count = 0;
+	root = xal_inode_at(xal, xal->root_idx);
+	root->ino = xal->sb.rootino;
+	root->ftype = XAL_ODF_DIR3_FT_DIR;
+	root->namelen = 0;
+	root->parent_idx = XAL_POOL_IDX_NONE;
+	root->content.extents.count = 0;
+	root->content.dentries.count = 0;
 
-	err = process_ino(xal, xal->root->ino, xal->root);
+	err = process_ino(xal, root->ino, root);
 	if (err) {
 		XAL_DEBUG("FAILED: process_ino(); err(%d)", err);
 		return err;

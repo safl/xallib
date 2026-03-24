@@ -160,7 +160,7 @@ xal_odf_dinode_format_str(int val)
 }
 
 int
-xal_inode_pp(struct xal_inode *inode)
+xal_inode_pp(struct xal *xal, struct xal_inode *inode)
 {
 	int wrtn = 0;
 
@@ -177,12 +177,12 @@ xal_inode_pp(struct xal_inode *inode)
 
 	switch (inode->ftype) {
 	case XAL_ODF_DIR3_FT_DIR:
+		struct xal_inode *children = xal_inode_at(xal, inode->content.dentries.inodes_idx);
+
 		wrtn += printf("  dentries.count: %u\n", inode->content.dentries.count);
 
 		for (uint8_t i = 0; i < inode->content.dentries.count; ++i) {
-			struct xal_inode *children = inode->content.dentries.inodes;
-
-			xal_inode_pp(&children[i]);
+			xal_inode_pp(xal, &children[i]);
 		}
 
 		break;

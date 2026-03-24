@@ -1,3 +1,4 @@
+#include <stdint.h>
 
 /**
  * A pool of mmap backed memory for fixed-size elements.
@@ -33,25 +34,13 @@ int
 xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t element_size);
 
 /**
- * Claims the current inode-offset
- *
- * This is utilized when decoding device-entries and the amount is not known ahead of time,
- * thus, the current position is written to 'inode', subsequent calls to
- */
-void
-xal_pool_current_inode(struct xal_pool *pool, struct xal_inode **inode);
-
-void
-xal_pool_current_extent(struct xal_pool *pool, struct xal_extent **extent);
-
-/**
  *
  */
 int
-xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **extents);
+xal_pool_claim_extents(struct xal_pool *pool, size_t count, uint32_t *idx);
 
 int
-xal_pool_claim_inodes(struct xal_pool *pool, size_t count, struct xal_inode **inodes);
+xal_pool_claim_inodes(struct xal_pool *pool, size_t count, uint32_t *idx);
 
 int
 xal_pool_clear(struct xal_pool *pool);

@@ -36,6 +36,7 @@
 
 #define XAL_INODE_NAME_MAXLEN 255
 #define XAL_PATH_MAXLEN 255
+#define XAL_POOL_IDX_NONE UINT32_MAX
 
 enum xal_backend {
 	XAL_BACKEND_XFS     = 1,
@@ -87,13 +88,13 @@ xal_extent_converted_pp(struct xal_extent_converted *extent);
 struct xal_inode;
 
 struct xal_dentries {
-	struct xal_inode *inodes; ///< Pointer to array of 'struct xal_inode'
-	uint32_t count;		  ///< Number of children; for directories
+	uint32_t inodes_idx; ///< Index of first child in xal->inodes pool
+	uint32_t count;      ///< Number of children; for directories
 };
 
 struct xal_extents {
-	struct xal_extent *extent; ///< Pointer to array of 'struct xal_extent'
-	uint32_t count;		   ///< Number of extents
+	uint32_t extent_idx; ///< Index of first extent in xal->extents pool
+	uint32_t count;      ///< Number of extents
 };
 
 union xal_inode_content {
@@ -109,11 +110,8 @@ struct xal_inode {
 	uint8_t namelen;		      ///< Length of the name; not counting nul-termination
 	char name[XAL_INODE_NAME_MAXLEN + 1]; ///< Name; not including nul-termination
 	uint8_t reserved[22];
-	struct xal_inode *parent;
+	uint32_t parent_idx;
 };
-
-int
-xal_inode_pp(struct xal_inode *inode);
 
 /**
  * XAL
@@ -125,6 +123,18 @@ xal_inode_pp(struct xal_inode *inode);
  * @struct xal
  */
 struct xal;
+
+struct xal_inode *
+xal_inode_at(struct xal *xal, uint32_t idx);
+
+struct xal_extent *
+xal_extent_at(struct xal *xal, uint32_t idx);
+
+uint32_t
+xal_inode_idx(struct xal *xal, struct xal_inode *inode);
+
+int
+xal_inode_pp(struct xal *xal, struct xal_inode *inode);
 
 /**
  * Returns the extent information in bytes.
@@ -287,7 +297,7 @@ uint64_t
 xal_fsbno_offset(struct xal *xal, uint64_t fsbno);
 
 int
-xal_inode_path_pp(struct xal_inode *inode);
+xal_inode_path_pp(struct xal *xal, struct xal_inode *inode);
 
 int
 build_inode_path(struct xal_inode *inode, char *buffer);
