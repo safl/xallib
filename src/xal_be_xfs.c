@@ -681,10 +681,12 @@ retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct 
 }
 
 int
-xal_be_xfs_open(struct xnvme_dev *dev, struct xal **xal)
+xal_be_xfs_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 {
 	struct xal *cand = NULL;
 	struct xal_be_xfs *be;
+	char shm_name[XAL_PATH_MAXLEN + 9];
+	const char *shm;
 	void *buf;
 	int err;
 
@@ -720,15 +722,31 @@ xal_be_xfs_open(struct xnvme_dev *dev, struct xal **xal)
 		cand->sb.nallocated += be->ags[seqno].agi_count;
 	}
 
-	err =
-	    xal_pool_map(&cand->inodes, 40000000UL, cand->sb.nallocated, sizeof(struct xal_inode));
+	if (opts->shm_name && strlen(opts->shm_name) > XAL_PATH_MAXLEN) {
+		XAL_DEBUG("FAILED: shm_name too long");
+		err = -EINVAL;
+		goto failed;
+	}
+
+	shm = NULL;
+	if (opts->shm_name) {
+		snprintf(shm_name, sizeof(shm_name), "%s_inodes", opts->shm_name);
+		shm = shm_name;
+	}
+	err = xal_pool_map(&cand->inodes, 40000000UL, cand->sb.nallocated, sizeof(struct xal_inode),
+	                   shm);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_map(inodes); err(%d)", err);
 		goto failed;
 	}
 
-	err = xal_pool_map(&cand->extents, 40000000UL, cand->sb.nallocated,
-			   sizeof(struct xal_extent));
+	shm = NULL;
+	if (opts->shm_name) {
+		snprintf(shm_name, sizeof(shm_name), "%s_extents", opts->shm_name);
+		shm = shm_name;
+	}
+	err = xal_pool_map(&cand->extents, 40000000UL, cand->sb.nallocated, sizeof(struct xal_extent),
+	                   shm);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_map(extents); err(%d)", err);
 		goto failed;

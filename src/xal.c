@@ -155,7 +155,7 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 
 	switch (opts->be) {
 		case XAL_BACKEND_XFS:
-			err = xal_be_xfs_open(dev, xal);
+			err = xal_be_xfs_open(dev, xal, opts);
 			if (err) {
 				XAL_DEBUG("FAILED: xal_be_xfs_open(); err(%d)", err);
 				return err;
