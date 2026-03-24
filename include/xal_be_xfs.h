@@ -27,4 +27,4 @@ struct xal_be_xfs {
 XAL_STATIC_ASSERT(sizeof(struct xal_be_xfs) == XAL_BACKEND_SIZE, "Incorrect size");
 
 int
-xal_be_xfs_open(struct xnvme_dev *dev, struct xal **xal);
+xal_be_xfs_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts);

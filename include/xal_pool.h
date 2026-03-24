@@ -29,9 +29,15 @@ xal_pool_unmap(struct xal_pool *pool);
  * See the xal_pool_claim() helper, which provides arrays of allocated memory usable for
  * inode-storage. The number of allocated inodes are grown, when claimed, until the reserved space
  * is exhausted.
+ *
+ * If shm_name is NULL, uses private anonymous memory with lazy mprotect growth.
+ * If shm_name is non-NULL, backs the pool with a POSIX shared memory object of that name.
+ * In the shm case the full reserved size is committed upfront and the caller is responsible
+ * for shm_unlink() when the shm is no longer needed.
  */
 int
-xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t element_size);
+xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t element_size,
+             const char *shm_name);
 
 /**
  *

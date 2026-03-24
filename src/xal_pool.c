@@ -32,37 +32,69 @@ xal_pool_grow(struct xal_pool *pool, size_t growby)
 }
 
 int
-xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t element_size)
+xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t element_size,
+             const char *shm_name)
 {
+	size_t nbytes = reserved * element_size;
 	int err;
 
 	if (pool->reserved) {
 		XAL_DEBUG("FAILED: xal_pool_map(...); errno(%d)", EINVAL);
 		return -EINVAL;
 	}
-	if (allocated > reserved) {
-		XAL_DEBUG("FAILED: xal_pool_map(...); errno(%d)", EINVAL);
-		return -EINVAL;
-	}
 
 	pool->reserved = reserved;
-	pool->allocated = 0;
-	pool->growby = allocated;
 	pool->element_size = element_size;
 	pool->free = 0;
 
-	pool->memory =
-	    mmap(NULL, reserved * element_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (MAP_FAILED == pool->memory) {
-		XAL_DEBUG("FAILED: mmap(...); errno(%d)", errno);
-		return -errno;
-	}
+	if (shm_name) {
+		int fd;
 
-	err = xal_pool_grow(pool, allocated);
-	if (err) {
-		XAL_DEBUG("FAILED: xal_pool_grow(...); err(%d)", err);
-		xal_pool_unmap(pool);
-		return err;
+		fd = shm_open(shm_name, O_CREAT | O_RDWR, 0666);
+		if (fd < 0) {
+			XAL_DEBUG("FAILED: shm_open(%s); errno(%d)", shm_name, errno);
+			return -errno;
+		}
+
+		err = ftruncate(fd, nbytes);
+		if (err) {
+			XAL_DEBUG("FAILED: ftruncate(); errno(%d)", errno);
+			close(fd);
+			return -errno;
+		}
+
+		pool->memory = mmap(NULL, nbytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+		close(fd);
+		if (pool->memory == MAP_FAILED) {
+			XAL_DEBUG("FAILED: mmap(); errno(%d)", errno);
+			return -errno;
+		}
+
+		memset(pool->memory, 0, nbytes);
+		pool->allocated = reserved;
+		pool->growby = reserved;
+	} else {
+		if (allocated > reserved) {
+			XAL_DEBUG("FAILED: xal_pool_map(...); errno(%d)", EINVAL);
+			return -EINVAL;
+		}
+
+		pool->allocated = 0;
+		pool->growby = allocated;
+
+		pool->memory =
+		    mmap(NULL, nbytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		if (MAP_FAILED == pool->memory) {
+			XAL_DEBUG("FAILED: mmap(...); errno(%d)", errno);
+			return -errno;
+		}
+
+		err = xal_pool_grow(pool, allocated);
+		if (err) {
+			XAL_DEBUG("FAILED: xal_pool_grow(...); err(%d)", err);
+			xal_pool_unmap(pool);
+			return err;
+		}
 	}
 
 	return 0;
