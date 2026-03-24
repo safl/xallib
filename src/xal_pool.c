@@ -68,18 +68,9 @@ xal_pool_map(struct xal_pool *pool, size_t reserved, size_t allocated, size_t el
 	return 0;
 }
 
-void
-xal_pool_current_inode(struct xal_pool *pool, struct xal_inode **inode)
-{
-	uint8_t *cursor = pool->memory;
-
-	*inode = (void *)&cursor[pool->free * pool->element_size];
-}
-
 int
-xal_pool_claim_inodes(struct xal_pool *pool, size_t count, struct xal_inode **inode)
+xal_pool_claim_inodes(struct xal_pool *pool, size_t count, uint32_t *idx)
 {
-	uint8_t *cursor = pool->memory;
 	int err;
 
 	if (count > pool->growby) {
@@ -95,26 +86,22 @@ xal_pool_claim_inodes(struct xal_pool *pool, size_t count, struct xal_inode **in
 		}
 	}
 
-	if (inode) {
-		*inode = (void *)&cursor[pool->free * pool->element_size];
+	if (pool->free + count > UINT32_MAX) {
+		XAL_DEBUG("FAILED: pool->free exceeds uint32_t range");
+		return -EOVERFLOW;
+	}
+
+	if (idx) {
+		*idx = pool->free;
 	}
 	pool->free += count;
 
 	return 0;
 }
 
-void
-xal_pool_current_extent(struct xal_pool *pool, struct xal_extent **extent)
-{
-	uint8_t *cursor = pool->memory;
-
-	*extent = (void *)&cursor[pool->free * pool->element_size];
-}
-
 int
-xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **extents)
+xal_pool_claim_extents(struct xal_pool *pool, size_t count, uint32_t *idx)
 {
-	uint8_t *cursor = pool->memory;
 	int err;
 
 	if (count > pool->growby) {
@@ -130,8 +117,8 @@ xal_pool_claim_extents(struct xal_pool *pool, size_t count, struct xal_extent **
 		}
 	}
 
-	if (extents) {
-		*extents = (void *)&cursor[pool->free * pool->element_size];
+	if (idx) {
+		*idx = pool->free;
 	}
 	pool->free += count;
 

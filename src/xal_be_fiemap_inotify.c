@@ -134,20 +134,21 @@ xal_be_fiemap_inotify_add_watcher(struct xal_inotify *inotify, char *path, struc
 }
 
 static int
-_inode_path(struct xal_be_fiemap *be, struct xal_inode *inode, char *path, int *idx)
+_inode_path(struct xal *xal, struct xal_inode *inode, char *path, int *idx)
 {
+	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
 	int wrtn, err;
 
 	if (!inode) {
 		return -1;
 	}
-	if (!inode->parent) {
+	if (inode->parent_idx == XAL_POOL_IDX_NONE) {
 		wrtn = snprintf(path + *idx, XAL_PATH_MAXLEN - *idx, "%s", be->mountpoint);
 		*idx += wrtn;
 		return 0;
 	}
 
-	err = _inode_path(be, inode->parent, path, idx);
+	err = _inode_path(xal, xal_inode_at(xal, inode->parent_idx), path, idx);
 	if (err) {
 		XAL_DEBUG("FAILED: _inode_path()");
 		return err;
@@ -165,10 +166,9 @@ _inode_path(struct xal_be_fiemap *be, struct xal_inode *inode, char *path, int *
 static int
 get_inode_path(struct xal *xal, struct xal_inode *inode, char *path)
 {
-	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
 	int err, idx = 0;
 
-	err = _inode_path(be, inode, path, &idx);
+	err = _inode_path(xal, inode, path, &idx);
 	if (err) {
 		XAL_DEBUG("FAILED: _inode_path()");
 		return err;
@@ -275,7 +275,7 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 				atomic_fetch_add(&xal->seq_lock, 1);
 
 				for (uint32_t j = 0; j < dir_inode->content.dentries.count; ++j) {
-					struct xal_inode *child = &dir_inode->content.dentries.inodes[j];
+					struct xal_inode *child = xal_inode_at(xal, dir_inode->content.dentries.inodes_idx + j);
 
 					if (strcmp(child->name, event->name) == 0) {
 						inode = child;
@@ -296,7 +296,7 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 				}
 
 				XAL_DEBUG("INFO: reprocessing inode:");
-				XAL_DEBUG_FCALL(xal_inode_pp(inode));
+				XAL_DEBUG_FCALL(xal_inode_pp(xal, inode));
 
 				err = xal_be_fiemap_process_inode_file(xal, path, inode);
 				if (err) {
@@ -305,7 +305,7 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 				}
 
 				XAL_DEBUG("INFO: finished reprocessing inode:");
-				XAL_DEBUG_FCALL(xal_inode_pp(inode));
+				XAL_DEBUG_FCALL(xal_inode_pp(xal, inode));
 
 				atomic_fetch_add(&xal->seq_lock, 1);
 
@@ -404,7 +404,7 @@ xal_watch_filesystem(struct xal *xal)
 		return 0;
 	}
 
-	if (!xal->root) {
+	if (xal->root_idx == XAL_POOL_IDX_NONE) {
 		XAL_DEBUG("FAILED: Missing call to xal_index()");
 		return -EINVAL;
 	}

@@ -42,12 +42,11 @@ struct xal_sb {
  */
 struct xal {
 	struct xnvme_dev *dev;
-	struct xal_pool inodes;	 ///< Pool of inodes in host-native format
+	struct xal_pool inodes;  ///< Pool of inodes in host-native format
 	struct xal_pool extents; ///< Pool of extents in host-native format
-	struct xal_inode *root;	 ///< Root of the file-system
+	uint32_t root_idx;       ///< Index of the root inode in the inodes pool
 	struct xal_sb sb;
 	uint8_t be[XAL_BACKEND_SIZE];
 	atomic_bool dirty;       ///< Whether the file system has changed since last index
 	atomic_int seq_lock;     ///< An uneven number indicates the struct is being modified and is not safe to read
 };
-

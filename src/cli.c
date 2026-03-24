@@ -84,7 +84,7 @@ parse_args(int argc, char *argv[], struct xal_cli_args *args)
  * Produces output on stdout similar to the output produced by running "find /mount/point"
  */
 int
-node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *cb_args,
+node_inspector_find(struct xal *xal, struct xal_inode *inode, void *cb_args,
 		    int XAL_UNUSED(level))
 {
 	struct xal_nodeinspector_args *args = cb_args;
@@ -99,11 +99,11 @@ node_inspector_find(struct xal *XAL_UNUSED(xal), struct xal_inode *inode, void *
 	}
 
 	printf("%s", args->cli_args->dev_uri);
-	if ((inode->parent) &&
+	if ((inode->parent_idx != XAL_POOL_IDX_NONE) &&
 	    (args->cli_args->dev_uri[strlen(args->cli_args->dev_uri) - 1] == '/')) {
 		printf("/");
 	}
-	xal_inode_path_pp(inode);
+	xal_inode_path_pp(xal, inode);
 	printf("\n");
 	return 0;
 }
@@ -114,7 +114,7 @@ pp_inode_extents(struct xal *xal, struct xal_inode *inode)
 	uint32_t blocksize = xal_get_sb_blocksize(xal);
 
 	for (uint32_t i = 0; i < inode->content.extents.count; ++i) {
-		struct xal_extent *extent = &inode->content.extents.extent[i];
+		struct xal_extent *extent = xal_extent_at(xal, inode->content.extents.extent_idx + i);
 		size_t fofz_begin, fofz_end, bofz_begin, bofz_end;
 
 		fofz_begin = (extent->start_offset * blocksize) / 512;
@@ -145,12 +145,12 @@ node_inspector_bmap(struct xal *xal, struct xal_inode *inode, void *cb_args, int
 	}
 
 	printf("'%s", args->cli_args->dev_uri);
-	if ((inode->parent) &&
+	if ((inode->parent_idx != XAL_POOL_IDX_NONE) &&
 	    (args->cli_args->dev_uri[strlen(args->cli_args->dev_uri) - 1] == '/')) {
 		printf("/");
 	}
 
-	xal_inode_path_pp(inode);
+	xal_inode_path_pp(xal, inode);
 	printf("':");
 
 	if (!inode->content.extents.count) {

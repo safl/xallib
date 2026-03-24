@@ -50,6 +50,24 @@ xal_fsbno_offset(struct xal *xal, uint64_t fsbno)
 	}
 }
 
+struct xal_inode *
+xal_inode_at(struct xal *xal, uint32_t idx)
+{
+	return (struct xal_inode *)xal->inodes.memory + idx;
+}
+
+struct xal_extent *
+xal_extent_at(struct xal *xal, uint32_t idx)
+{
+	return (struct xal_extent *)xal->extents.memory + idx;
+}
+
+uint32_t
+xal_inode_idx(struct xal *xal, struct xal_inode *inode)
+{
+	return (uint32_t)(inode - (struct xal_inode *)xal->inodes.memory);
+}
+
 void
 xal_close(struct xal *xal)
 {
@@ -213,7 +231,7 @@ _walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb_da
 
 	switch (inode->ftype) {
 	case XAL_ODF_DIR3_FT_DIR: {
-		struct xal_inode *inodes = inode->content.dentries.inodes;
+		struct xal_inode *inodes = xal_inode_at(xal, inode->content.dentries.inodes_idx);
 
 		for (uint32_t i = 0; i < inode->content.dentries.count; ++i) {
 			err = _walk(xal, &inodes[i], cb_func, cb_data, depth + 1);
@@ -243,7 +261,7 @@ xal_walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb
 struct xal_inode *
 xal_get_root(struct xal *xal)
 {
-	return xal->root;
+	return xal_inode_at(xal, xal->root_idx);
 }
 
 bool
@@ -265,18 +283,18 @@ xal_get_sb_blocksize(struct xal *xal)
 }
 
 int
-xal_inode_path_pp(struct xal_inode *inode)
+xal_inode_path_pp(struct xal *xal, struct xal_inode *inode)
 {
 	int wrtn = 0;
 
 	if (!inode) {
 		return wrtn;
 	}
-	if (!inode->parent) {
+	if (inode->parent_idx == XAL_POOL_IDX_NONE) {
 		return wrtn;
 	}
 
-	wrtn += xal_inode_path_pp(inode->parent);
+	wrtn += xal_inode_path_pp(xal, xal_inode_at(xal, inode->parent_idx));
 	wrtn += printf("/%.*s", inode->namelen, inode->name);
 
 	return wrtn;
