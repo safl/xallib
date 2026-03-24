@@ -103,8 +103,10 @@ int
 xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 {
 	const struct xnvme_ident *ident;
+	const struct xnvme_spec_idfy_ns *ns;
 	struct xal_opts opts_default = {0};
 	char mountpoint[XAL_PATH_MAXLEN + 1] = {0};
+	uint8_t fidx;
 	int err;
 
 	if (!dev) {
@@ -166,6 +168,20 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 	}
 
 	(*xal)->dev = dev;
+
+	ns = xnvme_dev_get_ns(dev);
+	if (!ns) {
+		err = -errno;
+		XAL_DEBUG("FAILED: xnvme_dev_get_ns(); err(%d)", err);
+		return err;
+	}
+
+	fidx = ns->flbas.format;
+	if (ns->nlbaf > 16) {
+		fidx += ns->flbas.format_msb << 4;
+	}
+
+	(*xal)->sb.lba_blksze = 1U << ns->lbaf[fidx].ds;
 
 	return 0;
 }
@@ -297,28 +313,12 @@ xal_extent_in_bytes(struct xal *xal, const struct xal_extent *extent, struct xal
 int
 xal_extent_in_lba(struct xal *xal, const struct xal_extent *extent, struct xal_extent_converted *output)
 {
-	const struct xnvme_spec_idfy_ns *ns;
-	uint8_t fidx;
-	uint lba_blksze;
+	uint32_t lba_blksze = xal->sb.lba_blksze;
 
 	if (!extent) {
 		XAL_DEBUG("FAILED: no extent given");
 		return -EINVAL;
 	}
-
-	ns = xnvme_dev_get_ns(xal->dev);
-	if (!ns) {
-		XAL_DEBUG("FAILED: xnvme_dev_get_ns(); errno(%d)", errno);
-		return -errno;
-	}
-
-	fidx = ns->flbas.format;
-	if (ns->nlbaf > 16) {
-		fidx += ns->flbas.format_msb << 4;
-	}
-
-	lba_blksze = 1U << ns->lbaf[fidx].ds;
-	XAL_DEBUG("INFO: Found lba block size %d", lba_blksze);
 
 	output->start_offset = extent->start_offset * xal->sb.blocksize / lba_blksze;
 	output->size = extent->nblocks * xal->sb.blocksize / lba_blksze;
