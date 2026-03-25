@@ -106,6 +106,71 @@ If ``opts.be`` is left as 0, ``xal_open()`` auto-selects the backend: if the
 device URI is found in ``/proc/mounts`` the ``FIEMAP`` backend is chosen,
 otherwise ``XFS`` is used.
 
+Backends
+========
+
+XFS
+---
+
+The XFS backend reads directly from the raw block device by parsing the XFS
+on-disk format. The filesystem does **not** need to be mounted — this is the
+primary use-case for the library, enabling access from user-space drivers
+(e.g., SPDK/NVMe) or peripheral devices where the OS has no control over the
+storage.
+
+FIEMAP
+------
+
+The FIEMAP backend uses the kernel's ``FS_IOC_FIEMAP`` ioctl to read file
+extent information, and standard ``opendir``/``readdir`` to walk the directory
+tree. The filesystem **must** be mounted. This backend provides a simpler
+integration and supports path-based inode and extent lookup via ``xal_get_inode()``/
+``xal_get_extents()``.
+
+Inotify watching
+~~~~~~~~~~~~~~~~
+
+When opened with a ``watch_mode`` other than ``XAL_WATCHMODE_NONE``, an
+inotify watch is registered for every directory during ``xal_index()``.
+A background thread started with ``xal_watch_filesystem()`` then processes
+events. The watched event mask per directory is: ``IN_CREATE``,
+``IN_DELETE``, ``IN_MOVE``, ``IN_MODIFY``, ``IN_ATTRIB``,
+``IN_CLOSE_WRITE``, and ``IN_UNMOUNT``.
+
+Watch modes
+~~~~~~~~~~~
+
+``XAL_WATCHMODE_NONE``
+  No inotify setup. The xal struct will never be marked dirty automatically.
+
+``XAL_WATCHMODE_DIRTY_DETECTION``
+  Any filesystem event marks the xal struct as dirty. The caller detects
+  this with ``xal_is_dirty()`` and must re-call ``xal_index()`` to rebuild
+  the tree.
+
+``XAL_WATCHMODE_EXTENT_UPDATE``
+  File-modification events (``IN_MODIFY``, ``IN_CLOSE_WRITE``) trigger an
+  automatic in-place extent refresh for the affected file via a new FIEMAP
+  call, coordinated with ``seq_lock`` so concurrent readers remain safe.
+  Structural changes (``IN_CREATE``, ``IN_DELETE``, ``IN_MOVE``) still mark
+  the struct dirty, as they require a full re-index.
+
+File lookup modes
+~~~~~~~~~~~~~~~~~
+
+The path-based inode and extent lookup implementation depends on which
+*lookup mode* is selected.
+
+``XAL_FILE_LOOKUPMODE_TRAVERSE``
+  Default. Searches the in-memory tree from ``xal->root`` using binary
+  search at each directory level. Entries are sorted alphabetically at
+  index time to make this possible.
+
+``XAL_FILE_LOOKUPMODE_HASHMAP``
+  At index time every inode is inserted into a hash map keyed by its
+  absolute path. ``xal_get_inode()`` then resolves in O(1). Trade-off:
+  higher memory usage proportional to the number of inodes.
+
 Nomenclature
 ============
 
