@@ -1,3 +1,6 @@
+#ifndef LIBXAL_H
+#define LIBXAL_H
+
 /**
  * Public API for the XAL library
  *
@@ -358,3 +361,5 @@ xal_get_extents(struct xal *xal, char *path, struct xal_extents **extents);
  */
 int
 xal_get_dentries(struct xal *xal, char *path, struct xal_dentries **dentries);
+
+#endif /* LIBXAL_H */
