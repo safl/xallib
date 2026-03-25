@@ -53,33 +53,55 @@ is stored in big-endian format, thus on x86 systems these need conversion to
 little-endian when reading them
 
 Superblock (SB)
-  ...
+  The primary superblock occupies the first sector of the first AG. It records
+  the filesystem geometry: block size, sector size, inode size, number of AGs,
+  and the root inode number. Every subsequent AG begins with a copy of the
+  superblock for redundancy; these copies are updated but the one at offset 0
+  is considered authoritative.
 
 Sector
   A unit which typically match the minimal I/O size; equivalent to an **lba** of
   an NVMe device.
 
 Inode
-  ...
+  The on-disk metadata record for a file or directory. Stores the file type,
+  size in bytes, and one of three data-fork formats: ``FMT_LOCAL`` (data fits
+  inline within the inode itself), ``FMT_EXTENT`` (a flat array of extents),
+  or ``FMT_BTREE`` (root node of an extent B+Tree, used when the file is
+  heavily fragmented). Inode numbers encode the AG number, block within that
+  AG, and position of the inode within that block.
 
 Allocation Group (AG)
-  ...
+  A self-contained sub-filesystem. The storage is divided into a fixed number
+  of equal-sized AGs at mkfs time. Each AG manages its own block and inode
+  allocation independently, which enables parallel allocation and makes the
+  filesystem scale on wide storage. Each AG starts with its own copy of the
+  superblock followed by three AG-specific headers: AGF, AGI, and AGFL.
 
   Allocaton Group Free Block (AGF)
 
-    ...
+    Tracks free-block accounting for the AG. Contains the roots of two
+    free-space B+Trees: one ordered by block number, the other by run length.
 
   Allocaton Group Inode (AGI)
 
-    ...
+    Tracks inode allocation for the AG. Contains ``agi_count`` (the number
+    of currently allocated inodes) and ``agi_root``, the block address of the
+    root of the inode B+Tree (magic ``IAB3``).
 
   Allocaton Group Free List (AGFL)
 
-    ...
+    A small circular array of pre-allocated spare blocks reserved exclusively
+    for B+Tree splits within the AG. Having these blocks set aside ensures
+    that space-management operations always have somewhere to write even when
+    the AG is nearly full.
 
 Block
 
-  ...
+  The fundamental allocation unit of the filesystem, sized at mkfs time
+  (commonly 4096 bytes). All data and metadata are read and written in whole
+  blocks. The block size is always a power of two and must be at least as
+  large as the sector size.
 
 Data Structures
 ===============
