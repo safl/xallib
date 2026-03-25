@@ -328,6 +328,12 @@ xal_get_seq_lock(struct xal *xal)
 	return atomic_load(&xal->seq_lock);
 }
 
+const struct xal_sb *
+xal_get_sb(struct xal *xal)
+{
+	return &xal->sb;
+}
+
 uint32_t
 xal_get_sb_blocksize(struct xal *xal)
 {

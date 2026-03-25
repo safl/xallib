@@ -215,6 +215,9 @@ xal_is_dirty(struct xal *xal);
 int
 xal_get_seq_lock(struct xal *xal);
 
+const struct xal_sb *
+xal_get_sb(struct xal *xal);
+
 uint32_t
 xal_get_sb_blocksize(struct xal *xal);
 
