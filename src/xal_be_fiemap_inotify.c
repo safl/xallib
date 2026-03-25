@@ -182,6 +182,7 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 	char path[XAL_PATH_MAXLEN];
 	khiter_t iter;
 	ssize_t len, i;
+	struct stat st;
 	int err;
 
 	inode_map = inotify->inode_map;
@@ -262,6 +263,15 @@ check_events(struct xal *xal, struct xal_inotify *inotify)
 					XAL_DEBUG("FAILED: xal_be_fiemap_process_inode_file(); err(%d)", err);
 					goto failed_with_lock;
 				}
+
+				// Update to new file size
+				err = stat(path, &st);
+				if (err) {
+					XAL_DEBUG("FAILED: stat(%s) errno(%d) while getting new file size", path, errno);
+					err = -errno;
+					goto failed_with_lock;
+				}
+				inode->size = st.st_size;
 
 				XAL_DEBUG("INFO: finished reprocessing inode:");
 				XAL_DEBUG_FCALL(xal_inode_pp, xal, inode);
