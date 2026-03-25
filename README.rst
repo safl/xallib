@@ -70,6 +70,42 @@ In addition, ``dd``` for reading/write, along with ``hexdump`` / ``bless`` for
 inspecting the data, either by accesing a storage device directly, or dumping
 it first.
 
+API Usage
+=========
+
+The typical call sequence is:
+
+1. Open a device handle with ``xnvme_dev_open()``.
+2. Call ``xal_open()`` to read the superblock and AG headers into ``struct xal``.
+3. Call ``xal_dinodes_retrieve()`` to read all inodes from disk.
+4. Call ``xal_index()`` to build the in-memory directory tree rooted at ``xal->root``.
+5. Use ``xal_get_root()``, ``xal_walk()``, ``xal_get_inode()``, ``xal_get_extents()``, etc.
+6. Call ``xal_close()`` and ``xnvme_dev_close()`` when done.
+
+Example::
+
+   struct xnvme_opts xnvme_opts = {0};
+   struct xal_opts opts = { .be = XAL_BACKEND_XFS };
+   struct xnvme_dev *dev;
+   struct xal *xal;
+   int err;
+
+   xnvme_opts_set_defaults(&xnvme_opts);
+   dev = xnvme_dev_open("/dev/nvme0n1", &xnvme_opts);
+
+   err = xal_open(dev, &xal, &opts);
+   err = xal_dinodes_retrieve(xal);
+   err = xal_index(xal);
+
+   xal_walk(xal, xal_get_root(xal), my_callback, NULL);
+
+   xal_close(xal);
+   xnvme_dev_close(dev);
+
+If ``opts.be`` is left as 0, ``xal_open()`` auto-selects the backend: if the
+device URI is found in ``/proc/mounts`` the ``FIEMAP`` backend is chosen,
+otherwise ``XFS`` is used.
+
 Nomenclature
 ============
 
