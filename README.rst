@@ -24,6 +24,31 @@ The library's minimal requirements include:
 The focus is solely on an efficient data-access library, with no interest in
 forensics, recovery, or repair.
 
+Building
+========
+
+Dependencies:
+
+* ``xnvme`` >= 0.7.0 — must be installed and visible to ``pkg-config``
+* ``librt``
+
+The default ``make`` target runs clean, configure, build, and install in one
+shot::
+
+   make
+
+For a debug build::
+
+   BUILD_TYPE=debug make
+
+Individual targets are also available::
+
+   make configure
+   make build
+   make install
+   make test
+
+
 Limits
 ======
 
