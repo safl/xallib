@@ -340,9 +340,6 @@ xal_fsbno_offset(struct xal *xal, uint64_t fsbno);
 int
 xal_inode_path_pp(struct xal *xal, struct xal_inode *inode);
 
-int
-build_inode_path(struct xal_inode *inode, char *buffer);
-
 /**
  * Determine if the given inode is a directory
  *
