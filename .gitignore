@@ -3,6 +3,7 @@
 
 bmap.json
 .vscode
+.claude
 
 # Meson generated files
 meson-logs/
