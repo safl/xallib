@@ -645,16 +645,21 @@ search_by_traversal(struct xal *xal, struct xal_inode *root, char *path, struct 
 		memcpy(component, search_begin, search_len);
 		component[search_len] = '\0';
 
+		XAL_DEBUG("Searching for component(%s)", component);
+
 		child = bsearch(component, xal_inode_at(xal, search->content.dentries.inodes_idx),
 				search->content.dentries.count, sizeof(struct xal_inode), compare_name_to_inode);
 
 		if (!child) {
+			XAL_DEBUG("Component(%s) not found", component);
 			break;
 		}
 
 		if (!search_end) {
+			XAL_DEBUG("Final component(%s) found", component);
 			found = child;
 		} else {
+			XAL_DEBUG("Component(%s) found, continuing", component);
 			search = child;
 			search_begin = search_end + 1;
 			search_end = strchr(search_begin, '/');
