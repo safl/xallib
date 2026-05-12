@@ -694,6 +694,75 @@ search_by_traversal(struct xal *xal, struct xal_inode *root, char *path, struct 
 	return 0;
 }
 
+static int
+build_hashmap_walk(struct xal *xal, struct xal_inode *inode)
+{
+	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
+	khash_t(path_to_inode) *map = be->path_inode_map;
+	khiter_t iter;
+	int err;
+
+	if (inode->namelen > 0) {
+		iter = kh_put(path_to_inode, map, inode->name, &err);
+		if (err < 0) {
+			XAL_DEBUG("FAILED: kh_put(%s); err(%d)", inode->name, err);
+			return -EIO;
+		}
+		kh_value(map, iter) = inode;
+	}
+
+	if (xal_inode_is_dir(inode)) {
+		for (uint32_t i = 0; i < inode->content.dentries.count; i++) {
+			struct xal_inode *child = xal_inode_at(xal, inode->content.dentries.inodes_idx + i);
+
+			err = build_hashmap_walk(xal, child);
+			if (err) {
+				return err;
+			}
+		}
+	}
+
+	return 0;
+}
+
+int
+xal_build_lookup_hashmap(struct xal *xal)
+{
+	struct xal_be_fiemap *be;
+	int err;
+
+	if (!xal) {
+		return -EINVAL;
+	}
+
+	be = (struct xal_be_fiemap *)&xal->be;
+
+	if (be->base.type != XAL_BACKEND_FIEMAP) {
+		XAL_DEBUG("FAILED: xal not opened with backend FIEMAP");
+		return -EINVAL;
+	}
+
+	if (be->path_inode_map) {
+		kh_destroy(path_to_inode, be->path_inode_map);
+	}
+
+	be->path_inode_map = kh_init(path_to_inode);
+	if (!be->path_inode_map) {
+		XAL_DEBUG("FAILED: kh_init()");
+		return -ENOMEM;
+	}
+
+	err = build_hashmap_walk(xal, xal_inode_at(xal, xal->root_idx));
+	if (err) {
+		XAL_DEBUG("FAILED: build_hashmap_walk(); err(%d)", err);
+		kh_destroy(path_to_inode, be->path_inode_map);
+		be->path_inode_map = NULL;
+		return err;
+	}
+
+	return 0;
+}
+
 int
 xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode)
 {
