@@ -395,6 +395,24 @@ int
 xal_get_inode(struct xal *xal, char *path, struct xal_inode **inode);
 
 /**
+ * Build a path-to-inode hash map from the in-memory inode tree.
+ *
+ * Intended for use after xal_open() without opts->file_lookupmode not set to 
+ * XAL_FILE_LOOKUPMODE_HASHMAP, or after xal_from_pools(), where xal_index() is not
+ * called but the caller wants constant-time inode lookup via xal_get_inode(). Walks
+ * the existing tree and populates the hash map locally. Any previously existing
+ * map is replaced.
+ *
+ * Note: xal must use backend FIEMAP.
+ *
+ * @param xal The xal struct
+ *
+ * @returns On success, 0 is returned. On error, negative errno is returned to indicate the error.
+ */
+int
+xal_build_lookup_hashmap(struct xal *xal);
+
+/**
  * Retrieve the extents for the file at the given path.
  * 
  * This will search through the tree at xal->root to find the inode. This call fails if the entry
