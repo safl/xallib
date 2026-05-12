@@ -243,17 +243,17 @@ failed:
 static int
 compare_dirent(const void *a, const void *b)
 {
-	const struct dirent *da = *(const struct dirent **)a;
-	const struct dirent *db = *(const struct dirent **)b;
-	return strcmp(da->d_name, db->d_name);
+	const char *da = *(const char **)a;
+	const char *db = *(const char **)b;
+	return strcmp(da, db);
 }
 
 static int
 xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *inode)
 {
 	struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
-	struct dirent **entries = NULL;
 	struct dirent *entry;
+	char **entries = NULL;
 	DIR *d;
 	size_t n_entries = 0, capacity = 0;
 	int err;
@@ -280,6 +280,8 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 
 	entry = readdir(d);
 	while (entry) {
+		char *name;
+
 		if (!_is_directory_member(entry->d_name)) {
 			entry = readdir(d);
 			continue;
@@ -290,7 +292,14 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 			entries = realloc(entries, capacity * sizeof(*entries));
 		}
 
-		entries[n_entries++] = entry;
+		name = strdup(entry->d_name);
+		if (!name) {
+			XAL_DEBUG("FAILED: strdup(); errno(%d)", errno);
+			err = -ENOMEM;
+			goto exit;
+		}
+
+		entries[n_entries++] = name;
 		entry = readdir(d);
 	}
 
@@ -299,18 +308,18 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 	err = xal_pool_claim_inodes(&xal->inodes, n_entries, &inode->content.dentries.inodes_idx);
 	if (err) {
 		XAL_DEBUG("FAILED: xal_pool_claim_inodes(); err(%d)", err);
-		goto failed;
+		goto exit;
 	}
 	inode->content.dentries.count = 0;
 
 	/* Actually process directory entries */
 	for (size_t i = 0; i < n_entries; i++) {
-		entry = entries[i];
+		char *entry_name = entries[i];
 
 		struct xal_inode *dentry = xal_inode_at(xal, inode->content.dentries.inodes_idx + inode->content.dentries.count);
 
-		char dentry_path[strlen(path) + 1 + strlen(entry->d_name) + 1];
-		snprintf(dentry_path, sizeof(dentry_path), "%s/%s", path, entry->d_name);
+		char dentry_path[strlen(path) + 1 + strlen(entry_name) + 1];
+		snprintf(dentry_path, sizeof(dentry_path), "%s/%s", path, entry_name);
 
 		strcpy(dentry->name, dentry_path);
 		dentry->namelen = strlen(dentry->name);
@@ -321,7 +330,7 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 		err = process_ino_fiemap(xal, dentry_path, dentry);
 		if (err) {
 			XAL_DEBUG("FAILED: process_ino_fiemap(); with path(%s)", dentry_path);
-			goto failed;
+			goto exit;
 		}
 	}
 
@@ -332,19 +341,19 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 		iter = kh_put(path_to_inode, map, inode->name, &err);
 		if (err < 0) {
 			XAL_DEBUG("FAILED: kh_put(); err(%d)", err);
-			return -EIO;
+			err = -EIO;
+			goto exit;
 		}
+
 		kh_value(map, iter) = inode;
+		err = 0;
 	}
 
+exit:
 	closedir(d);
-	free(entries);
 
-	return 0;
-
-failed:
-	if (d) {
-		closedir(d);
+	for (size_t i = 0; i < n_entries; i++) {
+		free(entries[i]);
 	}
 	free(entries);
 
