@@ -145,6 +145,7 @@ xal_be_fiemap_open(struct xal **xal, char *mountpoint, struct xal_opts *opts)
 	}
 
 	cand->root_idx = XAL_POOL_IDX_NONE;
+	cand->dirty = &cand->_dirty_storage;
 
 	be = (struct xal_be_fiemap *)&cand->be;
 
@@ -600,7 +601,7 @@ xal_be_fiemap_index(struct xal *xal)
 		goto exit;
 	}
 
-	atomic_store(&xal->dirty, false);
+	atomic_store(xal->dirty, false);
 
 exit:
 	atomic_fetch_add(&xal->seq_lock, 1);

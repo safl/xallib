@@ -320,7 +320,7 @@ background_thread_start(void *arg)
 	}
 
 	while (1) {
-		if (atomic_load(&xal->dirty)) {
+		if (atomic_load(xal->dirty)) {
 			continue;
 		}
 
@@ -332,7 +332,7 @@ background_thread_start(void *arg)
 
 		if (err) {
 			XAL_DEBUG("INFO: Found breaking changes, setting xal->dirty to true");
-			atomic_store(&xal->dirty, true);
+			atomic_store(xal->dirty, true);
 			if (be->inotify->cb) {
 				be->inotify->cb(xal, be->inotify->cb_args);
 			}

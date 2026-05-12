@@ -31,7 +31,8 @@ struct xal {
 	uint32_t root_idx;       ///< Index of the root inode in the inodes pool
 	struct xal_sb sb;
 	uint8_t be[XAL_BACKEND_SIZE];
-	atomic_bool dirty;       ///< Whether the file system has changed since last index
+	atomic_bool *dirty;      ///< Whether the file system has changed since last index; may point to external shared memory
+	atomic_bool _dirty_storage; ///< Backing store for dirty when no external pointer is provided
 	atomic_int seq_lock;     ///< An uneven number indicates the struct is being modified and is not safe to read
 	bool shared_view;        ///< If true, pool memory is owned externally; xal_close() will not unmap it
 };

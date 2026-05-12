@@ -258,13 +258,15 @@ xal_close(struct xal *xal);
  * @param mountpoint   Mountpoint of the file system
  * @param inodes_mem   Pointer to the mapped inode pool memory; the root inode must be at index 0
  * @param extents_mem  Pointer to the mapped extent pool memory
+ * @param dirty        Pointer to an atomic bool in shared memory used as the dirty flag; typically
+ *                     the mapping of the {shm_name}_dirty region created by the producer
  * @param out          Output pointer for the constructed xal
  *
  * @return On success, 0. On error, negative errno.
  */
 int
 xal_from_pools(const struct xal_sb *sb, const char *mountpoint, void *inodes_mem,
-	void *extents_mem, struct xal **out);
+	void *extents_mem, _Atomic bool *dirty, struct xal **out);
 
 /**
  * Retrieve inodes from disk and decode the on-disk-format of the retrieved data

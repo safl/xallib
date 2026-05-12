@@ -651,6 +651,7 @@ retrieve_and_decode_primary_superblock(struct xnvme_dev *dev, void *buf, struct 
 	}
 
 	cand->root_idx = XAL_POOL_IDX_NONE;
+	cand->dirty = &cand->_dirty_storage;
 
 	be = (struct xal_be_xfs *)&cand->be;
 
@@ -1724,7 +1725,7 @@ xal_be_xfs_index(struct xal *xal)
 		return err;
 	}
 
-	atomic_store(&xal->dirty, false);
+	atomic_store(xal->dirty, false);
 
 	return err;
 }
