@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <xal.h>
@@ -70,7 +71,7 @@ xal_inode_idx(struct xal *xal, struct xal_inode *inode)
 
 int
 xal_from_pools(const struct xal_sb *sb, const char *mountpoint, void *inodes_mem,
-	void *extents_mem, struct xal **out)
+	void *extents_mem, _Atomic bool *dirty, struct xal **out)
 {
 	struct xal *xal;
 
@@ -79,9 +80,15 @@ xal_from_pools(const struct xal_sb *sb, const char *mountpoint, void *inodes_mem
 		return -ENOMEM;
 	}
 
+	if (!dirty) {
+		free(xal);
+		return -EINVAL;
+	}
+
 	xal->sb = *sb;
 	xal->root_idx = 0;
 	xal->shared_view = true;
+	xal->dirty = dirty;
 
 	if (mountpoint) {
 		struct xal_be_fiemap *be = (struct xal_be_fiemap *)&xal->be;
@@ -125,6 +132,10 @@ xal_close(struct xal *xal)
 
 	xal_pool_unmap(&xal->inodes);
 	xal_pool_unmap(&xal->extents);
+
+	if (xal->dirty != &xal->_dirty_storage) {
+		munmap(xal->dirty, sizeof(atomic_bool));
+	}
 
 	be = (struct xal_backend_base *)&xal->be;
 	if (be->close) {
@@ -235,6 +246,39 @@ xal_open(struct xnvme_dev *dev, struct xal **xal, struct xal_opts *opts)
 
 	(*xal)->dev = dev;
 
+	if (opts->shm_name) {
+		char shm_name[XAL_PATH_MAXLEN + 9];
+		int fd;
+		void *mem;
+
+		snprintf(shm_name, sizeof(shm_name), "%s_dirty", opts->shm_name);
+
+		fd = shm_open(shm_name, O_CREAT | O_RDWR, 0666);
+		if (fd < 0) {
+			XAL_DEBUG("FAILED: shm_open(%s); errno(%d)", shm_name, errno);
+			xal_close(*xal);
+			return -errno;
+		}
+
+		err = ftruncate(fd, sizeof(atomic_bool));
+		if (err) {
+			XAL_DEBUG("FAILED: ftruncate(); errno(%d)", errno);
+			close(fd);
+			xal_close(*xal);
+			return -errno;
+		}
+
+		mem = mmap(NULL, sizeof(atomic_bool), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+		close(fd);
+		if (mem == MAP_FAILED) {
+			XAL_DEBUG("FAILED: mmap(); errno(%d)", errno);
+			xal_close(*xal);
+			return -errno;
+		}
+
+		(*xal)->dirty = mem;
+	}
+
 	ns = xnvme_dev_get_ns(dev);
 	if (!ns) {
 		err = -errno;
@@ -269,7 +313,7 @@ _walk(struct xal *xal, struct xal_inode *inode, xal_walk_cb cb_func, void *cb_da
 {
 	int err;
 
-	if (atomic_load(&xal->dirty)) {
+	if (atomic_load(xal->dirty)) {
 		XAL_DEBUG("FAILED: File system has changed");
 		return -ESTALE;
 	}
@@ -319,7 +363,7 @@ xal_get_root(struct xal *xal)
 bool
 xal_is_dirty(struct xal *xal)
 {
-	return atomic_load(&xal->dirty);
+	return atomic_load(xal->dirty);
 }
 
 int
