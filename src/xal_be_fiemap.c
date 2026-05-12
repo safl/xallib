@@ -288,8 +288,17 @@ xal_be_fiemap_process_inode_dir(struct xal *xal, char *path, struct xal_inode *i
 		}
 
 		if (n_entries == capacity) {
+			char **tmp;
+
 			capacity = capacity ? capacity * 2 : 64;
-			entries = realloc(entries, capacity * sizeof(*entries));
+
+			tmp = realloc(entries, capacity * sizeof(*entries));
+			if (!tmp) {
+				XAL_DEBUG("FAILED: realloc(); errno(%d)", errno);
+				err = -ENOMEM;
+				goto exit;
+			}
+			entries = tmp;
 		}
 
 		name = strdup(entry->d_name);
